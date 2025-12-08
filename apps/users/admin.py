@@ -1,3 +1,89 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.utils.translation import gettext_lazy as _
 
-# Register your models here.
+from .models import User
+
+
+@admin.register(User)
+class UserAdmin(BaseUserAdmin):
+    """Admin interface for custom User model."""
+    
+    # Display configuration
+    list_display = [
+        'username', 'email', 'full_name', 'role', 'status', 'is_staff', 
+        'is_active', 'tenant', 'workspace_id', 'created', 'last_login_at'
+    ]
+    list_filter = [
+        'role', 'status', 'is_staff', 'is_superuser', 'is_active', 'tenant',
+        'must_change_password', 'groups', 'created'
+    ]
+    search_fields = ['username', 'email', 'full_name', 'phone', 'tenant__name', 'workspace_id']
+    ordering = ['-created']
+    readonly_fields = ['created', 'modified', 'last_login_at', 'last_login', 'date_joined', 'is_removed']
+    
+    # Fieldsets for detail view
+    fieldsets = (
+        (None, {
+            'fields': ('username', 'email', 'password')
+        }),
+        (_('Personal Info'), {
+            'fields': ('full_name', 'first_name', 'last_name', 'phone', 'avatar')
+        }),
+        (_('Workspace'), {
+            'fields': ('workspace_id',)
+        }),
+        (_('Role & Status'), {
+            'fields': ('role', 'status', 'is_active', 'must_change_password')
+        }),
+        (_('Permissions'), {
+            'fields': ('is_staff', 'is_superuser', 'groups', 'user_permissions'),
+            'classes': ('collapse',)
+        }),
+        (_('Important Dates'), {
+            'fields': ('last_login', 'last_login_at', 'date_joined', 'created', 'modified'),
+            'classes': ('collapse',)
+        }),
+        (_('Audit'), {
+            'fields': ('created_by', 'is_removed'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    # Fieldsets for add view
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'email', 'password1', 'password2'),
+        }),
+        (_('Personal Info'), {
+            'fields': ('full_name', 'phone')
+        }),
+        (_('Workspace & Tenant'), {
+            'fields': ('tenant', 'workspace_id')
+        }),
+        (_('Role & Status'), {
+            'fields': ('role', 'status', 'is_active', 'is_staff', 'is_superuser')
+        }),
+    )
+    
+    # Actions
+    actions = ['activate_users', 'deactivate_users', 'suspend_users']
+    
+    def activate_users(self, request, queryset):
+        """Bulk activate selected users."""
+        updated = queryset.update(status='active', is_active=True)
+        self.message_user(request, f'{updated} user(s) activated successfully.')
+    activate_users.short_description = _('Activate selected users')
+    
+    def deactivate_users(self, request, queryset):
+        """Bulk deactivate selected users."""
+        updated = queryset.update(status='inactive', is_active=False)
+        self.message_user(request, f'{updated} user(s) deactivated successfully.')
+    deactivate_users.short_description = _('Deactivate selected users')
+    
+    def suspend_users(self, request, queryset):
+        """Bulk suspend selected users."""
+        updated = queryset.update(status='suspended', is_active=False)
+        self.message_user(request, f'{updated} user(s) suspended successfully.')
+    suspend_users.short_description = _('Suspend selected users')

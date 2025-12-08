@@ -14,6 +14,7 @@ LOGOUT_REDIRECT_URL = "/accounts/login/"
 
 # JWT Settings
 from datetime import timedelta
+from django.conf import settings
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
@@ -22,7 +23,7 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
     'ALGORITHM': 'HS256',
-    'SIGNING_KEY': None,  # Will use SECRET_KEY automatically
+    'SIGNING_KEY': settings.SECRET_KEY,
     'VERIFYING_KEY': None,
     'AUDIENCE': None,
     'ISSUER': None,

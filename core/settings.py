@@ -31,6 +31,7 @@ ALLOWED_HOSTS = []
 # Application definition
 from core.configuration.apps import PRELOAD_APPS, THIRD_PARTY_APPS, LOCAL_APPS
 from core.configuration.rest import REST_FRAMEWORK, SPECTACULAR_SETTINGS
+from core.configuration.auth import SIMPLE_JWT, AUTHENTICATION_BACKENDS, SITE_ID
 
 INSTALLED_APPS = PRELOAD_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -113,5 +114,9 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Custom User Model
+# https://docs.djangoproject.com/en/6.0/topics/auth/customizing/#substituting-a-custom-user-model
+
+AUTH_USER_MODEL = 'users.User'
 # Site ID for django.contrib.sites (required by django-allauth)
 from core.configuration.auth import SITE_ID
