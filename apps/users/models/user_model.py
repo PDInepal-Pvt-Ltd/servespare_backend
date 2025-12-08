@@ -21,6 +21,7 @@ class User(AbstractUser, BaseModel):
     class Role(models.TextChoices):
         SUPER_ADMIN = 'super_admin', _('Super Admin')
         ADMIN = 'admin', _('Admin')
+        SUB_ADMIN = 'sub_admin', _('Sub_Admin')
         CASHIER = 'cashier', _('Cashier')
         INVENTORY_MANAGER = 'inventory_manager', _('Inventory Manager')
     
@@ -80,7 +81,7 @@ class User(AbstractUser, BaseModel):
     
     must_change_password = models.BooleanField(
         _('must change password'),
-        default=False,
+        default=True,
         help_text=_('Indicates if the user must change their password on next login.')
     )
     
@@ -110,6 +111,17 @@ class User(AbstractUser, BaseModel):
         help_text=_('Workspace identifier for multi-tenancy.')
     )
     
+    tenant = models.ForeignKey(
+        'tenant.Tenant',
+        on_delete=models.CASCADE,
+        related_name='users',
+        null=True,
+        blank=True,
+        db_column='tenant_id',
+        verbose_name=_('tenant'),
+        help_text=_('Tenant organization this user belongs to.')
+    )
+    
     created_by = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
@@ -134,12 +146,6 @@ class User(AbstractUser, BaseModel):
             models.Index(fields=['status', 'is_active'], name='users_status_active_idx'),
             models.Index(fields=['workspace_id', 'status'], name='users_workspace_status_idx'),
             models.Index(fields=['created'], name='users_created_idx'),
-        ]
-        constraints = [
-            models.CheckConstraint(
-                check=models.Q(status__in=['active', 'inactive', 'suspended']),
-                name='valid_status',
-            ),
         ]
     
     def __str__(self):

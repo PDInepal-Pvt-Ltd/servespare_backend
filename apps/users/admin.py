@@ -12,15 +12,15 @@ class UserAdmin(BaseUserAdmin):
     # Display configuration
     list_display = [
         'username', 'email', 'full_name', 'role', 'status', 'is_staff', 
-        'is_active', 'workspace_id', 'created', 'last_login_at'
+        'is_active', 'tenant', 'workspace_id', 'created', 'last_login_at'
     ]
     list_filter = [
-        'role', 'status', 'is_staff', 'is_superuser', 'is_active', 
+        'role', 'status', 'is_staff', 'is_superuser', 'is_active', 'tenant',
         'must_change_password', 'groups', 'created'
     ]
-    search_fields = ['username', 'email', 'full_name', 'phone', 'workspace_id']
+    search_fields = ['username', 'email', 'full_name', 'phone', 'tenant__name', 'workspace_id']
     ordering = ['-created']
-    readonly_fields = ['created', 'modified', 'last_login_at', 'last_login', 'date_joined']
+    readonly_fields = ['created', 'modified', 'last_login_at', 'last_login', 'date_joined', 'is_removed']
     
     # Fieldsets for detail view
     fieldsets = (
@@ -45,7 +45,7 @@ class UserAdmin(BaseUserAdmin):
             'classes': ('collapse',)
         }),
         (_('Audit'), {
-            'fields': ('created_by', 'is_removed', 'removed'),
+            'fields': ('created_by', 'is_removed'),
             'classes': ('collapse',)
         }),
     )
@@ -59,8 +59,8 @@ class UserAdmin(BaseUserAdmin):
         (_('Personal Info'), {
             'fields': ('full_name', 'phone')
         }),
-        (_('Workspace'), {
-            'fields': ('workspace_id',)
+        (_('Workspace & Tenant'), {
+            'fields': ('tenant', 'workspace_id')
         }),
         (_('Role & Status'), {
             'fields': ('role', 'status', 'is_active', 'is_staff', 'is_superuser')

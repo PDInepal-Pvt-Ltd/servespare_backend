@@ -15,7 +15,7 @@ class UserListSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'full_name', 'role', 'role_display',
-            'status', 'status_display', 'is_active', 'workspace_id',
+            'status', 'status_display', 'is_active', 'tenant', 'workspace_id',
             'created', 'last_login_at'
         ]
         read_only_fields = ['id', 'created', 'last_login_at']
@@ -33,7 +33,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'full_name', 'first_name', 'last_name',
-            'phone', 'avatar', 'workspace_id',
+            'phone', 'avatar', 'tenant', 'workspace_id',
             'role', 'role_display', 'status', 'status_display',
             'is_active', 'is_staff', 'is_superuser',
             'must_change_password',
@@ -43,7 +43,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'last_login', 'last_login_at', 'date_joined',
-            'created', 'modified', 'is_removed', 'removed'
+            'created', 'modified', 'is_removed'
         ]
     
     def get_groups_list(self, obj):
@@ -75,7 +75,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         fields = [
             'username', 'email', 'password', 'password_confirm',
             'full_name', 'first_name', 'last_name', 'phone',
-            'avatar', 'workspace_id',
+            'avatar', 'tenant', 'workspace_id',
             'role', 'status', 'is_active', 'created_by'
         ]
         extra_kwargs = {
@@ -110,7 +110,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'email', 'full_name', 'first_name', 'last_name', 'phone',
-            'avatar', 'workspace_id',
+            'avatar', 'tenant', 'workspace_id',
             'role', 'status', 'is_active', 'is_staff',
             'must_change_password'
         ]
@@ -201,7 +201,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'full_name', 'first_name', 'last_name',
-            'phone', 'avatar', 'workspace_id',
+            'phone', 'avatar', 'tenant', 'workspace_id',
             'role', 'role_display', 'status', 'status_display',
             'must_change_password',
             'last_login_at', 'date_joined', 'created'
@@ -219,7 +219,7 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'email', 'full_name', 'first_name', 'last_name',
-            'phone', 'avatar'
+            'phone', 'avatar', 'tenant'
         ]
 
 

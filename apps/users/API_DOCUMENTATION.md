@@ -218,7 +218,6 @@ GET /api/users/?role=admin&status=active&search=john&ordering=-created
   "last_name": "Doe",
   "phone": "+1234567890",
   "avatar": "https://example.com/avatar.jpg",
-  "business_name": "John's Business",
   "workspace_id": "ws_123",
   "role": "admin",
   "role_display": "Admin",

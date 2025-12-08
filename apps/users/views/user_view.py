@@ -94,7 +94,7 @@ class UserViewSet(viewsets.ModelViewSet):
     """
     
     queryset = User.objects.filter(is_removed=False)
-    filterset_fields = ['role', 'status', 'is_active', 'workspace_id', 'is_staff']
+    filterset_fields = ['role', 'status', 'is_active', 'tenant', 'workspace_id', 'is_staff']
     search_fields = ['username', 'email', 'full_name', 'phone']
     ordering_fields = ['created', 'username', 'email', 'last_login_at']
     ordering = ['-created']
@@ -143,8 +143,7 @@ class UserViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         """Soft delete user."""
         instance.is_removed = True
-        instance.removed = timezone.now()
-        instance.save(update_fields=['is_removed', 'removed', 'modified'])
+        instance.save(update_fields=['is_removed', 'modified'])
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
@@ -308,7 +307,7 @@ class UserViewSet(viewsets.ModelViewSet):
             users.update(status=User.Status.SUSPENDED, is_active=False)
             message = f'{count} user(s) suspended successfully.'
         elif action_type == 'delete':
-            users.update(is_removed=True, removed=timezone.now())
+            users.update(is_removed=True)
             message = f'{count} user(s) deleted successfully.'
         
         return Response({'message': message}, status=status.HTTP_200_OK)
@@ -365,16 +364,9 @@ class AuthViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         
-        # Generate JWT tokens
-        refresh = RefreshToken.for_user(user)
-        
         return Response({
             'message': 'User registered successfully.',
             'user': UserProfileSerializer(user).data,
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }
         }, status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['post'])
