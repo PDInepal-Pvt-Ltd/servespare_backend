@@ -118,3 +118,5 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/6.0/topics/auth/customizing/#substituting-a-custom-user-model
 
 AUTH_USER_MODEL = 'users.User'
+# Site ID for django.contrib.sites (required by django-allauth)
+from core.configuration.auth import SITE_ID
