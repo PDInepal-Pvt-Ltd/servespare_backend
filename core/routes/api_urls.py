@@ -23,6 +23,7 @@ urlpatterns = [
     # Other apps
     path('subscription/', include('apps.subscription.urls')),
     path('stock-management/', include('apps.stock_management.urls')),
+    path('tenant/', include('apps.tenant.urls')),
 ]
     
 
