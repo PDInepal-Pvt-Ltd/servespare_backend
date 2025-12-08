@@ -9,6 +9,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 
+from apps.base.pagination import StandardResultsSetPagination
 from apps.users.models import User
 from apps.users.serializers import (
     UserListSerializer,
@@ -100,6 +101,7 @@ class UserViewSet(viewsets.ModelViewSet):
     ordering = ['-created']
     
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    pagination_class = StandardResultsSetPagination
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""
@@ -458,7 +460,7 @@ class AuthViewSet(viewsets.GenericViewSet):
                 {'message': 'Logout successful.'},
                 status=status.HTTP_200_OK
             )
-        except Exception as e:
+        except Exception:
             return Response(
                 {'error': 'Invalid token or token already blacklisted.'},
                 status=status.HTTP_400_BAD_REQUEST
