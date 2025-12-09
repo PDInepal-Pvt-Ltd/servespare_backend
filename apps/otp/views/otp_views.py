@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from apps.otp.throttling import OTPResendRateThrottle
 from apps.users.models import User
 from django.db.models import Q
-from apps.otp.serializers import RecoveryRequestSerializer
+from apps.otp.serializers import RecoveryRequestSerializer, OTPVerificationSerializer
 from apps.otp.utils import generate_and_save_otp, send_otp_email
 from apps.users.tokens import create_recovery_token
 from apps.otp.models import OTP
@@ -53,43 +53,42 @@ class VerifyOtpViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="verify")
     def verify_otp(self, request):
-        code = request.data.get("otp")
+        serializer = OTPVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        if not code:
+        identifier = serializer.validated_data["identifier"]
+        code = serializer.validated_data["otp"]
+
+        try:
+            user = User.objects.get(Q(username=identifier) | Q(email=identifier))
+        except User.DoesNotExist:
             return Response(
-                {"error": "OTP code required."}, 
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Invalid or expired code."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Look up OTP by code and infer the user from the OTP record
-        otp = OTP.objects.filter(code=code).order_by("-created_at").first()
+        otp = OTP.objects.filter(user=user, code=code).first()
         if not otp:
             return Response(
-                {"error": "Invalid or expired code."}, 
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Invalid or expired code."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check if OTP is expired
         if not otp.is_valid():
             otp.delete()
             return Response(
                 {"error": "Invalid or expired code."},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = otp.user
-
-        # Clean up the used OTP immediately
         otp.delete()
 
-        # Generate secure JWT token for password reset
         token_data = create_recovery_token(
             user=user,
             purpose='password_reset',
             expires_in=15  # 15 minutes
         )
 
-        # Return the token (client should use token_data["access"] as Bearer token)
         return Response(
             {
                 "message": "OTP verified successfully. Use the token to reset your password.",

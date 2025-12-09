@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -121,17 +122,16 @@ AUTH_USER_MODEL = 'users.User'
 # Site ID for django.contrib.sites (required by django-allauth)
 from core.configuration.auth import SITE_ID
 
-# Email Configuration
-# For development, using console backend (prints emails to console)
-# For production, configure SMTP settings
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'noreply@serveiq.com'
+# Email configuration
+# If SMTP creds are missing while DEBUG is True, fall back to console backend so emails are visible during development.
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@serveiq.com')
 
-# For production SMTP (Gmail example):
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.gmail.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'your-email@gmail.com'
-# EMAIL_HOST_PASSWORD = 'your-app-password'  # Use app password, not regular password
-# DEFAULT_FROM_EMAIL = 'noreply@serveiq.com'
+if DEBUG and (not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD):
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

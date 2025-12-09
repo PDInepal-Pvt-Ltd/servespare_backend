@@ -3,9 +3,13 @@ from apps.otp.models import OTP
 
 class OTPVerificationSerializer(serializers.Serializer):
     """Serializer for verifying the OTP code submitted by the user."""
+    identifier = serializers.CharField(
+        required=True,
+        help_text="Enter your username or email address."
+    )
     otp = serializers.CharField(
-        max_length=6, 
-        min_length=6, 
+        max_length=6,
+        min_length=6,
         write_only=True,
         error_messages={'min_length': 'OTP must be 6 digits.', 'max_length': 'OTP must be 6 digits.'}
     )

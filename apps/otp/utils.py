@@ -41,11 +41,12 @@ def send_otp_email(user, otp_code):
     try:
         current_site = Site.objects.get_current()
         domain = current_site.domain
-        # Use HTTPS if SECURE_SSL_REDIRECT is True, otherwise HTTP (for local)
         protocol = 'https' if getattr(settings, 'SECURE_SSL_REDIRECT', False) else 'http'
     except Exception as e:
-        print(f"Failed to get site domain. Check if django.contrib.sites is installed and configured. Error: {e}")
-        return False
+        # Fall back to localhost instead of aborting so email still sends
+        print(f"Failed to get site domain; using localhost fallback. Error: {e}")
+        domain = 'localhost:8000'
+        protocol = 'http'
 
     # 1. Define the context for the template
     context = {

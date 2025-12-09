@@ -535,6 +535,23 @@ class AuthViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # If user must change password, do not issue JWT tokens; return guidance only
+        if user.must_change_password:
+            return Response({
+                'message': 'User must change password.',
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'full_name': user.full_name,
+                    'role': user.role,
+                    'role_display': user.get_role_display(),
+                    'status': user.status,
+                    'workspace_id': user.workspace_id,
+                    'must_change_password': user.must_change_password,
+                }
+            }, status=status.HTTP_200_OK)
+
         # Update last login
         user.update_last_login()
         
