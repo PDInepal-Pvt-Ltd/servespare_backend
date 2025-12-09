@@ -31,8 +31,7 @@ urlpatterns = [
     path('stock-management/', include('apps.stock_management.urls')),
     path('tenant/', include('apps.tenant.urls')),
     path('sales/', include('apps.sales.urls')),
-    # DRF Spectacular schema and Redoc docs
-
+    path('cash-and-bank/', include('apps.cashandbank.urls')),
 ]
     
 
