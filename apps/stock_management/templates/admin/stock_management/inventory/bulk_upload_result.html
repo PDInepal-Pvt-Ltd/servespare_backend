@@ -1,0 +1,212 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; <a href="{% url 'admin:stock_management_inventory_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; <a href="{% url 'admin:stock_management_inventory_bulk_upload' %}">{% trans 'Bulk Upload' %}</a>
+&rsaquo; {% trans 'Results' %}
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>Bulk Upload Results</h1>
+
+<div class="module">
+    <h2>Summary</h2>
+    <table>
+        <tr>
+            <th>Total Rows</th>
+            <td>{{ result.total_rows }}</td>
+        </tr>
+        <tr>
+            <th>Successful</th>
+            <td style="color: green; font-weight: bold;">{{ result.successful }}</td>
+        </tr>
+        <tr>
+            <th>Failed</th>
+            <td style="color: red; font-weight: bold;">{{ result.failed }}</td>
+        </tr>
+    </table>
+</div>
+
+{% if result.successful_imports %}
+<div class="module">
+    <h2 style="color: green;">Successfully Imported Items ({{ result.successful }})</h2>
+    <table class="results-table">
+        <thead>
+            <tr>
+                <th>Row</th>
+                <th>ID</th>
+                <th>Item Name</th>
+                <th>Part Number</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in result.successful_imports %}
+            <tr>
+                <td>{{ item.row }}</td>
+                <td><a href="{% url 'admin:stock_management_inventory_change' item.id %}">{{ item.id }}</a></td>
+                <td>{{ item.item_name }}</td>
+                <td>{{ item.part_number }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if result.failed_imports %}
+<div class="module">
+    <h2 style="color: red;">Failed Imports ({{ result.failed }})</h2>
+    {% for failed in result.failed_imports %}
+    <div class="failed-item">
+        <h3>Row {{ failed.row }}</h3>
+        <div class="errors">
+            <strong>Errors:</strong>
+            <ul>
+                {% if failed.errors|length > 0 %}
+                    {% if failed.errors|first|length > 0 %}
+                        {% for error in failed.errors %}
+                            {% if error|length > 0 %}
+                                <li>{{ error }}</li>
+                            {% else %}
+                                {% for key, value in error.items %}
+                                    <li><strong>{{ key }}:</strong> {{ value|join:", " }}</li>
+                                {% endfor %}
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        {% for key, value in failed.errors.items %}
+                            <li><strong>{{ key }}:</strong> {{ value|join:", " }}</li>
+                        {% endfor %}
+                    {% endif %}
+                {% else %}
+                    <li>Unknown error occurred</li>
+                {% endif %}
+            </ul>
+        </div>
+        {% if failed.data %}
+        <div class="data">
+            <strong>Data:</strong>
+            <pre>{{ failed.data|pprint }}</pre>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="submit-row">
+    <a href="{% url 'admin:stock_management_inventory_bulk_upload' %}" class="button">Upload Another File</a>
+    <a href="{% url 'admin:stock_management_inventory_changelist' %}" class="button default">Back to Inventory List</a>
+</div>
+
+<style>
+.module {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 20px 0;
+}
+
+.module h2 {
+    margin-top: 0;
+    color: #417690;
+}
+
+.module table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+}
+
+.module table th,
+.module table td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.module table th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.results-table thead {
+    background-color: #f5f5f5;
+}
+
+.results-table th,
+.results-table td {
+    padding: 8px;
+    text-align: left;
+    border: 1px solid #ddd;
+}
+
+.results-table tbody tr:hover {
+    background-color: #f9f9f9;
+}
+
+.failed-item {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.failed-item h3 {
+    margin-top: 0;
+    color: #856404;
+}
+
+.errors {
+    margin: 10px 0;
+}
+
+.errors ul {
+    margin: 5px 0;
+    padding-left: 20px;
+}
+
+.errors li {
+    color: #dc3545;
+    margin: 3px 0;
+}
+
+.data {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.data pre {
+    margin: 5px 0;
+    font-size: 12px;
+    overflow-x: auto;
+}
+
+.submit-row {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+}
+
+.submit-row .button {
+    margin-right: 10px;
+}
+</style>
+{% endblock %}
+
