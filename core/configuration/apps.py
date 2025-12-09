@@ -29,6 +29,7 @@ LOCAL_APPS = [
     'apps.subscription',
     'apps.tenant',
     'apps.stock_management',
+    'apps.sales'
 #     'apps.subscription_plan',
 #     'apps.properties',
 #     'apps.hotel.apps.HotelConfig',

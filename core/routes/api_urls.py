@@ -24,6 +24,7 @@ urlpatterns = [
     path('subscription/', include('apps.subscription.urls')),
     path('stock-management/', include('apps.stock_management.urls')),
     path('tenant/', include('apps.tenant.urls')),
+    path('sales/', include('apps.sales.urls')),
 ]
     
 

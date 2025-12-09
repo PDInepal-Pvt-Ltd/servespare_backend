@@ -14,7 +14,7 @@ class User(AbstractUser, BaseModel):
     Uses role field for role management with Groups sync.
     Inherits from BaseModel for timestamps and soft delete functionality.
     
-    Roles available: Super Admin, Admin, Cashier, Inventory Manager
+    Roles available: Super Admin, Admin, Sub Admin, Cashier, Inventory Manager, Customer
     """
     
     # Role choices
@@ -24,6 +24,7 @@ class User(AbstractUser, BaseModel):
         SUB_ADMIN = 'sub_admin', _('Sub_Admin')
         CASHIER = 'cashier', _('Cashier')
         INVENTORY_MANAGER = 'inventory_manager', _('Inventory Manager')
+        CUSTOMER = 'customer', _('Customer')
     
     # Status choices
     class Status(models.TextChoices):
@@ -216,6 +217,10 @@ class User(AbstractUser, BaseModel):
         """Check if user is an Inventory Manager."""
         return self.role == self.Role.INVENTORY_MANAGER
     
+    def is_customer(self):
+        """Check if user is a Customer."""
+        return self.role == self.Role.CUSTOMER
+    
     def set_role(self, role_value):
         """Set user role and sync with corresponding group."""
         if role_value in [choice[0] for choice in self.Role.choices]:
@@ -236,8 +241,14 @@ class User(AbstractUser, BaseModel):
         self.groups.add(group)
     
     def save(self, *args, **kwargs):
-        """Override save to sync role with groups."""
+        """Override save to sync role with groups and handle customer-specific behavior."""
         is_new = self.pk is None
+        
+        # Handle customer role specific behavior
+        if self.role == self.Role.CUSTOMER:
+            self.must_change_password = False
+            self.tenant = None
+        
         super().save(*args, **kwargs)
         
         # Sync role to group after save
@@ -281,6 +292,13 @@ def create_user_groups(sender, **kwargs):
                 'permissions': [
                     ('view_user', 'users', 'user'),  # Can view users
                     # Add more inventory-specific permissions here
+                ]
+            },
+            'Customer': {
+                'description': 'Customer account with basic access',
+                'permissions': [
+                    ('view_user', 'users', 'user'),  # Can view their own user
+                    # Add more customer-specific permissions here
                 ]
             },
         }
