@@ -20,21 +20,21 @@ THIRD_PARTY_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'django_filters',
     'drf_spectacular',
-
 ]
 
 LOCAL_APPS = [
     'apps.base',
     'apps.users',
+    'apps.otp',
     'apps.subscription',
     'apps.tenant',
     'apps.stock_management',
-    'apps.sales'
+    'apps.sales',
+    'apps.cashandbank',
 #     'apps.subscription_plan',
 #     'apps.properties',
 #     'apps.hotel.apps.HotelConfig',
 #     'apps.resturant.apps.RestaurantConfig',
-#     'apps.otp',
 #     'apps.accounts',
 #     'apps.support_and_ticket',
 #     'apps.global_announcement.apps.GlobalAnnouncementConfig',

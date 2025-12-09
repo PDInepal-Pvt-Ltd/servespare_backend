@@ -3,6 +3,10 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from apps.users.models import User
+from apps.users.utils import (
+    send_password_change_notification_email,
+    send_welcome_credentials_email,
+)
 
 
 class UserListSerializer(serializers.ModelSerializer):
@@ -92,13 +96,24 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return attrs
     
     def create(self, validated_data):
-        """Create user with hashed password."""
+        """Create user with hashed password and send welcome email."""
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
+        
+        # Set must_change_password to True for non-customer users
+        role = validated_data.get('role', User.Role.CASHIER)
+        if role != User.Role.CUSTOMER:
+            validated_data['must_change_password'] = True
+        else:
+            validated_data['must_change_password'] = False
         
         user = User(**validated_data)
         user.set_password(password)
         user.save()
+        
+        # Send welcome email with credentials (not for customers)
+        if user.role != User.Role.CUSTOMER and user.email:
+            send_welcome_credentials_email(user, password)
         
         return user
 
@@ -169,6 +184,7 @@ class ChangePasswordSerializer(serializers.Serializer):
         user.set_password(self.validated_data['new_password'])
         user.must_change_password = False
         user.save(update_fields=['password', 'must_change_password', 'modified'])
+        send_password_change_notification_email(user)
         return user
 
 
@@ -188,6 +204,63 @@ class ResetPasswordSerializer(serializers.Serializer):
         user.set_password(self.validated_data['new_password'])
         user.must_change_password = self.validated_data['must_change_password']
         user.save(update_fields=['password', 'must_change_password', 'modified'])
+        return user
+
+
+class FirstTimePasswordChangeSerializer(serializers.Serializer):
+    """Serializer for first-time password change using JWT authentication.
+    
+    This endpoint is used for:
+    1. First-time login password change (after receiving credentials email)
+    2. Password recovery after OTP verification
+    
+    User must be authenticated via JWT token (from OTP verification or initial login attempt).
+    """
+    
+    new_password = serializers.CharField(
+        required=True,
+        write_only=True,
+        validators=[validate_password],
+        style={'input_type': 'password'}
+    )
+    new_password_confirm = serializers.CharField(
+        required=True,
+        write_only=True,
+        style={'input_type': 'password'}
+    )
+    
+    def validate(self, attrs):
+        """Validate passwords."""
+        # Check if new passwords match
+        if attrs['new_password'] != attrs['new_password_confirm']:
+            raise serializers.ValidationError({
+                'new_password_confirm': 'Password fields do not match.'
+            })
+        
+        # Get user from context (provided by view from JWT token)
+        user = self.context.get('request').user
+        
+        if not user or not user.is_authenticated:
+            raise serializers.ValidationError({
+                'detail': 'Authentication required.'
+            })
+        
+        # Check if user is customer (customers don't have forced password change)
+        if user.role == User.Role.CUSTOMER:
+            raise serializers.ValidationError({
+                'detail': 'This endpoint is not for customer accounts.'
+            })
+        
+        attrs['user'] = user
+        return attrs
+    
+    def save(self, **kwargs):
+        """Update user password and clear must_change_password flag."""
+        user = self.validated_data['user']
+        user.set_password(self.validated_data['new_password'])
+        user.must_change_password = False
+        user.save(update_fields=['password', 'must_change_password', 'modified'])
+        send_password_change_notification_email(user)
         return user
 
 

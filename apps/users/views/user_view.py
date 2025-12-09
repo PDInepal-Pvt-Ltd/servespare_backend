@@ -1,6 +1,6 @@
 from django.contrib.auth import authenticate
 from django.utils import timezone
-from rest_framework import viewsets, status, filters
+from rest_framework import viewsets, status, filters, serializers
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.response import Response
@@ -18,6 +18,7 @@ from apps.users.serializers import (
     UserUpdateSerializer,
     ChangePasswordSerializer,
     ResetPasswordSerializer,
+    FirstTimePasswordChangeSerializer,
     UserProfileSerializer,
     UserProfileUpdateSerializer,
     UserStatusUpdateSerializer,
@@ -48,12 +49,17 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
         
+        # Check if user must change password (except for customers)
+        if self.user.must_change_password and self.user.role != 'customer':
+            raise serializers.ValidationError({
+                'detail': 'You must change your password before you can log in. Please use the password change endpoint first.',
+                'must_change_password': True,
+                'user_id': self.user.id,
+                'username': self.user.username
+            })
+        
         # Update last login timestamp
         self.user.update_last_login()
-        
-        # Check if must change password
-        if self.user.must_change_password:
-            data['must_change_password'] = True
         
         # Add user data to response
         data['user'] = {
@@ -117,6 +123,8 @@ class UserViewSet(viewsets.ModelViewSet):
             return UserProfileUpdateSerializer
         elif self.action == 'change_password':
             return ChangePasswordSerializer
+        elif self.action == 'first_time_password_change':
+            return FirstTimePasswordChangeSerializer
         elif self.action == 'reset_password':
             return ResetPasswordSerializer
         elif self.action == 'update_status':
@@ -129,8 +137,10 @@ class UserViewSet(viewsets.ModelViewSet):
     
     def get_permissions(self):
         """Set permissions based on action."""
-        if self.action in ['me', 'update_profile', 'change_password']:
+        if self.action in ['me', 'update_profile', 'change_password', 'first_time_password_change']:
             permission_classes = [IsAuthenticated]
+        elif self.action == 'get_password_change_token':
+            permission_classes = [AllowAny]
         elif self.action in ['create', 'update', 'partial_update', 'destroy',
                              'reset_password', 'update_status', 'update_role', 'bulk_action']:
             permission_classes = [IsAuthenticated, IsAdminUser]
@@ -188,6 +198,126 @@ class UserViewSet(viewsets.ModelViewSet):
             {'message': 'Password changed successfully.'},
             status=status.HTTP_200_OK
         )
+    
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def get_password_change_token(self, request):
+        """
+        Get JWT token for password change without full login.
+        
+        For users with must_change_password=True who need to change their password
+        before they can fully log in.
+        
+        POST /api/users/get_password_change_token/
+        Body: {username, password}
+        
+        Returns JWT token that can be used with first_time_password_change endpoint.
+        """
+        username = request.data.get('username')
+        password = request.data.get('password')
+        
+        if not username or not password:
+            return Response(
+                {'error': 'Username and password are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user = authenticate(username=username, password=password)
+        
+        if user is None:
+            return Response(
+                {'error': 'Invalid username or password.'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        if not user.is_active:
+            return Response(
+                {'error': 'User account is disabled.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if user.status != User.Status.ACTIVE:
+            return Response(
+                {'error': f'User account is {user.get_status_display().lower()}.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if user is customer (customers don't use this endpoint)
+        if user.role == User.Role.CUSTOMER:
+            return Response(
+                {'error': 'This endpoint is not for customer accounts. Use regular login.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if user must change password
+        if not user.must_change_password:
+            return Response(
+                {'error': 'You do not need to change your password. Use regular login endpoint.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Generate JWT token for password change
+        refresh = RefreshToken.for_user(user)
+        refresh['username'] = user.username
+        refresh['email'] = user.email
+        refresh['role'] = user.role
+        refresh['purpose'] = 'password_change'
+        
+        return Response({
+            'message': 'Token issued. Use this token to change your password.',
+            'token': str(refresh.access_token),
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'full_name': user.full_name,
+                'role': user.role,
+                'role_display': user.get_role_display(),
+                'must_change_password': True
+            }
+        }, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def first_time_password_change(self, request):
+        """
+        Change password using JWT authentication.
+        
+        This endpoint is used for:
+        1. First-time login password change (after email with credentials)
+        2. Password recovery after OTP verification
+        
+        User must provide JWT token (from OTP verification or special recovery token).
+        
+        POST /api/users/first_time_password_change/
+        Headers: Authorization: Bearer <jwt_token>
+        Body: {new_password, new_password_confirm}
+        """
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        
+        # Generate fresh JWT tokens for the user after password change
+        refresh = RefreshToken.for_user(user)
+        refresh['username'] = user.username
+        refresh['email'] = user.email
+        refresh['role'] = user.role
+        refresh['role_display'] = user.get_role_display()
+        refresh['workspace_id'] = user.workspace_id
+        
+        return Response({
+            'message': 'Password changed successfully. You can now log in with your new password.',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'full_name': user.full_name,
+                'role': user.role,
+                'role_display': user.get_role_display(),
+            },
+            'tokens': {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            }
+        }, status=status.HTTP_200_OK)
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
     def reset_password(self, request, pk=None):
@@ -405,6 +535,23 @@ class AuthViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # If user must change password, do not issue JWT tokens; return guidance only
+        if user.must_change_password:
+            return Response({
+                'message': 'User must change password.',
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'full_name': user.full_name,
+                    'role': user.role,
+                    'role_display': user.get_role_display(),
+                    'status': user.status,
+                    'workspace_id': user.workspace_id,
+                    'must_change_password': user.must_change_password,
+                }
+            }, status=status.HTTP_200_OK)
+
         # Update last login
         user.update_last_login()
         
