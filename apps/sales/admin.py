@@ -1,0 +1,123 @@
+from django.contrib import admin
+from apps.sales.models import SalesOrder, SalesOrderItem
+
+
+class SalesOrderItemInline(admin.TabularInline):
+    """Inline admin for SalesOrderItem"""
+    model = SalesOrderItem
+    extra = 1
+    fields = [
+        'inventory', 'quantity', 'unit_price', 
+        'discount_percentage', 'tax_percentage', 'line_total'
+    ]
+    readonly_fields = ['line_total']
+
+
+@admin.register(SalesOrder)
+class SalesOrderAdmin(admin.ModelAdmin):
+    """Admin interface for SalesOrder model"""
+    
+    list_display = [
+        'order_number', 'customer', 'order_date', 'order_status', 
+        'payment_status', 'total_amount', 'paid_amount', 'created_by'
+    ]
+    list_filter = [
+        'order_status', 'payment_status', 'payment_method', 
+        'order_date', 'is_active'
+    ]
+    search_fields = [
+        'order_number', 'customer__username', 'customer__full_name',
+        'tracking_number', 'notes'
+    ]
+    readonly_fields = [
+        'order_number', 'order_date', 'subtotal', 'discount_amount',
+        'tax_amount', 'total_amount', 'created', 'modified'
+    ]
+    inlines = [SalesOrderItemInline]
+    
+    fieldsets = (
+        ('Order Information', {
+            'fields': ('order_number', 'order_date', 'customer', 'order_status', 'is_active')
+        }),
+        ('Financial Summary', {
+            'fields': (
+                'subtotal', 'discount_percentage', 'discount_amount',
+                'tax_percentage', 'tax_amount', 'shipping_charges', 'total_amount'
+            )
+        }),
+        ('Payment Information', {
+            'fields': ('payment_status', 'payment_method', 'paid_amount')
+        }),
+        ('Delivery Address', {
+            'fields': (
+                'delivery_address', 'delivery_city', 
+                'delivery_state', 'delivery_pincode'
+            )
+        }),
+        ('Delivery Details', {
+            'fields': (
+                'expected_delivery_date', 'actual_delivery_date',
+                'tracking_number', 'courier_partner'
+            )
+        }),
+        ('Notes', {
+            'fields': ('notes', 'internal_notes'),
+            'classes': ('collapse',)
+        }),
+        ('Staff Information', {
+            'fields': ('created_by',),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created', 'modified'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def save_model(self, request, obj, form, change):
+        """Set created_by when saving"""
+        if not change:  # Only set on creation
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(SalesOrderItem)
+class SalesOrderItemAdmin(admin.ModelAdmin):
+    """Admin interface for SalesOrderItem model"""
+    
+    list_display = [
+        'order', 'item_name', 'quantity', 'unit_price', 
+        'discount_amount', 'tax_amount', 'line_total'
+    ]
+    list_filter = ['order__order_status', 'created']
+    search_fields = ['order__order_number', 'item_name', 'part_number']
+    readonly_fields = [
+        'item_name', 'part_number', 'warranty_period',
+        'discount_amount', 'tax_amount', 'line_total', 
+        'created', 'modified'
+    ]
+    
+    fieldsets = (
+        ('Order Information', {
+            'fields': ('order',)
+        }),
+        ('Product Information', {
+            'fields': ('inventory', 'item_name', 'part_number')
+        }),
+        ('Pricing', {
+            'fields': (
+                'quantity', 'unit_price', 
+                'discount_percentage', 'discount_amount',
+                'tax_percentage', 'tax_amount', 'line_total'
+            )
+        }),
+        ('Additional Information', {
+            'fields': ('warranty_period', 'notes'),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created', 'modified'),
+            'classes': ('collapse',)
+        }),
+    )
+

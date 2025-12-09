@@ -109,6 +109,98 @@ curl -X POST http://localhost:8000/api/users/ `
 ### Statistics
 - `GET /api/users/stats/` - Get user statistics
 
+## Sales API
+
+### Sales Orders
+- `GET /api/sales/orders/` - List sales orders (with filters)
+- `GET /api/sales/orders/{id}/` - Get order detail
+- `POST /api/sales/orders/` - Create new sales order
+- `PUT /api/sales/orders/{id}/` - Update sales order
+- `PATCH /api/sales/orders/{id}/` - Partial update
+- `DELETE /api/sales/orders/{id}/` - Soft delete order
+
+### Order Actions
+- `POST /api/sales/orders/{id}/update_status/` - Update order status
+- `POST /api/sales/orders/{id}/add_payment/` - Add payment
+- `POST /api/sales/orders/{id}/cancel/` - Cancel order
+- `GET /api/sales/orders/{id}/items/` - Get order items
+
+### Order Statistics
+- `GET /api/sales/orders/stats/` - Get sales order statistics
+
+### Create Sales Order Example
+```powershell
+curl -X POST http://localhost:8000/api/sales/orders/ `
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" `
+  -H "Content-Type: application/json" `
+  -d '{
+    "customer": 1,
+    "delivery_address": "123 Main St",
+    "delivery_city": "Kathmandu",
+    "delivery_state": "Bagmati",
+    "delivery_pincode": "44600",
+    "tax_percentage": "13.00",
+    "shipping_charges": "100.00",
+    "items": [
+      {
+        "inventory": 1,
+        "quantity": "2.00",
+        "unit_price": "1500.00"
+      }
+    ]
+  }'
+```
+
+### Update Order Status Example
+```powershell
+curl -X POST http://localhost:8000/api/sales/orders/1/update_status/ `
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" `
+  -H "Content-Type: application/json" `
+  -d '{
+    "order_status": "packed"
+  }'
+```
+
+### Add Payment Example
+```powershell
+curl -X POST http://localhost:8000/api/sales/orders/1/add_payment/ `
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" `
+  -H "Content-Type: application/json" `
+  -d '{
+    "amount": "5000.00",
+    "payment_method": "cash"
+  }'
+```
+
+### Order Status Values
+- `confirmed` - Confirmed Order
+- `ready_to_pack` - Ready to Pack
+- `packed` - Packed
+- `ready_to_depart` - Ready to Depart
+- `in_transit` - In Transit
+- `delivered` - Delivered
+- `cancelled` - Cancelled
+
+### Payment Method Values
+- `cash` - Cash
+- `card` - Card
+- `upi` - UPI
+- `bank_transfer` - Bank Transfer
+- `credit` - Credit
+
+### Query Parameters for Sales Orders
+```
+/api/sales/orders/?customer=1&order_status=confirmed&payment_status=pending&search=SO-&ordering=-order_date&page=1
+```
+
+- **customer**: Filter by customer user ID
+- **order_status**: `confirmed`, `packed`, `in_transit`, `delivered`, etc.
+- **payment_status**: `pending`, `partial`, `paid`
+- **search**: Search in order_number, tracking_number, notes
+- **ordering**: Sort by field (prefix with `-` for descending)
+- **page**: Page number
+- **page_size**: Items per page
+
 ## Query Parameters for List Users
 
 ```
