@@ -20,6 +20,9 @@ urlpatterns = [
     # Router endpoints (users, auth, etc.)
     path('', include(router.urls)),
     
+    # OTP endpoints
+    path('otp/', include('apps.otp.urls')),
+    
     # Other apps
     path('subscription/', include('apps.subscription.urls')),
     path('stock-management/', include('apps.stock_management.urls')),

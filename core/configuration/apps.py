@@ -26,6 +26,7 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     'apps.base',
     'apps.users',
+    'apps.otp',
     'apps.subscription',
     'apps.tenant',
     'apps.stock_management',
@@ -34,7 +35,6 @@ LOCAL_APPS = [
 #     'apps.properties',
 #     'apps.hotel.apps.HotelConfig',
 #     'apps.resturant.apps.RestaurantConfig',
-#     'apps.otp',
 #     'apps.accounts',
 #     'apps.support_and_ticket',
 #     'apps.global_announcement.apps.GlobalAnnouncementConfig',
