@@ -8,6 +8,7 @@ class TenantSerializer(serializers.ModelSerializer):
     Serializer for Tenant model
     """
     package_detail = SubscriptionPlanSerializer(source='package', read_only=True)
+    user_count = serializers.SerializerMethodField()
     
     class Meta:
         model = Tenant
@@ -20,10 +21,15 @@ class TenantSerializer(serializers.ModelSerializer):
             'package_detail',
             'status',
             'is_active',
+            'user_count',
             'created',
             'modified'
         ]
-        read_only_fields = ['id', 'created', 'modified', 'package_detail']
+        read_only_fields = ['id', 'created', 'modified', 'package_detail', 'user_count']
+    
+    def get_user_count(self, obj):
+        """Get the total number of active users in this tenant"""
+        return obj.get_user_count()
     
     def validate_email(self, value):
         """Validate email uniqueness"""

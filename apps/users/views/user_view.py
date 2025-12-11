@@ -26,6 +26,7 @@ from apps.users.serializers import (
     BulkUserActionSerializer,
     UserLoginSerializer,
     UserRegistrationSerializer,
+    AdminAccountSerializer,
 )
 
 
@@ -113,6 +114,8 @@ class UserViewSet(viewsets.ModelViewSet):
         """Return appropriate serializer based on action."""
         if self.action == 'list':
             return UserListSerializer
+        elif self.action == 'admin_accounts':
+            return AdminAccountSerializer
         elif self.action == 'create':
             return UserCreateSerializer
         elif self.action in ['update', 'partial_update']:
@@ -443,6 +446,83 @@ class UserViewSet(viewsets.ModelViewSet):
             message = f'{count} user(s) deleted successfully.'
         
         return Response({'message': message}, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def admin_accounts(self, request):
+        """
+        Get all admin accounts with their tenant and subscription information.
+        Shows admins with their tenant details, subscription package name, and user count.
+        
+        GET /api/users/admin_accounts/
+        
+        Query parameters:
+        - status: Filter by user status (active, inactive, suspended)
+        - package: Filter by subscription package ID
+        - search: Search by name, email, or business name
+        - mode: Filter by subscription mode (live/trial)
+
+        # Get all active admins in live mode
+        GET /api/users/admin_accounts/?status=active&mode=live
+
+        # Search for admins with "tech" in any field
+        GET /api/users/admin_accounts/?search=tech
+
+        # Get all admins with package ID 3
+        GET /api/users/admin_accounts/?package=3
+
+        # Get all trial admins
+        GET /api/users/admin_accounts/?mode=trial
+
+        # Get all admins (no filters)
+        GET /api/users/admin_accounts/
+        """
+        # Get all users with admin or super_admin roles
+        queryset = User.objects.filter(
+            role__in=[User.Role.ADMIN, User.Role.SUPER_ADMIN],
+            is_removed=False
+        ).select_related('tenant', 'tenant__package')
+        
+        # Filter by status
+        status_filter = request.query_params.get('status', None)
+        if status_filter and status_filter.lower() != 'all':
+            queryset = queryset.filter(status=status_filter)
+        
+        # Filter by package
+        package_filter = request.query_params.get('package', None)
+        if package_filter and package_filter.lower() != 'all':
+            queryset = queryset.filter(tenant__package_id=package_filter)
+        
+        # Filter by mode (tenant status)
+        mode_filter = request.query_params.get('mode', None)
+        if mode_filter and mode_filter.lower() != 'all':
+            # Map 'live mode' to 'active' status
+            if mode_filter.lower() == 'live':
+                queryset = queryset.filter(tenant__status='active')
+            else:
+                queryset = queryset.filter(tenant__status=mode_filter)
+        
+        # Search by name, email, or business name
+        search = request.query_params.get('search', None)
+        if search:
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(username__icontains=search) |
+                Q(email__icontains=search) |
+                Q(full_name__icontains=search) |
+                Q(tenant__business_name__icontains=search)
+            )
+        
+        # Order by creation date (newest first)
+        queryset = queryset.order_by('-created')
+        
+        # Paginate the results
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def stats(self, request):

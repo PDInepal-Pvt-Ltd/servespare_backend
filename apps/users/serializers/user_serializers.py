@@ -7,6 +7,7 @@ from apps.users.utils import (
     send_password_change_notification_email,
     send_welcome_credentials_email,
 )
+from apps.tenant.serializers import TenantSerializer
 
 
 class UserListSerializer(serializers.ModelSerializer):
@@ -420,3 +421,49 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         user.save()
         
         return user
+
+
+class AdminAccountSerializer(serializers.ModelSerializer):
+    """
+    Serializer for listing admin accounts with tenant and subscription information.
+    Shows admin details along with their tenant's subscription package and user count.
+    """
+    tenant_detail = TenantSerializer(source='tenant', read_only=True)
+    subscription_name = serializers.SerializerMethodField()
+    tenant_user_count = serializers.SerializerMethodField()
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'username',
+            'email',
+            'full_name',
+            'phone',
+            'role',
+            'role_display',
+            'status',
+            'status_display',
+            'tenant',
+            'tenant_detail',
+            'subscription_name',
+            'tenant_user_count',
+            'is_active',
+            'created',
+            'last_login_at'
+        ]
+        read_only_fields = ['id', 'created', 'last_login_at']
+    
+    def get_subscription_name(self, obj):
+        """Get the subscription/package name for the admin's tenant"""
+        if obj.tenant and obj.tenant.package:
+            return obj.tenant.package.name
+        return None
+    
+    def get_tenant_user_count(self, obj):
+        """Get the total number of users in the admin's tenant"""
+        if obj.tenant:
+            return obj.tenant.get_user_count()
+        return 0
