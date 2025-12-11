@@ -5,7 +5,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
-from django.db.models import Q, F
+from django.db.models import Q, F, Sum, DecimalField
 from apps.stock_management.models import Inventory, InventoryImage, Party
 from apps.stock_management.serializers import InventorySerializer, InventoryImageSerializer
 
@@ -72,6 +72,47 @@ class InventoryViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(low_stock_items, many=True)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def stock_stats(self, request):
+        """
+        Get comprehensive stock statistics
+        GET /api/inventory/stock_stats/
+        - Total low stock items (quantity <= min_stock_level)
+        - Total out of stock items (quantity = 0)
+        - Total stock value (sum of quantity * price)
+        """
+        all_inventory = Inventory.objects.filter(is_active=True)
+        
+        # Count low stock items (quantity <= min_stock_level and quantity > 0)
+        low_stock_count = all_inventory.filter(
+            quantity__lte=F('min_stock_level'),
+            quantity__gt=0
+        ).count()
+        
+        # Count out of stock items (quantity = 0)
+        out_of_stock_count = all_inventory.filter(quantity=0).count()
+        
+        # Calculate total stock value (quantity * price)
+        stock_value_data = all_inventory.aggregate(
+            total_stock_value=Sum(F('quantity') * F('price'), output_field=DecimalField())
+        )
+        total_stock_value = stock_value_data['total_stock_value'] or Decimal('0.00')
+        
+        # Additional stats
+        total_items = all_inventory.count()
+        total_quantity = all_inventory.aggregate(
+            total=Sum('quantity', output_field=DecimalField())
+        )['total'] or Decimal('0.00')
+        
+        return Response({
+            'total_items': total_items,
+            'low_stock_count': low_stock_count,
+            'out_of_stock_count': out_of_stock_count,
+            'total_quantity': float(total_quantity),
+            'total_stock_value': float(total_stock_value),
+            'in_stock_count': total_items - out_of_stock_count,
+        }, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=['get'])
     def by_category(self, request):
@@ -298,7 +339,7 @@ class InventoryViewSet(viewsets.ModelViewSet):
                                 elif months == 24:
                                     value = '24_month'
                                 else:
-                                    errors.append(f"Warranty Period must be one of: 0, 1, 2, 3, 4, 5, 6, 9, 12, 24 months")
+                                    errors.append("Warranty Period must be one of: 0, 1, 2, 3, 4, 5, 6, 9, 12, 24 months")
                                     continue
                             except ValueError:
                                 # If already in format like "6_month", use as is
