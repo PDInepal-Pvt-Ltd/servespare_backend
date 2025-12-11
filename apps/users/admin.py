@@ -20,7 +20,7 @@ class UserAdmin(BaseUserAdmin):
     ]
     search_fields = ['username', 'email', 'full_name', 'phone', 'tenant__name', 'workspace_id']
     ordering = ['-created']
-    readonly_fields = ['tenant', 'created', 'modified', 'last_login_at', 'last_login', 'date_joined', 'is_removed']
+    readonly_fields = ['created', 'modified', 'last_login_at', 'last_login', 'date_joined', 'is_removed']
     
     # Fieldsets for detail view
     fieldsets = (
@@ -87,3 +87,12 @@ class UserAdmin(BaseUserAdmin):
         updated = queryset.update(status='suspended', is_active=False)
         self.message_user(request, f'{updated} user(s) suspended successfully.')
     suspend_users.short_description = _('Suspend selected users')
+    
+    def get_readonly_fields(self, request, obj=None):
+        """Make tenant field readonly when editing existing users, except for superadmins."""
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj:  # Editing an existing user
+            # Only superadmins can change tenant
+            if not request.user.is_superuser:
+                readonly.append('tenant')
+        return readonly
