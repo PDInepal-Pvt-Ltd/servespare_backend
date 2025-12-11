@@ -459,7 +459,7 @@ class AdminAccountSerializer(serializers.ModelSerializer):
     def get_subscription_name(self, obj):
         """Get the subscription/package name for the admin's tenant"""
         if obj.tenant and obj.tenant.package:
-            return obj.tenant.package.name
+            return obj.tenant.package.plan_name
         return None
     
     def get_tenant_user_count(self, obj):

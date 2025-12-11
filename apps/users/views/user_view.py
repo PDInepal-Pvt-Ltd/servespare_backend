@@ -478,7 +478,7 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         # Get all users with admin or super_admin roles
         queryset = User.objects.filter(
-            role__in=[User.Role.ADMIN, User.Role.SUPER_ADMIN],
+            role__in=[User.Role.ADMIN],
             is_removed=False
         ).select_related('tenant', 'tenant__package')
         
