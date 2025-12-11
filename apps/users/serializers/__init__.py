@@ -14,6 +14,7 @@ from .user_serializers import (
     BulkUserActionSerializer,
     UserLoginSerializer,
     UserRegistrationSerializer,
+    AdminAccountSerializer,
 )
 
 __all__ = [

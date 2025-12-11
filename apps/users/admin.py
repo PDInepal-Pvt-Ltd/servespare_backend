@@ -20,7 +20,7 @@ class UserAdmin(BaseUserAdmin):
     ]
     search_fields = ['username', 'email', 'full_name', 'phone', 'tenant__name', 'workspace_id']
     ordering = ['-created']
-    readonly_fields = ['created', 'modified', 'last_login_at', 'last_login', 'date_joined', 'is_removed']
+    readonly_fields = ['tenant', 'created', 'modified', 'last_login_at', 'last_login', 'date_joined', 'is_removed']
     
     # Fieldsets for detail view
     fieldsets = (
@@ -30,8 +30,8 @@ class UserAdmin(BaseUserAdmin):
         (_('Personal Info'), {
             'fields': ('full_name', 'first_name', 'last_name', 'phone', 'avatar')
         }),
-        (_('Workspace'), {
-            'fields': ('workspace_id',)
+        (_('Workspace & Tenant'), {
+            'fields': ('tenant', 'workspace_id',)
         }),
         (_('Role & Status'), {
             'fields': ('role', 'status', 'is_active', 'must_change_password')
