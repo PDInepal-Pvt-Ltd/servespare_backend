@@ -463,6 +463,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 'admin': queryset.filter(role=User.Role.ADMIN).count(),
                 'cashier': queryset.filter(role=User.Role.CASHIER).count(),
                 'inventory_manager': queryset.filter(role=User.Role.INVENTORY_MANAGER).count(),
+                'customer': queryset.filter(role=User.Role.CUSTOMER).count(),
             },
             'must_change_password': queryset.filter(must_change_password=True).count(),
         }
