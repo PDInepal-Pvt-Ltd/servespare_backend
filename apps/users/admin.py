@@ -30,8 +30,8 @@ class UserAdmin(BaseUserAdmin):
         (_('Personal Info'), {
             'fields': ('full_name', 'first_name', 'last_name', 'phone', 'avatar')
         }),
-        (_('Workspace'), {
-            'fields': ('workspace_id',)
+        (_('Workspace & Tenant'), {
+            'fields': ('tenant', 'workspace_id',)
         }),
         (_('Role & Status'), {
             'fields': ('role', 'status', 'is_active', 'must_change_password')
@@ -87,3 +87,12 @@ class UserAdmin(BaseUserAdmin):
         updated = queryset.update(status='suspended', is_active=False)
         self.message_user(request, f'{updated} user(s) suspended successfully.')
     suspend_users.short_description = _('Suspend selected users')
+    
+    def get_readonly_fields(self, request, obj=None):
+        """Make tenant field readonly when editing existing users, except for superadmins."""
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj:  # Editing an existing user
+            # Only superadmins can change tenant
+            if not request.user.is_superuser:
+                readonly.append('tenant')
+        return readonly

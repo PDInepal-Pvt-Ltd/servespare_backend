@@ -8,6 +8,7 @@ from .sales_order import (
     SalesOrderStatusUpdateSerializer,
     AddPaymentSerializer,
 )
+from .bill import BillSerializer
 
 __all__ = [
     'SalesOrderItemSerializer',
@@ -18,4 +19,5 @@ __all__ = [
     'SalesOrderUpdateSerializer',
     'SalesOrderStatusUpdateSerializer',
     'AddPaymentSerializer',
+    'BillSerializer',
 ]
