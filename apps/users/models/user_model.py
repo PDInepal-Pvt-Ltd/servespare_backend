@@ -46,7 +46,7 @@ class User(AbstractUser, BaseModel):
         _('role'),
         max_length=30,
         choices=Role.choices,
-        default=Role.CASHIER,
+        default=Role.CUSTOMER,
         db_index=True,
         help_text=_('User role determining access level and permissions.')
     )
@@ -59,6 +59,14 @@ class User(AbstractUser, BaseModel):
         blank=True,
         db_index=True,
         help_text=_('Contact phone number.')
+    )
+    
+    location = models.CharField(
+        _('location'),
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text=_('User location or address.')
     )
     
     # Personal information

@@ -28,6 +28,7 @@ from apps.users.serializers import (
     UserRegistrationSerializer,
     AdminAccountSerializer,
 )
+from apps.users.utils import send_welcome_credentials_email
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -571,11 +572,23 @@ class AuthViewSet(viewsets.GenericViewSet):
         Register a new user.
         
         POST /api/auth/register/
-        Body: {username, email, password, password_confirm, full_name, ...}
+        Body: {username, email, password, password_confirm, full_name, phone, role (optional)}
+        
+        Super Admin/Admin can optionally assign a role during registration by including 'role' field.
+        If not provided, defaults to CUSTOMER role.
         """
         serializer = UserRegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        # Get the raw password before it's hashed
+        raw_password = serializer.validated_data.get('password')
+        
+        # Save the user (role is handled by serializer)
         user = serializer.save()
+        
+        # Send welcome credentials email (skip for customers)
+        if user.role != User.Role.CUSTOMER:
+            send_welcome_credentials_email(user, raw_password)
         
         return Response({
             'message': 'User registered successfully.',

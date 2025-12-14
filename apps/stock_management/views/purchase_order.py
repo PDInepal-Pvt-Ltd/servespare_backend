@@ -1,7 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Q
+from django.db.models import Q, Count, Sum, F, DecimalField
+from django.db.models.functions import Coalesce
 from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem
 from apps.stock_management.serializers import PurchaseOrderSerializer, PurchaseOrderItemSerializer
 
@@ -76,6 +77,54 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """
+        Get purchase order statistics:
+        - Total POs: count of all purchase orders
+        - Total Value: sum of all purchase order values
+        - Pending: count of draft and ordered POs
+        - Received: count of received POs
+        """
+        queryset = PurchaseOrder.objects.all()
+        
+        # Total POs count
+        total_pos = queryset.count()
+        
+        # Total Value - sum of all PO items
+        total_value = PurchaseOrderItem.objects.filter(
+            purchase_order__in=queryset
+        ).aggregate(
+            total=Coalesce(
+                Sum(F('quantity') * F('rate'), output_field=DecimalField()),
+                0,
+                output_field=DecimalField()
+            )
+        )['total']
+        
+        # Pending count (draft + ordered)
+        pending_count = queryset.filter(status__in=['draft', 'ordered']).count()
+        
+        # Received count
+        received_count = queryset.filter(status='received').count()
+        
+        # Billed count
+        billed_count = queryset.filter(status='billed').count()
+        
+        return Response({
+            'total_pos': total_pos,
+            'total_value': float(total_value) if total_value else 0.0,
+            'pending': pending_count,
+            'received': received_count,
+            'billed': billed_count,
+            'status_breakdown': {
+                'draft': queryset.filter(status='draft').count(),
+                'ordered': queryset.filter(status='ordered').count(),
+                'received': received_count,
+                'billed': billed_count,
+            }
+        })
 
 
 class PurchaseOrderItemViewSet(viewsets.ModelViewSet):

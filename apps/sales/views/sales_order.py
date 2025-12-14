@@ -164,17 +164,27 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
         total_paid = queryset.aggregate(total=Sum('paid_amount'))['total'] or 0
         total_outstanding = total_revenue - total_paid
         
+        # Calculate average order value
+        avg_order_value = float(total_revenue) / total_orders if total_orders > 0 else 0
+        
+        # Today's stats
+        today = timezone.now().date()
+        today_orders = queryset.filter(order_date__date=today)
+        today_sales = today_orders.count()
+        today_revenue = today_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        
         stats = {
             'total_orders': total_orders,
             'total_revenue': float(total_revenue),
             'total_paid': float(total_paid),
             'total_outstanding': float(total_outstanding),
+            'avg_order_value': avg_order_value,
+            'today': {
+                'sales': today_sales,
+                'revenue': float(today_revenue),
+            },
             'by_status': {},
             'by_payment_status': {},
-            'today': {
-                'orders': 0,
-                'revenue': 0,
-            },
             'this_month': {
                 'orders': 0,
                 'revenue': 0,
@@ -198,12 +208,6 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
                 'count': count,
                 'label': payment_status[1]
             }
-        
-        # Today's stats
-        today = timezone.now().date()
-        today_orders = queryset.filter(order_date__date=today)
-        stats['today']['orders'] = today_orders.count()
-        stats['today']['revenue'] = float(today_orders.aggregate(total=Sum('total_amount'))['total'] or 0)
         
         # This month's stats
         current_month = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)

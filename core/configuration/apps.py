@@ -31,5 +31,6 @@ LOCAL_APPS = [
     'apps.stock_management',
     'apps.sales',
     'apps.cashandbank',
+    'apps.carts',
 
 ]
