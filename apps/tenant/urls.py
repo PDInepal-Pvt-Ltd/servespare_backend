@@ -4,7 +4,7 @@ from apps.tenant.views import TenantViewSet
 
 # Create a router and register our viewsets
 router = DefaultRouter()
-router.register(r'tenants', TenantViewSet, basename='tenant')
+router.register(r'', TenantViewSet, basename='tenant')
 
 urlpatterns = [
     path('', include(router.urls)),

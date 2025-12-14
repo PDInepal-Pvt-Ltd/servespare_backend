@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from apps.tenant.models import Tenant
 from apps.tenant.serializers import TenantSerializer
+from django.db.models import Count
 
 
 class TenantViewSet(viewsets.ModelViewSet):
@@ -88,4 +89,19 @@ class TenantViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(trial_tenants, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def counts(self, request):
+        """
+        Get counts of tenants grouped by status, or a single status via `?status=`.
+        """
+        status_filter = request.query_params.get('status', None)
+        qs = Tenant.objects.all()
+
+        if status_filter:
+            count = qs.filter(status=status_filter).count()
+            return Response({'status': status_filter, 'count': count})
+
+        counts = qs.values('status').annotate(count=Count('id'))
+        return Response({item['status']: item['count'] for item in counts})
 

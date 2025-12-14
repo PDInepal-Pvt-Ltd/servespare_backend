@@ -7,10 +7,9 @@ class Tenant(BaseModel):
     Model to store tenant/business information
     """
     STATUS_CHOICES = [
-        ('active', 'Active'),
-        ('inactive', 'Inactive'),
-        ('suspended', 'Suspended'),
-        ('trial', 'Trial'),
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
     ]
     
     business_name = models.CharField(max_length=255)
