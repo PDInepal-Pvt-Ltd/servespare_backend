@@ -97,7 +97,7 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
             purchase_order__in=queryset
         ).aggregate(
             total=Coalesce(
-                Sum(F('quantity') * F('rate'), output_field=DecimalField()),
+                Sum(F('quantity') * F('unit_price'), output_field=DecimalField()),
                 0,
                 output_field=DecimalField()
             )
