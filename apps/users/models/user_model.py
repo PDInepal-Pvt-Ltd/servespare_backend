@@ -46,7 +46,7 @@ class User(AbstractUser, BaseModel):
         _('role'),
         max_length=30,
         choices=Role.choices,
-        default=Role.CASHIER,
+        default=Role.CUSTOMER,
         db_index=True,
         help_text=_('User role determining access level and permissions.')
     )

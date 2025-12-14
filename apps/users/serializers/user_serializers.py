@@ -57,7 +57,11 @@ class UserDetailSerializer(serializers.ModelSerializer):
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating new users."""
+    """Serializer for creating new users by admin/super admin.
+    
+    Allows super admin/admin users to assign roles to newly created users.
+    Users default to CUSTOMER role if not specified.
+    """
     
     password = serializers.CharField(
         write_only=True,
@@ -85,7 +89,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             'email': {'required': False},
-            'role': {'required': True},
+            'role': {'required': False},
         }
     
     def validate(self, attrs):
@@ -97,14 +101,21 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return attrs
     
     def create(self, validated_data):
-        """Create user with hashed password and send welcome email."""
+        """Create user with hashed password and send welcome email.
+        
+        Allows super admin/admin to assign roles. Defaults to CUSTOMER if not specified.
+        """
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
         
+        # Default role to CUSTOMER if not provided by admin/super admin
+        role = validated_data.get('role', User.Role.CUSTOMER)
+        if 'role' not in validated_data:
+            validated_data['role'] = User.Role.CUSTOMER
+        
         # Set must_change_password to True for non-customer users
-        role = validated_data.get('role', User.Role.CASHIER)
         if role != User.Role.CUSTOMER:
-            validated_data['must_change_password'] = True
+            validated_data['must_change_password'] = False
         else:
             validated_data['must_change_password'] = False
         
@@ -395,8 +406,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'username', 'email', 'password', 'password_confirm',
-            'full_name', 'first_name', 'last_name', 'phone'
+            'full_name', 'first_name', 'last_name', 'phone', 'role'
         ]
+        extra_kwargs = {
+            'role': {'required': False},
+        }
     
     def validate(self, attrs):
         """Validate password confirmation."""
@@ -407,12 +421,14 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return attrs
     
     def create(self, validated_data):
-        """Create user with default cashier role."""
+        """Create user with default customer role or assigned role by super admin."""
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
         
-        # Default role for self-registration
-        validated_data['role'] = User.Role.CASHIER
+        # Default role for self-registration is CUSTOMER (if not provided)
+        if 'role' not in validated_data:
+            validated_data['role'] = User.Role.CUSTOMER
+        
         validated_data['status'] = User.Status.ACTIVE
         validated_data['is_active'] = True
         
