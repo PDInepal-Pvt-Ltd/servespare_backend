@@ -38,7 +38,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'full_name', 'first_name', 'last_name',
-            'phone', 'avatar', 'tenant', 'workspace_id',
+            'phone', 'location', 'avatar', 'tenant', 'workspace_id',
             'role', 'role_display', 'status', 'status_display',
             'is_active', 'is_staff', 'is_superuser',
             'must_change_password',
@@ -83,7 +83,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'username', 'email', 'password', 'password_confirm',
-            'full_name', 'first_name', 'last_name', 'phone',
+            'full_name', 'first_name', 'last_name', 'phone', 'location',
             'avatar', 'tenant', 'workspace_id',
             'role', 'status', 'is_active', 'created_by'
         ]
@@ -136,7 +136,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'email', 'full_name', 'first_name', 'last_name', 'phone',
+            'email', 'full_name', 'first_name', 'last_name', 'phone', 'location',
             'avatar', 'tenant', 'workspace_id',
             'role', 'status', 'is_active', 'is_staff',
             'must_change_password'
@@ -286,7 +286,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'full_name', 'first_name', 'last_name',
-            'phone', 'avatar', 'tenant', 'workspace_id',
+            'phone', 'location', 'avatar', 'tenant', 'workspace_id',
             'role', 'role_display', 'status', 'status_display',
             'must_change_password',
             'last_login_at', 'date_joined', 'created'
@@ -304,7 +304,7 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'email', 'full_name', 'first_name', 'last_name',
-            'phone', 'avatar', 'tenant'
+            'phone', 'location', 'avatar', 'tenant'
         ]
 
 
@@ -406,7 +406,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'username', 'email', 'password', 'password_confirm',
-            'full_name', 'first_name', 'last_name', 'phone', 'role'
+            'full_name', 'first_name', 'last_name', 'phone', 'location', 'role'
         ]
         extra_kwargs = {
             'role': {'required': False},

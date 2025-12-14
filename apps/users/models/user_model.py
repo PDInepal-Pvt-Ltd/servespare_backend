@@ -61,6 +61,14 @@ class User(AbstractUser, BaseModel):
         help_text=_('Contact phone number.')
     )
     
+    location = models.CharField(
+        _('location'),
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text=_('User location or address.')
+    )
+    
     # Personal information
     full_name = models.CharField(
         _('full name'),
