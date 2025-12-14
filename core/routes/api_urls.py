@@ -32,6 +32,7 @@ urlpatterns = [
     path('tenant/', include('apps.tenant.urls')),
     path('sales/', include('apps.sales.urls')),
     path('cash-and-bank/', include('apps.cashandbank.urls')),
+    path('carts/', include('apps.carts.urls')),
 ]
     
 
