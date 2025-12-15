@@ -32,5 +32,5 @@ LOCAL_APPS = [
     'apps.sales',
     'apps.cashandbank',
     'apps.carts',
-
+    'seeds',
 ]
