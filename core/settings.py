@@ -157,6 +157,9 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Default primary key type
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 # Custom User Model
 # https://docs.djangoproject.com/en/6.0/topics/auth/customizing/#substituting-a-custom-user-model
 
