@@ -5,9 +5,10 @@ from django.utils import timezone
 from datetime import date
 from apps.subscription.models import Subscription
 from apps.subscription.serializers import SubscriptionSerializer
+from apps.base.drf import TenantViewSetMixin
 
 
-class SubscriptionViewSet(viewsets.ModelViewSet):
+class SubscriptionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing subscriptions
     """
@@ -53,12 +54,12 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
         Get all active (non-expired) subscriptions
         """
         today = date.today()
-        active_subscriptions = Subscription.objects.filter(
+        active_subscriptions = self.filter_queryset(Subscription.objects.filter(
             is_active=True,
             subscription_date__lte=today,
             finish_date__gte=today
-        ).select_related('tenant', 'subscription_plan')
-        
+        ).select_related('tenant', 'subscription_plan'))
+
         serializer = self.get_serializer(active_subscriptions, many=True)
         return Response(serializer.data)
     
@@ -68,10 +69,10 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
         Get all expired subscriptions
         """
         today = date.today()
-        expired_subscriptions = Subscription.objects.filter(
+        expired_subscriptions = self.filter_queryset(Subscription.objects.filter(
             finish_date__lt=today
-        ).select_related('tenant', 'subscription_plan')
-        
+        ).select_related('tenant', 'subscription_plan'))
+
         serializer = self.get_serializer(expired_subscriptions, many=True)
         return Response(serializer.data)
     
@@ -87,10 +88,10 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        subscriptions = Subscription.objects.filter(
+        subscriptions = self.filter_queryset(Subscription.objects.filter(
             tenant_id=tenant_id
-        ).select_related('tenant', 'subscription_plan')
-        
+        ).select_related('tenant', 'subscription_plan'))
+
         serializer = self.get_serializer(subscriptions, many=True)
         return Response(serializer.data)
 

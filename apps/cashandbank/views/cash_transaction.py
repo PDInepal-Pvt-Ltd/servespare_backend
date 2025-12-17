@@ -5,9 +5,10 @@ from rest_framework.response import Response
 
 from apps.cashandbank.models import CashTransaction
 from apps.cashandbank.serializers import CashTransactionSerializer
+from apps.base.drf import TenantViewSetMixin
 
 
-class CashTransactionViewSet(viewsets.ModelViewSet):
+class CashTransactionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     queryset = CashTransaction.objects.all()
     serializer_class = CashTransactionSerializer
 

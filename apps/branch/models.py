@@ -1,5 +1,6 @@
 from django.db import models
 from apps.base.models import BaseModel
+from apps.base.managers import TenantManager
 
 class Branch(BaseModel):
     """
@@ -18,6 +19,8 @@ class Branch(BaseModel):
     state = models.CharField(max_length=100, blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
     Email = models.EmailField(unique=True)
+    
+    objects = TenantManager()
    
    
    

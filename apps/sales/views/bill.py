@@ -4,9 +4,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from apps.sales.models import Bill
 from apps.sales.serializers import BillSerializer
+from apps.base.drf import TenantViewSetMixin
 
 
-class BillViewSet(viewsets.ModelViewSet):
+class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing bills
     """
@@ -64,11 +65,11 @@ class BillViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        bills = Bill.objects.filter(
+        bills = self.filter_queryset(Bill.objects.filter(
             customer_type=customer_type,
             is_active=True
-        )
-        
+        ))
+
         serializer = self.get_serializer(bills, many=True)
         return Response(serializer.data)
 
