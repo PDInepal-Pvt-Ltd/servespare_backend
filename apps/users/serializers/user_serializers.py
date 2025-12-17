@@ -113,11 +113,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
         if 'role' not in validated_data:
             validated_data['role'] = User.Role.CUSTOMER
         
-        # Set must_change_password to True for non-customer users
-        if role != User.Role.CUSTOMER:
+        # Ensure customers and super admins do NOT need to change password on first login
+        if role in [User.Role.CUSTOMER, User.Role.SUPER_ADMIN]:
             validated_data['must_change_password'] = False
         else:
-            validated_data['must_change_password'] = False
+            validated_data['must_change_password'] = True
         
         user = User(**validated_data)
         user.set_password(password)
@@ -428,10 +428,16 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         # Default role for self-registration is CUSTOMER (if not provided)
         if 'role' not in validated_data:
             validated_data['role'] = User.Role.CUSTOMER
-        
+
+        # Ensure customers and super admins do NOT need to change password on first login
+        if validated_data.get('role') in [User.Role.CUSTOMER, User.Role.SUPER_ADMIN]:
+            validated_data['must_change_password'] = False
+        else:
+            validated_data['must_change_password'] = True
+
         validated_data['status'] = User.Status.ACTIVE
         validated_data['is_active'] = True
-        
+
         user = User(**validated_data)
         user.set_password(password)
         user.save()

@@ -264,10 +264,14 @@ class User(AbstractUser, BaseModel):
         """Override save to sync role with groups and handle customer-specific behavior."""
         is_new = self.pk is None
         
-        # Handle customer role specific behavior
+        # Handle customer/super_admin role specific behavior
+        # Customers and Super Admins created programmatically should not be forced
+        # to change password on first login by default.
         if self.role == self.Role.CUSTOMER:
             self.must_change_password = False
             self.tenant = None
+        elif self.role == self.Role.SUPER_ADMIN:
+            self.must_change_password = False
         
         super().save(*args, **kwargs)
         
