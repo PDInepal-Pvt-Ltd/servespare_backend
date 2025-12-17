@@ -17,6 +17,7 @@ class Subscription(BaseModel):
         on_delete=models.CASCADE,
         related_name='subscriptions'
     )
+
     subscription_date = models.DateField()
     finish_date = models.DateField()
     renew_date = models.DateField(null=True, blank=True)

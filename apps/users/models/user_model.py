@@ -130,6 +130,15 @@ class User(AbstractUser, BaseModel):
         verbose_name=_('tenant'),
         help_text=_('Tenant organization this user belongs to.')
     )
+
+    branch = models.ForeignKey(
+        'branch.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users',
+        help_text=_('Branch this user belongs to.')
+    )
     
     created_by = models.ForeignKey(
         'self',

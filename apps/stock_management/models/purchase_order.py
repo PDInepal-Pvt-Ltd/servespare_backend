@@ -35,6 +35,15 @@ class PurchaseOrder(BaseModel):
         related_name='purchase_orders',
         help_text='Supplier for this purchase order'
     )
+
+    branch = models.ForeignKey(
+        'branch.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='purchase_orders',
+        help_text='Branch placing this purchase order'
+    )
     order_date = models.DateField(
         help_text='Date when the order was placed'
     )
@@ -146,6 +155,15 @@ class PurchaseOrderItem(BaseModel):
         blank=True,
         null=True,
         help_text='Description of discount applied'
+    )
+
+    branch = models.ForeignKey(
+        'branch.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='purchase_order_items',
+        help_text='Branch responsible for this purchase item'
     )
     
     class Meta:
