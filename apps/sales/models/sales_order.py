@@ -54,6 +54,15 @@ class SalesOrder(BaseModel):
         related_name='sales_orders',
         help_text='User/Customer who placed the order'
     )
+
+    branch = models.ForeignKey(
+        'branch.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sales_orders',
+        help_text='Branch handling this order'
+    )
     
     # Order Status
     order_status = models.CharField(
@@ -372,6 +381,15 @@ class SalesOrderItem(BaseModel):
         on_delete=models.PROTECT,
         related_name='sales_items',
         help_text='Inventory item being sold'
+    )
+
+    branch = models.ForeignKey(
+        'branch.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sales_order_items',
+        help_text='Branch fulfilling this item'
     )
     
     # Item Details

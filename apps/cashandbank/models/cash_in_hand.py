@@ -85,6 +85,15 @@ class CashTransaction(BaseModel):
 		help_text='Destination account for transfer (optional)'
 	)
 
+	branch = models.ForeignKey(
+		'branch.Branch',
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='cash_transactions',
+		help_text='Branch associated with this cash transaction'
+	)
+
 	objects = CashTransactionQuerySet.as_manager()
 
 	class Meta:

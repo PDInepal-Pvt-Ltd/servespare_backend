@@ -22,7 +22,7 @@ class SubscriptionPlan(BaseModel):
         choices=SUPPORT_TYPE_CHOICES,
         default='email'
     )
-    
+
     class Meta:
         db_table = 'subscription_plan'
         verbose_name = 'Subscription Plan'

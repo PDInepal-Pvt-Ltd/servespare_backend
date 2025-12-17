@@ -56,6 +56,15 @@ class Party(BaseModel):
         null=True,
         help_text='Name of the contact person'
     )
+
+    branch = models.ForeignKey(
+        'branch.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='parties',
+        help_text='Branch that manages this party'
+    )
     
     # Contact Information
     phone = models.CharField(
