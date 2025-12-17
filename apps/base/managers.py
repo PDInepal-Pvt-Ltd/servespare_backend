@@ -33,3 +33,10 @@ class TenantManager(models.Manager):
     def get_queryset(self):
         qs = TenantQuerySet(self.model, using=self._db)
         return qs._maybe_filter()
+
+    # Ensure compatibility with Django auth which calls
+    # `<User>._default_manager.get_by_natural_key(username)` during authentication
+    def get_by_natural_key(self, username):
+        # Resolve the model's username field dynamically (defaults to 'username' for User)
+        username_field = getattr(self.model, 'USERNAME_FIELD', 'username')
+        return self.get(**{username_field: username})
