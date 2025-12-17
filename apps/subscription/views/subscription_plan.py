@@ -3,9 +3,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from apps.subscription.models import SubscriptionPlan
 from apps.subscription.serializers import SubscriptionPlanSerializer
+from apps.base.drf import TenantViewSetMixin
 
 
-class SubscriptionPlanViewSet(viewsets.ModelViewSet):
+class SubscriptionPlanViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing subscription plans
     """
@@ -30,7 +31,7 @@ class SubscriptionPlanViewSet(viewsets.ModelViewSet):
         """
         Get all active subscription plans
         """
-        active_plans = SubscriptionPlan.objects.filter(is_active=True)
+        active_plans = self.filter_queryset(SubscriptionPlan.objects.filter(is_active=True))
         serializer = self.get_serializer(active_plans, many=True)
         return Response(serializer.data)
 

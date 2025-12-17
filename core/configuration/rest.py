@@ -20,6 +20,11 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10
 }
 
+# Apply tenant filter backend globally so API querysets are scoped to the
+# requesting user's tenant (unless they are superuser).
+REST_FRAMEWORK.setdefault('DEFAULT_FILTER_BACKENDS', [])
+REST_FRAMEWORK['DEFAULT_FILTER_BACKENDS'].insert(0, 'apps.base.drf.TenantFilterBackend')
+
 # drf-spectacular settings
 SPECTACULAR_SETTINGS = {
     'TITLE': 'ServeIQ Admin API',

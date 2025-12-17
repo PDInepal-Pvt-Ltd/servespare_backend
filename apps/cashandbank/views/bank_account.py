@@ -4,9 +4,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from apps.cashandbank.models import BankAccount
 from apps.cashandbank.serializers import BankAccountSerializer
+from apps.base.drf import TenantViewSetMixin
 
 
-class BankAccountViewSet(viewsets.ModelViewSet):
+class BankAccountViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing bank accounts
     """
@@ -53,11 +54,11 @@ class BankAccountViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        accounts = BankAccount.objects.filter(
+        accounts = self.filter_queryset(BankAccount.objects.filter(
             account_type=account_type,
             is_active=True
-        )
-        
+        ))
+
         serializer = self.get_serializer(accounts, many=True)
         return Response(serializer.data)
 

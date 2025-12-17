@@ -16,9 +16,10 @@ from apps.sales.serializers import (
     SalesOrderStatusUpdateSerializer,
     AddPaymentSerializer,
 )
+from apps.base.drf import TenantViewSetMixin
 
 
-class SalesOrderViewSet(viewsets.ModelViewSet):
+class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for Sales Order CRUD operations.
     
