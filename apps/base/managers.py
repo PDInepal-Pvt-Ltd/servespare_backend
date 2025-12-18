@@ -1,3 +1,4 @@
+from django.contrib.auth.models import UserManager as DjangoUserManager
 from django.db import models
 from apps.base.tenant import get_current_tenant, get_current_user
 
@@ -23,7 +24,7 @@ class TenantQuerySet(models.QuerySet):
         return self
 
 
-class TenantManager(models.Manager):
+class TenantManager(DjangoUserManager):
     """Manager that applies tenant scoping automatically via thread-local tenant.
 
     Usage: set `objects = TenantManager()` on models that have a `tenant` FK
