@@ -29,20 +29,20 @@ DEBUG = True
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
-    'bandoleered-toney-loveably.ngrok-free.dev',
+    'unopinionated-kiddingly-verline.ngrok-free.dev',
 ]
 
 # Allow localhost and ngrok host for CSRF and CORS (used by corsheaders middleware)
 # Include the scheme (https/http) as required by Django for CSRF_TRUSTED_ORIGINS
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
-    'https://bandoleered-toney-loveably.ngrok-free.dev',
+    'https://unopinionated-kiddingly-verline.ngrok-free.dev',
 ]
 
 # If you need cross-origin requests from frontend, explicitly allow it via django-cors-headers settings.
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
-    'https://bandoleered-toney-loveably.ngrok-free.dev',
+    'https://unopinionated-kiddingly-verline.ngrok-free.dev',
     
 ]
 
