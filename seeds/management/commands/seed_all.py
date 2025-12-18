@@ -48,6 +48,9 @@ class Command(BaseCommand):
         
         # Seed Inventory
         self.seed_inventory()
+
+        # Seed additional bulk inventory for read-heavy scenarios
+        self.seed_bulk_inventory_samples(target_count=100, reset=True)
         
         # Seed Inventory Images
         self.seed_inventory_images()
@@ -898,6 +901,66 @@ class Command(BaseCommand):
                 self.stdout.write(f"  ✓ Created inventory: {item.item_name} ({item.part_number})")
             else:
                 self.stdout.write(f"  - Inventory already exists: {item.item_name}")
+
+    def seed_bulk_inventory_samples(self, target_count=100, reset=False):
+        """Seed additional inventory items to support read-heavy RBAC testing."""
+        self.stdout.write(f'Seeding Bulk Inventory Samples (target {target_count})...')
+
+        suppliers = list(Party.objects.filter(party_type='supplier'))
+        branches = list(Branch.objects.all())
+
+        if not suppliers or not branches:
+            self.stdout.write("  - Skipping bulk inventory seeding (suppliers or branches missing)")
+            return
+
+        if reset:
+            deleted_count, _ = Inventory.objects.filter(part_number__startswith='BULK-INV-').delete()
+            self.stdout.write(f"  - Cleared {deleted_count} existing bulk inventory records")
+
+        existing_bulk = Inventory.objects.filter(part_number__startswith='BULK-INV-').count()
+        to_create = max(target_count - existing_bulk, 0)
+
+        if to_create == 0:
+            self.stdout.write(f"  - Bulk inventory already at target ({existing_bulk})")
+            return
+
+        warranties = ['6_month', '12_month', '24_month']
+        categories = ['local', 'original']
+        vehicle_types = ['two_wheeler', 'four_wheeler']
+        bulk_items = []
+
+        for idx in range(existing_bulk, existing_bulk + to_create):
+            price_base = Decimal('10.00') + Decimal(idx % 25)
+            distributor_price = price_base
+            wholesale_price = distributor_price + Decimal('2.50')
+            retail_price = wholesale_price + Decimal('3.50')
+            mrp = retail_price + Decimal('5.00')
+
+            bulk_items.append(Inventory(
+                item_name=f"Bulk Inventory Item {idx + 1}",
+                category=categories[idx % len(categories)],
+                vehicle_type=vehicle_types[idx % len(vehicle_types)],
+                part_number=f"BULK-INV-{idx:05d}",
+                barcode=f"999000{idx:07d}",
+                hsn_code='87089900',
+                quantity=Decimal('10.00') + Decimal(idx % 30),
+                min_stock_level=Decimal('3.00'),
+                price=distributor_price,
+                mrp=mrp,
+                retail_pricing=retail_price,
+                wholesale_price=wholesale_price,
+                distributor_price=distributor_price,
+                storage_location=f"Aisle {chr(65 + (idx % 26))}{idx % 10}",
+                warranty_period=warranties[idx % len(warranties)],
+                vehicle_bike_details='Compatible with multiple models',
+                model=f"Model-{idx % 150}",
+                type='Bulk Auto Part',
+                party=suppliers[idx % len(suppliers)],
+                branch=branches[idx % len(branches)]
+            ))
+
+        Inventory.objects.bulk_create(bulk_items, ignore_conflicts=True)
+        self.stdout.write(f"  ✓ Added {len(bulk_items)} bulk inventory items (target {target_count})")
 
     def seed_inventory_images(self):
         """Seed inventory items with images from internet"""

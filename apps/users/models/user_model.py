@@ -285,69 +285,65 @@ def create_user_groups(sender, **kwargs):
     if sender.name == 'apps.users':
         from django.contrib.contenttypes.models import ContentType
         
+        # Pre-fetch reusable permission sets
+        view_permissions = list(Permission.objects.filter(codename__startswith='view_'))
+
+        def resolve_permissions(permission_specs):
+            """Resolve (codename, app_label, model) tuples into Permission objects."""
+            resolved = []
+            for perm_codename, app_label, model_name in permission_specs:
+                try:
+                    content_type = ContentType.objects.get(app_label=app_label, model=model_name)
+                    permission = Permission.objects.get(codename=perm_codename, content_type=content_type)
+                    resolved.append(permission)
+                except (ContentType.DoesNotExist, Permission.DoesNotExist):
+                    continue
+            return resolved
+
         # Define roles and their permissions (using display names)
         roles_permissions = {
-            'Super Admin': {
+            User.Role.SUPER_ADMIN.label: {
                 'description': 'Full system access with all permissions',
-                'permissions': 'all'  # Will get all permissions
+                'permissions': 'all',
             },
-            'Admin': {
+            User.Role.ADMIN.label: {
                 'description': 'Administrative access to manage users and settings',
-                'permissions': [
+                'permissions': view_permissions + resolve_permissions([
                     ('add_user', 'users', 'user'),
                     ('change_user', 'users', 'user'),
                     ('delete_user', 'users', 'user'),
                     ('view_user', 'users', 'user'),
-                ]
+                ]),
             },
-            'Cashier': {
-                'description': 'Access to sales and customer transactions',
-                'permissions': [
-                    ('view_user', 'users', 'user'),  # Can view users
-                    # Add more cashier-specific permissions here
-                ]
+            User.Role.SUB_ADMIN.label: {
+                'description': 'Read-only access within tenant scope',
+                'permissions': view_permissions,
             },
-            'Inventory Manager': {
+            User.Role.CASHIER.label: {
+                'description': 'Access to sales and customer transactions (read + cashier ops)',
+                'permissions': view_permissions + resolve_permissions([
+                    ('view_user', 'users', 'user'),
+                ]),
+            },
+            User.Role.INVENTORY_MANAGER.label: {
                 'description': 'Manage inventory, stock, and suppliers',
-                'permissions': [
-                    ('view_user', 'users', 'user'),  # Can view users
-                    # Add more inventory-specific permissions here
-                ]
+                'permissions': view_permissions + resolve_permissions([
+                    ('view_user', 'users', 'user'),
+                ]),
             },
-            'Customer': {
-                'description': 'Customer account with basic access',
-                'permissions': [
-                    ('view_user', 'users', 'user'),  # Can view their own user
-                    # Add more customer-specific permissions here
-                ]
+            User.Role.CUSTOMER.label: {
+                'description': 'Customer account with read access across models',
+                'permissions': view_permissions,
             },
         }
-        
+
         for role_name, role_config in roles_permissions.items():
-            group, created = Group.objects.get_or_create(name=role_name)
-            
-            if created or not group.permissions.exists():
-                if role_config['permissions'] == 'all':
-                    # Super Admin gets all permissions
-                    all_permissions = Permission.objects.all()
-                    group.permissions.set(all_permissions)
-                else:
-                    # Add specific permissions
-                    permissions = []
-                    for perm_codename, app_label, model_name in role_config['permissions']:
-                        try:
-                            content_type = ContentType.objects.get(
-                                app_label=app_label,
-                                model=model_name
-                            )
-                            permission = Permission.objects.get(
-                                codename=perm_codename,
-                                content_type=content_type
-                            )
-                            permissions.append(permission)
-                        except (ContentType.DoesNotExist, Permission.DoesNotExist):
-                            pass
-                    
-                    group.permissions.set(permissions)
-                
-                print(f"✓ Created/Updated group: {role_name} - {role_config['description']}")
+            group, _ = Group.objects.get_or_create(name=role_name)
+
+            if role_config['permissions'] == 'all':
+                permissions = Permission.objects.all()
+            else:
+                permissions = role_config['permissions']
+
+            group.permissions.set(permissions)
+            print(f"✓ Synced group: {role_name} - {role_config['description']}")
