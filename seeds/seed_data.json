@@ -1,0 +1,220 @@
+{
+  "subscription_plans": [
+    {
+      "plan_name": "Starter",
+      "plan_price": 9.99,
+      "no_of_user": 1,
+      "no_of_branch": 1,
+      "support_type": "email"
+    },
+    {
+      "plan_name": "Professional",
+      "plan_price": 29.99,
+      "no_of_user": 5,
+      "no_of_branch": 2,
+      "support_type": "email"
+    },
+    {
+      "plan_name": "Business",
+      "plan_price": 99.99,
+      "no_of_user": 20,
+      "no_of_branch": 5,
+      "support_type": "phone"
+    },
+    {
+      "plan_name": "Enterprise",
+      "plan_price": 299.99,
+      "no_of_user": 100,
+      "no_of_branch": 20,
+      "support_type": "ticket"
+    }
+  ],
+  "tenants": [
+    {
+      "business_name": "ServeIQ Demo Co",
+      "email": "admin@serveiqdemo.com",
+      "phone": "+1234567890",
+      "package": "Starter",
+      "status": "approved"
+    }
+  ],
+  "branches": [
+    {
+      "branch_name": "Main Branch",
+      "branch_code": "MAIN001",
+      "Address": "123 Main Street, New York, NY",
+      "city": "New York",
+      "state": "NY",
+      "phone": "+1234567890",
+      "Email": "main@serveiqdemo.com",
+      "tenant": "ServeIQ Demo Co"
+    },
+    {
+      "branch_name": "Warehouse A",
+      "branch_code": "WH001",
+      "Address": "456 Warehouse Road, Newark, NJ",
+      "city": "Newark",
+      "state": "NJ",
+      "phone": "+1231231234",
+      "Email": "warehouse@serveiqdemo.com",
+      "tenant": "ServeIQ Demo Co"
+    }
+  ],
+  "users": [
+    {
+      "username": "superadmin",
+      "email": "superadmin@serveiqdemo.com",
+      "password": "SuperAdmin@123",
+      "first_name": "Super",
+      "last_name": "Admin",
+      "full_name": "Super Admin",
+      "phone": "+1111111111",
+      "role": "super_admin",
+      "status": "active",
+      "is_staff": true,
+      "is_superuser": true,
+      "tenant": "ServeIQ Demo Co"
+    },
+    {
+      "username": "admin",
+      "email": "admin@serveiqdemo.com",
+      "password": "Admin@123",
+      "first_name": "John",
+      "last_name": "Manager",
+      "full_name": "John Manager",
+      "phone": "+2222222222",
+      "role": "admin",
+      "status": "active",
+      "is_staff": true,
+      "tenant": "ServeIQ Demo Co",
+      "branch": "Main Branch"
+    },
+    {
+      "username": "cashier",
+      "email": "cashier@serveiqdemo.com",
+      "password": "Cashier@123",
+      "first_name": "Cara",
+      "last_name": "Cash",
+      "full_name": "Cara Cash",
+      "phone": "+3333333333",
+      "role": "cashier",
+      "status": "active",
+      "tenant": "ServeIQ Demo Co",
+      "branch": "Main Branch"
+    },
+    {
+      "username": "inventory",
+      "email": "inventory@serveiqdemo.com",
+      "password": "Inventory@123",
+      "first_name": "Ian",
+      "last_name": "Inventory",
+      "full_name": "Ian Inventory",
+      "phone": "+4444444444",
+      "role": "inventory_manager",
+      "status": "active",
+      "tenant": "ServeIQ Demo Co",
+      "branch": "Warehouse A"
+    },
+    {
+      "username": "customer",
+      "email": "customer@serveiqdemo.com",
+      "password": "Customer@123",
+      "first_name": "Cathy",
+      "last_name": "Customer",
+      "full_name": "Cathy Customer",
+      "phone": "+5555555555",
+      "role": "customer",
+      "status": "active"
+    }
+  ],
+  "parties": [
+    {
+      "party_type": "supplier",
+      "party_name": "Global Auto Parts Supplier",
+      "contact_person": "Mr. Kumar",
+      "email": "contact@globalauto.com",
+      "phone": "+1111111111",
+      "address": "100 Supplier Lane",
+      "city": "Newark",
+      "state_province": "NJ",
+      "pan_number": "AABBH1234A",
+      "payment_terms": "cash",
+      "branch": "Warehouse A"
+    },
+    {
+      "party_type": "customer",
+      "customer_type": "retailer",
+      "party_name": "City Auto Retail Store",
+      "contact_person": "Mr. Williams",
+      "email": "manager@cityauto.com",
+      "phone": "+5555555555",
+      "address": "500 Retail Plaza",
+      "city": "New York",
+      "state_province": "NY",
+      "payment_terms": "cash",
+      "branch": "Main Branch"
+    }
+  ],
+  "inventory": [
+    {
+      "item_name": "Engine Oil Filter Premium",
+      "part_number": "OIL-FIL-001",
+      "barcode": "8901234567001",
+      "hsn_code": "84211190",
+      "category": "original",
+      "vehicle_type": "four_wheeler",
+      "quantity": 150,
+      "min_stock_level": 20,
+      "price": 8.5,
+      "mrp": 12.0,
+      "retail_pricing": 10.5,
+      "wholesale_price": 9.0,
+      "distributor_price": 8.5,
+      "storage_location": "Shelf A1",
+      "warranty_period": "3_month",
+      "vehicle_bike_details": "Maruti Swift, Hyundai i20",
+      "model": "Standard Filter",
+      "type": "Engine Component",
+      "party": "Global Auto Parts Supplier",
+      "branch": "Warehouse A"
+    },
+    {
+      "item_name": "Tire Tube 17 inch MRF",
+      "part_number": "TIRE-17-001",
+      "barcode": "8901234567009",
+      "hsn_code": "40121100",
+      "category": "local",
+      "vehicle_type": "two_wheeler",
+      "quantity": 100,
+      "min_stock_level": 15,
+      "price": 15.0,
+      "mrp": 25.0,
+      "retail_pricing": 20.0,
+      "wholesale_price": 17.5,
+      "distributor_price": 15.0,
+      "storage_location": "Shelf C2",
+      "warranty_period": "3_month",
+      "vehicle_bike_details": "Motorcycles, Scooters",
+      "model": "17 inch",
+      "type": "Tires & Tubes",
+      "party": "Global Auto Parts Supplier",
+      "branch": "Warehouse A"
+    }
+  ],
+  "bank_accounts": [
+    {
+      "account_type": "bank_account",
+      "account_name": "Main Operating Account",
+      "bank_name": "First National Bank",
+      "account_number": "ACC-001234567890",
+      "account_holders_name": "ServeIQ Demo Co",
+      "branch": "Main Branch"
+    },
+    {
+      "account_type": "cash",
+      "account_name": "Main Cash Register",
+      "account_holders_name": "ServeIQ Demo Co",
+      "branch": "Main Branch"
+    }
+  ]
+}

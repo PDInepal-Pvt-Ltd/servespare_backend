@@ -8,9 +8,10 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Q, F, Sum, DecimalField
 from apps.stock_management.models import Inventory, InventoryImage, Party
 from apps.stock_management.serializers import InventorySerializer, InventoryImageSerializer
+from apps.base.drf import TenantViewSetMixin
 
 
-class InventoryViewSet(viewsets.ModelViewSet):
+class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing inventory items
     """
@@ -65,11 +66,11 @@ class InventoryViewSet(viewsets.ModelViewSet):
         """
         Get all items with low stock (quantity <= min_stock_level)
         """
-        low_stock_items = Inventory.objects.filter(
+        low_stock_items = self.filter_queryset(Inventory.objects.filter(
             quantity__lte=F('min_stock_level'),
             is_active=True
-        ).select_related('party').prefetch_related('images')
-        
+        ).select_related('party').prefetch_related('images'))
+
         serializer = self.get_serializer(low_stock_items, many=True)
         return Response(serializer.data)
     
@@ -82,7 +83,7 @@ class InventoryViewSet(viewsets.ModelViewSet):
         - Total out of stock items (quantity = 0)
         - Total stock value (sum of quantity * price)
         """
-        all_inventory = Inventory.objects.filter(is_active=True)
+        all_inventory = self.filter_queryset(Inventory.objects.filter(is_active=True))
         
         # Count low stock items (quantity <= min_stock_level and quantity > 0)
         low_stock_count = all_inventory.filter(
@@ -126,11 +127,11 @@ class InventoryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        items = Inventory.objects.filter(
+        items = self.filter_queryset(Inventory.objects.filter(
             category=category,
             is_active=True
-        ).select_related('party').prefetch_related('images')
-        
+        ).select_related('party').prefetch_related('images'))
+
         serializer = self.get_serializer(items, many=True)
         return Response(serializer.data)
     
@@ -146,11 +147,11 @@ class InventoryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        items = Inventory.objects.filter(
+        items = self.filter_queryset(Inventory.objects.filter(
             vehicle_type=vehicle_type,
             is_active=True
-        ).select_related('party').prefetch_related('images')
-        
+        ).select_related('party').prefetch_related('images'))
+
         serializer = self.get_serializer(items, many=True)
         return Response(serializer.data)
     
@@ -349,7 +350,7 @@ class InventoryViewSet(viewsets.ModelViewSet):
                         
                         elif model_field == 'party_name':
                             # Lookup party by name
-                            party = Party.objects.filter(party_name__iexact=value, is_active=True).first()
+                            party = self.filter_queryset(Party.objects.filter(party_name__iexact=value, is_active=True)).first()
                             if party:
                                 inventory_data['party'] = party.id
                             else:
@@ -410,7 +411,7 @@ class InventoryViewSet(viewsets.ModelViewSet):
             return Response(response_data, status=status.HTTP_201_CREATED)
 
 
-class InventoryImageViewSet(viewsets.ModelViewSet):
+class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing inventory images
     """

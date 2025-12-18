@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from apps.base.models import BaseModel
+from apps.base.managers import TenantManager
 
 
 class Subscription(BaseModel):
@@ -17,6 +18,7 @@ class Subscription(BaseModel):
         on_delete=models.CASCADE,
         related_name='subscriptions'
     )
+
     subscription_date = models.DateField()
     finish_date = models.DateField()
     renew_date = models.DateField(null=True, blank=True)
@@ -47,4 +49,6 @@ class Subscription(BaseModel):
     
     def __str__(self):
         return f"{self.tenant.business_name} - {self.subscription_plan.plan_name} ({self.subscription_date})"
+
+    objects = TenantManager()
 

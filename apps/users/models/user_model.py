@@ -5,6 +5,7 @@ from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 
 from apps.base.models import BaseModel
+from apps.base.managers import TenantManager
 
 
 class User(AbstractUser, BaseModel):
@@ -129,6 +130,17 @@ class User(AbstractUser, BaseModel):
         db_column='tenant_id',
         verbose_name=_('tenant'),
         help_text=_('Tenant organization this user belongs to.')
+    )
+
+    objects = TenantManager()
+
+    branch = models.ForeignKey(
+        'branch.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users',
+        help_text=_('Branch this user belongs to.')
     )
     
     created_by = models.ForeignKey(

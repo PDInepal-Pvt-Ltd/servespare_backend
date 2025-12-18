@@ -1,13 +1,14 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Q, Count, Sum, F, DecimalField
+from django.db.models import Sum, F, DecimalField
 from django.db.models.functions import Coalesce
 from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem
 from apps.stock_management.serializers import PurchaseOrderSerializer, PurchaseOrderItemSerializer
+from apps.base.drf import TenantViewSetMixin
 
 
-class PurchaseOrderViewSet(viewsets.ModelViewSet):
+class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing purchase orders
     """
@@ -55,10 +56,10 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        purchase_orders = PurchaseOrder.objects.filter(
+        purchase_orders = self.filter_queryset(PurchaseOrder.objects.filter(
             status=status_filter
-        ).select_related('supplier').prefetch_related('items')
-        
+        ).select_related('supplier').prefetch_related('items'))
+
         serializer = self.get_serializer(purchase_orders, many=True)
         return Response(serializer.data)
     
@@ -87,7 +88,7 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
         - Pending: count of draft and ordered POs
         - Received: count of received POs
         """
-        queryset = PurchaseOrder.objects.all()
+        queryset = self.filter_queryset(PurchaseOrder.objects.all())
         
         # Total POs count
         total_pos = queryset.count()
@@ -127,7 +128,7 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
         })
 
 
-class PurchaseOrderItemViewSet(viewsets.ModelViewSet):
+class PurchaseOrderItemViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing purchase order items
     """

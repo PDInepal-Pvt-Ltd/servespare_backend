@@ -2,11 +2,12 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 
+from apps.base.admin import TenantAdminMixin
 from .models import User
 
 
 @admin.register(User)
-class UserAdmin(BaseUserAdmin):
+class UserAdmin(TenantAdminMixin, BaseUserAdmin):
     """Admin interface for custom User model."""
     
     # Display configuration

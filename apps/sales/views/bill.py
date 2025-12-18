@@ -4,9 +4,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from apps.sales.models import Bill
 from apps.sales.serializers import BillSerializer
+from apps.base.drf import TenantViewSetMixin
 
 
-class BillViewSet(viewsets.ModelViewSet):
+class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing bills
     """
@@ -15,7 +16,7 @@ class BillViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """
-        Optionally filter by customer_type or is_active
+        Optionally filter by customer_type, is_active, status, payment_method and search
         """
         queryset = Bill.objects.all()
         
@@ -24,6 +25,16 @@ class BillViewSet(viewsets.ModelViewSet):
         if customer_type is not None:
             queryset = queryset.filter(customer_type=customer_type)
         
+        # Filter by status
+        status_param = self.request.query_params.get('status', None)
+        if status_param is not None:
+            queryset = queryset.filter(status=status_param)
+
+        # Filter by payment_method
+        payment_method = self.request.query_params.get('payment_method', None)
+        if payment_method is not None:
+            queryset = queryset.filter(payment_method=payment_method)
+
         # Filter by is_active
         is_active = self.request.query_params.get('is_active', None)
         if is_active is not None:
@@ -54,11 +65,11 @@ class BillViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        bills = Bill.objects.filter(
+        bills = self.filter_queryset(Bill.objects.filter(
             customer_type=customer_type,
             is_active=True
-        )
-        
+        ))
+
         serializer = self.get_serializer(bills, many=True)
         return Response(serializer.data)
 
