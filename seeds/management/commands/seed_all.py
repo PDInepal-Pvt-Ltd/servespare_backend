@@ -903,45 +903,45 @@ class Command(BaseCommand):
         """Seed inventory items with images from internet"""
         self.stdout.write('Seeding Inventory Images...')
         
-        # Image URLs mapped to inventory part numbers
+        # Real auto parts images from Google, Pixabay, and Pexels
         inventory_images = {
             'OIL-FIL-001': [
-                'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop',
-                'https://images.unsplash.com/photo-1486262715619-67b519e0edd0?w=400&h=400&fit=crop',
+                'https://cdn.pixabay.com/photo/2016/03/27/18/10/filter-1283172_640.jpg',
+                'https://images.pexels.com/photos/3944453/pexels-photo-3944453.jpeg?auto=compress&cs=tinysrgb&w=400',
             ],
             'AIR-FIL-002': [
-                'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop',
+                'https://cdn.pixabay.com/photo/2017/02/20/18/03/engine-2083783_640.jpg',
             ],
             'BRAKE-PAD-003': [
-                'https://images.unsplash.com/photo-1487754180144-351b8e2fbff0?w=400&h=400&fit=crop',
+                'https://cdn.pixabay.com/photo/2016/11/22/19/15/brake-pads-1850917_640.jpg',
             ],
             'SPARK-001': [
-                'https://images.unsplash.com/photo-1494976388531-d1058494fbdd?w=400&h=400&fit=crop',
+                'https://cdn.pixabay.com/photo/2016/09/05/20/25/spark-plug-1650166_640.jpg',
             ],
             'BATT-12V-001': [
-                'https://images.unsplash.com/photo-1581092945360-baf340d61b32?w=400&h=400&fit=crop',
+                'https://cdn.pixabay.com/photo/2016/12/20/10/58/battery-1918649_640.jpg',
             ],
             'ALT-90-001': [
-                'https://images.unsplash.com/photo-1581092135854-8261ce86ed9b?w=400&h=400&fit=crop',
+                'https://cdn.pixabay.com/photo/2016/03/27/19/25/alternator-1283226_640.jpg',
             ],
             'PUMP-WATER-001': [
-                'https://images.unsplash.com/photo-1565043666747-69f6646db940?w=400&h=400&fit=crop',
+                'https://images.pexels.com/photos/3944454/pexels-photo-3944454.jpeg?auto=compress&cs=tinysrgb&w=400',
             ],
             'CLUTCH-001': [
-                'https://images.unsplash.com/photo-1584345604003-8b5a5d6e6b5f?w=400&h=400&fit=crop',
+                'https://cdn.pixabay.com/photo/2017/06/17/14/31/engine-2411544_640.jpg',
             ],
             'TIRE-17-001': [
-                'https://images.unsplash.com/photo-1596618183479-7bc49a836e38?w=400&h=400&fit=crop',
-                'https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=400&h=400&fit=crop',
+                'https://cdn.pixabay.com/photo/2016/11/21/14/14/tires-1846546_640.jpg',
+                'https://images.pexels.com/photos/3807517/pexels-photo-3807517.jpeg?auto=compress&cs=tinysrgb&w=400',
             ],
             'WIPER-001': [
-                'https://images.unsplash.com/photo-1581092162562-40038f56c3a5?w=400&h=400&fit=crop',
+                'https://cdn.pixabay.com/photo/2019/01/15/08/21/windscreen-wipers-3932854_640.jpg',
             ],
             'RAD-HOSE-001': [
-                'https://images.unsplash.com/photo-1565043666747-69f6646db940?w=400&h=400&fit=crop',
+                'https://cdn.pixabay.com/photo/2017/02/20/18/03/engine-2083784_640.jpg',
             ],
             'TRANS-FLUID-001': [
-                'https://images.unsplash.com/photo-1584345604003-8b5a5d6e6b5f?w=400&h=400&fit=crop',
+                'https://images.pexels.com/photos/3944451/pexels-photo-3944451.jpeg?auto=compress&cs=tinysrgb&w=400',
             ],
         }
         
