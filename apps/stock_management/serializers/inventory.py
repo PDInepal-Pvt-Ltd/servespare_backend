@@ -20,7 +20,7 @@ class InventoryImageSerializer(serializers.ModelSerializer):
             'created',
             'modified'
         ]
-        read_only_fields = ['id', 'created', 'modified']
+        read_only_fields = ['id', 'inventory', 'created', 'modified']
 
 
 class InventorySerializer(serializers.ModelSerializer):
@@ -28,7 +28,7 @@ class InventorySerializer(serializers.ModelSerializer):
     Serializer for Inventory model
     """
     party_detail = PartySerializer(source='party', read_only=True)
-    images = InventoryImageSerializer(many=True, read_only=True)
+    images = InventoryImageSerializer(many=True, required=False)
     is_low_stock = serializers.BooleanField(read_only=True)
     
     class Meta:
@@ -66,7 +66,6 @@ class InventorySerializer(serializers.ModelSerializer):
             'created',
             'modified',
             'party_detail',
-            'images',
             'is_low_stock'
         ]
     
@@ -108,4 +107,30 @@ class InventorySerializer(serializers.ModelSerializer):
         if value < 0:
             raise serializers.ValidationError("Minimum stock level cannot be negative.")
         return value
+
+    def _create_images(self, inventory, images_data):
+        """Create inventory images from nested payload."""
+        for image_data in images_data:
+            serializer = InventoryImageSerializer(data={**image_data, 'inventory': inventory.id})
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+    def create(self, validated_data):
+        images_data = validated_data.pop('images', [])
+        inventory = super().create(validated_data)
+        if images_data:
+            self._create_images(inventory, images_data)
+        return inventory
+
+    def update(self, instance, validated_data):
+        images_data = validated_data.pop('images', None)
+        inventory = super().update(instance, validated_data)
+
+        # If images are provided, replace existing set with the new payload
+        if images_data is not None:
+            instance.images.all().delete()
+            if images_data:
+                self._create_images(inventory, images_data)
+
+        return inventory
 
