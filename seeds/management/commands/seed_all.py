@@ -8,11 +8,14 @@ from django.contrib.auth.models import Group, Permission
 from django.utils import timezone
 from datetime import timedelta, date
 from decimal import Decimal
+import requests
+from io import BytesIO
+from django.core.files.base import ContentFile
 from apps.users.models import User
 from apps.tenant.models import Tenant
 from apps.subscription.models import SubscriptionPlan, Subscription
 from apps.branch.models import Branch
-from apps.stock_management.models import Inventory, Party, PurchaseOrder
+from apps.stock_management.models import Inventory, Party, PurchaseOrder, InventoryImage
 from apps.sales.models import SalesOrder, Bill
 from apps.cashandbank.models import BankAccount
 from apps.carts.models import Cart, CartItem
@@ -45,6 +48,9 @@ class Command(BaseCommand):
         
         # Seed Inventory
         self.seed_inventory()
+        
+        # Seed Inventory Images
+        self.seed_inventory_images()
         
         # Seed Purchase Orders
         self.seed_purchase_orders()
@@ -892,6 +898,96 @@ class Command(BaseCommand):
                 self.stdout.write(f"  ✓ Created inventory: {item.item_name} ({item.part_number})")
             else:
                 self.stdout.write(f"  - Inventory already exists: {item.item_name}")
+
+    def seed_inventory_images(self):
+        """Seed inventory items with images from internet"""
+        self.stdout.write('Seeding Inventory Images...')
+        
+        # Image URLs mapped to inventory part numbers
+        inventory_images = {
+            'OIL-FIL-001': [
+                'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop',
+                'https://images.unsplash.com/photo-1486262715619-67b519e0edd0?w=400&h=400&fit=crop',
+            ],
+            'AIR-FIL-002': [
+                'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop',
+            ],
+            'BRAKE-PAD-003': [
+                'https://images.unsplash.com/photo-1487754180144-351b8e2fbff0?w=400&h=400&fit=crop',
+            ],
+            'SPARK-001': [
+                'https://images.unsplash.com/photo-1494976388531-d1058494fbdd?w=400&h=400&fit=crop',
+            ],
+            'BATT-12V-001': [
+                'https://images.unsplash.com/photo-1581092945360-baf340d61b32?w=400&h=400&fit=crop',
+            ],
+            'ALT-90-001': [
+                'https://images.unsplash.com/photo-1581092135854-8261ce86ed9b?w=400&h=400&fit=crop',
+            ],
+            'PUMP-WATER-001': [
+                'https://images.unsplash.com/photo-1565043666747-69f6646db940?w=400&h=400&fit=crop',
+            ],
+            'CLUTCH-001': [
+                'https://images.unsplash.com/photo-1584345604003-8b5a5d6e6b5f?w=400&h=400&fit=crop',
+            ],
+            'TIRE-17-001': [
+                'https://images.unsplash.com/photo-1596618183479-7bc49a836e38?w=400&h=400&fit=crop',
+                'https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=400&h=400&fit=crop',
+            ],
+            'WIPER-001': [
+                'https://images.unsplash.com/photo-1581092162562-40038f56c3a5?w=400&h=400&fit=crop',
+            ],
+            'RAD-HOSE-001': [
+                'https://images.unsplash.com/photo-1565043666747-69f6646db940?w=400&h=400&fit=crop',
+            ],
+            'TRANS-FLUID-001': [
+                'https://images.unsplash.com/photo-1584345604003-8b5a5d6e6b5f?w=400&h=400&fit=crop',
+            ],
+        }
+        
+        for part_number, image_urls in inventory_images.items():
+            try:
+                inventory = Inventory.objects.get(part_number=part_number)
+            except Inventory.DoesNotExist:
+                self.stdout.write(f"  - Inventory item not found: {part_number}")
+                continue
+            
+            for idx, image_url in enumerate(image_urls):
+                try:
+                    # Check if image already exists
+                    existing_image = InventoryImage.objects.filter(
+                        inventory=inventory,
+                        is_primary=(idx == 0)
+                    ).exists()
+                    
+                    if existing_image:
+                        self.stdout.write(f"  - Image already exists for: {part_number}")
+                        continue
+                    
+                    # Download image from URL
+                    response = requests.get(image_url, timeout=10)
+                    response.raise_for_status()
+                    
+                    # Create image file
+                    image_name = f"{part_number}_{idx}.jpg"
+                    image_content = ContentFile(response.content, name=image_name)
+                    
+                    # Create InventoryImage record
+                    inventory_image = InventoryImage.objects.create(
+                        inventory=inventory,
+                        image=image_content,
+                        description=f"Image {idx + 1} for {inventory.item_name}",
+                        is_primary=(idx == 0),
+                        branch=inventory.branch
+                    )
+                    
+                    status = "PRIMARY" if inventory_image.is_primary else "secondary"
+                    self.stdout.write(f"  ✓ Added {status} image for: {inventory.item_name}")
+                    
+                except requests.RequestException as e:
+                    self.stdout.write(self.style.WARNING(f"  ⚠ Failed to download image for {part_number}: {str(e)}"))
+                except Exception as e:
+                    self.stdout.write(self.style.WARNING(f"  ⚠ Error creating image for {part_number}: {str(e)}"))
 
     def seed_purchase_orders(self):
         """Seed purchase orders with items"""
