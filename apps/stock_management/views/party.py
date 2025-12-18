@@ -3,9 +3,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from apps.stock_management.models import Party
 from apps.stock_management.serializers import PartySerializer
+from apps.base.drf import TenantViewSetMixin
 
 
-class PartyViewSet(viewsets.ModelViewSet):
+class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing parties (suppliers and customers)
     """
@@ -46,7 +47,7 @@ class PartyViewSet(viewsets.ModelViewSet):
         """
         Get all suppliers
         """
-        suppliers = Party.objects.filter(party_type='supplier', is_active=True)
+        suppliers = self.filter_queryset(Party.objects.filter(party_type='supplier', is_active=True))
         serializer = self.get_serializer(suppliers, many=True)
         return Response(serializer.data)
     
@@ -55,7 +56,7 @@ class PartyViewSet(viewsets.ModelViewSet):
         """
         Get all customers
         """
-        customers = Party.objects.filter(party_type='customer', is_active=True)
+        customers = self.filter_queryset(Party.objects.filter(party_type='customer', is_active=True))
         serializer = self.get_serializer(customers, many=True)
         return Response(serializer.data)
 

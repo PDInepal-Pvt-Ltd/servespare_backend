@@ -55,6 +55,15 @@ class Inventory(BaseModel):
         related_name='inventory_items',
         help_text='Party/Supplier associated with this item'
     )
+
+    branch = models.ForeignKey(
+        'branch.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='inventory_items',
+        help_text='Branch that owns this inventory record'
+    )
     
     # Part Information
     part_number = models.CharField(
@@ -250,6 +259,15 @@ class InventoryImage(BaseModel):
     is_primary = models.BooleanField(
         default=False,
         help_text='Mark as primary image'
+    )
+
+    branch = models.ForeignKey(
+        'branch.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='inventory_images',
+        help_text='Branch associated with this image'
     )
     
     class Meta:

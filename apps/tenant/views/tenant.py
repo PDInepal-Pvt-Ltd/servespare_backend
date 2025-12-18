@@ -3,10 +3,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from apps.tenant.models import Tenant
 from apps.tenant.serializers import TenantSerializer
+from apps.base.drf import TenantViewSetMixin
 from django.db.models import Count
 
 
-class TenantViewSet(viewsets.ModelViewSet):
+class TenantViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing tenants
     """
@@ -51,10 +52,10 @@ class TenantViewSet(viewsets.ModelViewSet):
         """
         Get all active tenants
         """
-        active_tenants = Tenant.objects.filter(
+        active_tenants = self.filter_queryset(Tenant.objects.filter(
             is_active=True,
             status='active'
-        ).select_related('package')
+        ).select_related('package'))
         
         serializer = self.get_serializer(active_tenants, many=True)
         return Response(serializer.data)
@@ -71,9 +72,9 @@ class TenantViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        tenants = Tenant.objects.filter(
+        tenants = self.filter_queryset(Tenant.objects.filter(
             status=status_filter
-        ).select_related('package')
+        ).select_related('package'))
         
         serializer = self.get_serializer(tenants, many=True)
         return Response(serializer.data)
@@ -83,9 +84,9 @@ class TenantViewSet(viewsets.ModelViewSet):
         """
         Get all trial tenants
         """
-        trial_tenants = Tenant.objects.filter(
+        trial_tenants = self.filter_queryset(Tenant.objects.filter(
             status='trial'
-        ).select_related('package')
+        ).select_related('package'))
         
         serializer = self.get_serializer(trial_tenants, many=True)
         return Response(serializer.data)
@@ -96,7 +97,7 @@ class TenantViewSet(viewsets.ModelViewSet):
         Get counts of tenants grouped by status, or a single status via `?status=`.
         """
         status_filter = request.query_params.get('status', None)
-        qs = Tenant.objects.all()
+        qs = self.filter_queryset(Tenant.objects.all())
 
         if status_filter:
             count = qs.filter(status=status_filter).count()

@@ -11,6 +11,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.base.pagination import StandardResultsSetPagination
 from apps.users.models import User
+from apps.base.drf import TenantViewSetMixin
 from apps.users.serializers import (
     UserListSerializer,
     UserDetailSerializer,
@@ -84,7 +85,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for User CRUD operations.
     
@@ -430,7 +431,7 @@ class UserViewSet(viewsets.ModelViewSet):
         user_ids = serializer.validated_data['user_ids']
         action_type = serializer.validated_data['action']
         
-        users = User.objects.filter(id__in=user_ids)
+        users = self.filter_queryset(User.objects.filter(id__in=user_ids))
         count = users.count()
         
         if action_type == 'activate':
@@ -478,10 +479,10 @@ class UserViewSet(viewsets.ModelViewSet):
         GET /api/users/admin_accounts/
         """
         # Get all users with admin or super_admin roles
-        queryset = User.objects.filter(
+        queryset = self.filter_queryset(User.objects.filter(
             role__in=[User.Role.ADMIN],
             is_removed=False
-        ).select_related('tenant', 'tenant__package')
+        ).select_related('tenant', 'tenant__package'))
         
         # Filter by status
         status_filter = request.query_params.get('status', None)

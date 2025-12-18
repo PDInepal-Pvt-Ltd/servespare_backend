@@ -8,10 +8,14 @@ from django.contrib.auth.models import Group, Permission
 from django.utils import timezone
 from datetime import timedelta, date
 from decimal import Decimal
+import requests
+from io import BytesIO
+from django.core.files.base import ContentFile
 from apps.users.models import User
 from apps.tenant.models import Tenant
 from apps.subscription.models import SubscriptionPlan, Subscription
-from apps.stock_management.models import Inventory, Party, PurchaseOrder
+from apps.branch.models import Branch
+from apps.stock_management.models import Inventory, Party, PurchaseOrder, InventoryImage
 from apps.sales.models import SalesOrder, Bill
 from apps.cashandbank.models import BankAccount
 from apps.carts.models import Cart, CartItem
@@ -29,6 +33,9 @@ class Command(BaseCommand):
         
         # Seed Tenants
         self.seed_tenants()
+
+        # Seed Branches
+        self.seed_branches()
         
         # Seed Subscriptions
         self.seed_subscriptions()
@@ -41,6 +48,9 @@ class Command(BaseCommand):
         
         # Seed Inventory
         self.seed_inventory()
+        
+        # Seed Inventory Images
+        self.seed_inventory_images()
         
         # Seed Purchase Orders
         self.seed_purchase_orders()
@@ -61,6 +71,64 @@ class Command(BaseCommand):
         self.seed_otp()
         
         self.stdout.write(self.style.SUCCESS('✓ All seed data has been created successfully!'))
+
+    def seed_branches(self):
+        """Seed branches for tenants"""
+        self.stdout.write('Seeding Branches...')
+
+        tenants = Tenant.objects.all()
+
+        if not tenants:
+            self.stdout.write("  - No tenants found, skipping branches seeding")
+            return
+
+        primary_tenant = tenants[0]
+        secondary_tenant = tenants[1] if len(tenants) > 1 else primary_tenant
+
+        branches_data = [
+            {
+                'tenant': primary_tenant,
+                'branch_name': 'Main Branch',
+                'branch_code': 'MAIN001',
+                'Address': '123 Main Street, New York, NY',
+                'city': 'New York',
+                'state': 'NY',
+                'phone': '+1234567890',
+                'Email': 'main@serveiqdemo.com'
+            },
+            {
+                'tenant': primary_tenant,
+                'branch_name': 'Warehouse A',
+                'branch_code': 'WH001',
+                'Address': '456 Warehouse Road, Newark, NJ',
+                'city': 'Newark',
+                'state': 'NJ',
+                'phone': '+1231231234',
+                'Email': 'warehouse@serveiqdemo.com'
+            }
+        ]
+
+        if len(tenants) > 1:
+            branches_data.append({
+                'tenant': secondary_tenant,
+                'branch_name': 'Parts Center Branch',
+                'branch_code': 'PC001',
+                'Address': '789 Parts Ave, Los Angeles, CA',
+                'city': 'Los Angeles',
+                'state': 'CA',
+                'phone': '+1987654321',
+                'Email': 'branch@partscenter.com'
+            })
+
+        for branch_data in branches_data:
+            branch, created = Branch.objects.get_or_create(
+                branch_code=branch_data['branch_code'],
+                defaults=branch_data
+            )
+            if created:
+                self.stdout.write(f"  ✓ Created branch: {branch.branch_name}")
+            else:
+                self.stdout.write(f"  - Branch already exists: {branch.branch_name}")
 
     def seed_subscription_plans(self):
         """Seed subscription plans"""
@@ -401,6 +469,10 @@ class Command(BaseCommand):
         primary_tenant = tenants[0]
         secondary_tenant = tenants[1] if len(tenants) > 1 else tenants[0]
         
+        main_branch = Branch.objects.filter(branch_code='MAIN001').first()
+        warehouse_branch = Branch.objects.filter(branch_code='WH001').first() or main_branch
+        secondary_branch = Branch.objects.filter(branch_code='PC001').first() or main_branch
+
         parties_data = [
             # Suppliers for Primary Tenant
             {
@@ -414,7 +486,7 @@ class Command(BaseCommand):
                 'state_province': 'NJ',
                 'pan_number': 'AABBH1234A',
                 'payment_terms': 'cash',
-                'tenant': primary_tenant
+                'branch': warehouse_branch
             },
             {
                 'party_type': 'supplier',
@@ -427,7 +499,7 @@ class Command(BaseCommand):
                 'state_province': 'NJ',
                 'pan_number': 'CCDDP5678B',
                 'payment_terms': '15_day_credit',
-                'tenant': primary_tenant
+                'branch': warehouse_branch
             },
             {
                 'party_type': 'supplier',
@@ -440,7 +512,7 @@ class Command(BaseCommand):
                 'state_province': 'NJ',
                 'pan_number': 'EEFFM9012C',
                 'payment_terms': '30_day_credit',
-                'tenant': primary_tenant
+                'branch': warehouse_branch
             },
             {
                 'party_type': 'supplier',
@@ -453,7 +525,7 @@ class Command(BaseCommand):
                 'state_province': 'NJ',
                 'pan_number': 'GGHHR3456D',
                 'payment_terms': '7_day_credit',
-                'tenant': primary_tenant
+                'branch': warehouse_branch
             },
             # Customers for Primary Tenant
             {
@@ -467,7 +539,7 @@ class Command(BaseCommand):
                 'city': 'New York',
                 'state_province': 'NY',
                 'payment_terms': 'cash',
-                'tenant': primary_tenant
+                'branch': main_branch
             },
             {
                 'party_type': 'customer',
@@ -480,7 +552,7 @@ class Command(BaseCommand):
                 'city': 'New York',
                 'state_province': 'NY',
                 'payment_terms': '15_day_credit',
-                'tenant': primary_tenant
+                'branch': main_branch
             },
             {
                 'party_type': 'customer',
@@ -493,7 +565,7 @@ class Command(BaseCommand):
                 'city': 'Newark',
                 'state_province': 'NJ',
                 'payment_terms': '30_day_credit',
-                'tenant': primary_tenant
+                'branch': warehouse_branch
             },
             {
                 'party_type': 'customer',
@@ -506,7 +578,7 @@ class Command(BaseCommand):
                 'city': 'Paterson',
                 'state_province': 'NJ',
                 'payment_terms': '45_day_credit',
-                'tenant': primary_tenant
+                'branch': warehouse_branch
             }
         ]
         
@@ -523,12 +595,11 @@ class Command(BaseCommand):
                     'state_province': 'CA',
                     'pan_number': 'IIJES7890E',
                     'payment_terms': 'cash',
-                    'tenant': secondary_tenant
+                    'branch': secondary_branch
                 }
             ])
         
         for party_data in parties_data:
-            party_data.pop('tenant', None)  # Remove tenant if present
             party, created = Party.objects.get_or_create(
                 party_name=party_data['party_name'],
                 defaults=party_data
@@ -544,6 +615,8 @@ class Command(BaseCommand):
         
         tenants = Tenant.objects.all()
         suppliers = Party.objects.filter(party_type='supplier')
+        main_branch = Branch.objects.filter(branch_code='MAIN001').first()
+        warehouse_branch = Branch.objects.filter(branch_code='WH001').first() or main_branch
         
         if not tenants or not suppliers:
             self.stdout.write("  - No tenants or suppliers found, skipping inventory seeding")
@@ -570,6 +643,7 @@ class Command(BaseCommand):
                 'model': 'Standard Filter',
                 'type': 'Engine Component',
                 'party': suppliers.first(),
+                'branch': warehouse_branch
             },
             {
                 'item_name': 'Air Filter High Flow',
@@ -591,6 +665,7 @@ class Command(BaseCommand):
                 'model': 'High Flow',
                 'type': 'Air Intake',
                 'party': suppliers.first(),
+                'branch': warehouse_branch
             },
             {
                 'item_name': 'Brake Pads Set Ceramic',
@@ -612,6 +687,7 @@ class Command(BaseCommand):
                 'model': 'Ceramic Pro',
                 'type': 'Braking System',
                 'party': suppliers.first(),
+                'branch': warehouse_branch
             },
             {
                 'item_name': 'Spark Plug Iridium',
@@ -633,6 +709,7 @@ class Command(BaseCommand):
                 'model': 'Iridium',
                 'type': 'Ignition',
                 'party': suppliers.first(),
+                'branch': warehouse_branch
             },
             {
                 'item_name': 'Battery 12V 50Ah Premium',
@@ -654,6 +731,7 @@ class Command(BaseCommand):
                 'model': 'Premium 50Ah',
                 'type': 'Electrical',
                 'party': suppliers.first(),
+                'branch': warehouse_branch
             },
             {
                 'item_name': 'Alternator 90A Durable',
@@ -675,6 +753,7 @@ class Command(BaseCommand):
                 'model': '90A Standard',
                 'type': 'Charging System',
                 'party': suppliers.first(),
+                'branch': warehouse_branch
             },
             {
                 'item_name': 'Water Pump Assembly Complete',
@@ -696,6 +775,7 @@ class Command(BaseCommand):
                 'model': 'Complete Assembly',
                 'type': 'Cooling System',
                 'party': suppliers.first(),
+                'branch': warehouse_branch
             },
             {
                 'item_name': 'Clutch Plate Heavy Duty',
@@ -717,6 +797,7 @@ class Command(BaseCommand):
                 'model': 'Heavy Duty',
                 'type': 'Transmission',
                 'party': suppliers.first(),
+                'branch': warehouse_branch
             },
             {
                 'item_name': 'Tire Tube 17 inch MRF',
@@ -738,6 +819,7 @@ class Command(BaseCommand):
                 'model': '17 inch',
                 'type': 'Tires & Tubes',
                 'party': suppliers.first(),
+                'branch': warehouse_branch
             },
             {
                 'item_name': 'Wiper Blade Assembly Bosch',
@@ -759,6 +841,7 @@ class Command(BaseCommand):
                 'model': 'Bosch Premium',
                 'type': 'Wipers',
                 'party': suppliers.first(),
+                'branch': warehouse_branch
             },
             {
                 'item_name': 'Radiator Hose Silicone',
@@ -780,6 +863,7 @@ class Command(BaseCommand):
                 'model': 'Silicone',
                 'type': 'Cooling',
                 'party': suppliers.first(),
+                'branch': warehouse_branch
             },
             {
                 'item_name': 'Transmission Fluid ATF',
@@ -801,6 +885,7 @@ class Command(BaseCommand):
                 'model': 'Premium ATF',
                 'type': 'Fluids',
                 'party': suppliers.first(),
+                'branch': warehouse_branch
             }
         ]
         
@@ -814,6 +899,96 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(f"  - Inventory already exists: {item.item_name}")
 
+    def seed_inventory_images(self):
+        """Seed inventory items with images from internet"""
+        self.stdout.write('Seeding Inventory Images...')
+        
+        # Real auto parts images from Google, Pixabay, and Pexels
+        inventory_images = {
+            'OIL-FIL-001': [
+                'https://cdn.pixabay.com/photo/2016/03/27/18/10/filter-1283172_640.jpg',
+                'https://images.pexels.com/photos/3944453/pexels-photo-3944453.jpeg?auto=compress&cs=tinysrgb&w=400',
+            ],
+            'AIR-FIL-002': [
+                'https://cdn.pixabay.com/photo/2017/02/20/18/03/engine-2083783_640.jpg',
+            ],
+            'BRAKE-PAD-003': [
+                'https://cdn.pixabay.com/photo/2016/11/22/19/15/brake-pads-1850917_640.jpg',
+            ],
+            'SPARK-001': [
+                'https://cdn.pixabay.com/photo/2016/09/05/20/25/spark-plug-1650166_640.jpg',
+            ],
+            'BATT-12V-001': [
+                'https://cdn.pixabay.com/photo/2016/12/20/10/58/battery-1918649_640.jpg',
+            ],
+            'ALT-90-001': [
+                'https://cdn.pixabay.com/photo/2016/03/27/19/25/alternator-1283226_640.jpg',
+            ],
+            'PUMP-WATER-001': [
+                'https://images.pexels.com/photos/3944454/pexels-photo-3944454.jpeg?auto=compress&cs=tinysrgb&w=400',
+            ],
+            'CLUTCH-001': [
+                'https://cdn.pixabay.com/photo/2017/06/17/14/31/engine-2411544_640.jpg',
+            ],
+            'TIRE-17-001': [
+                'https://cdn.pixabay.com/photo/2016/11/21/14/14/tires-1846546_640.jpg',
+                'https://images.pexels.com/photos/3807517/pexels-photo-3807517.jpeg?auto=compress&cs=tinysrgb&w=400',
+            ],
+            'WIPER-001': [
+                'https://cdn.pixabay.com/photo/2019/01/15/08/21/windscreen-wipers-3932854_640.jpg',
+            ],
+            'RAD-HOSE-001': [
+                'https://cdn.pixabay.com/photo/2017/02/20/18/03/engine-2083784_640.jpg',
+            ],
+            'TRANS-FLUID-001': [
+                'https://images.pexels.com/photos/3944451/pexels-photo-3944451.jpeg?auto=compress&cs=tinysrgb&w=400',
+            ],
+        }
+        
+        for part_number, image_urls in inventory_images.items():
+            try:
+                inventory = Inventory.objects.get(part_number=part_number)
+            except Inventory.DoesNotExist:
+                self.stdout.write(f"  - Inventory item not found: {part_number}")
+                continue
+            
+            for idx, image_url in enumerate(image_urls):
+                try:
+                    # Check if image already exists
+                    existing_image = InventoryImage.objects.filter(
+                        inventory=inventory,
+                        is_primary=(idx == 0)
+                    ).exists()
+                    
+                    if existing_image:
+                        self.stdout.write(f"  - Image already exists for: {part_number}")
+                        continue
+                    
+                    # Download image from URL
+                    response = requests.get(image_url, timeout=10)
+                    response.raise_for_status()
+                    
+                    # Create image file
+                    image_name = f"{part_number}_{idx}.jpg"
+                    image_content = ContentFile(response.content, name=image_name)
+                    
+                    # Create InventoryImage record
+                    inventory_image = InventoryImage.objects.create(
+                        inventory=inventory,
+                        image=image_content,
+                        description=f"Image {idx + 1} for {inventory.item_name}",
+                        is_primary=(idx == 0),
+                        branch=inventory.branch
+                    )
+                    
+                    status = "PRIMARY" if inventory_image.is_primary else "secondary"
+                    self.stdout.write(f"  ✓ Added {status} image for: {inventory.item_name}")
+                    
+                except requests.RequestException as e:
+                    self.stdout.write(self.style.WARNING(f"  ⚠ Failed to download image for {part_number}: {str(e)}"))
+                except Exception as e:
+                    self.stdout.write(self.style.WARNING(f"  ⚠ Error creating image for {part_number}: {str(e)}"))
+
     def seed_purchase_orders(self):
         """Seed purchase orders with items"""
         self.stdout.write('Seeding Purchase Orders...')
@@ -822,6 +997,8 @@ class Command(BaseCommand):
         
         suppliers = Party.objects.filter(party_type='supplier')
         inventory = Inventory.objects.all()
+        main_branch = Branch.objects.filter(branch_code='MAIN001').first()
+        warehouse_branch = Branch.objects.filter(branch_code='WH001').first() or main_branch
         
         if not suppliers or not inventory:
             self.stdout.write("  - No suppliers or inventory found, skipping purchase orders seeding")
@@ -832,6 +1009,7 @@ class Command(BaseCommand):
                 'po_number': 'PO-2025-001',
                 'status': 'ordered',
                 'supplier': suppliers.first(),
+                'branch': warehouse_branch,
                 'order_date': date.today() - timedelta(days=7),
                 'expected_delivery_date': date.today() + timedelta(days=7),
                 'notes': 'Urgent order for stock replenishment',
@@ -843,7 +1021,8 @@ class Command(BaseCommand):
                         'quantity': Decimal('50.00'),
                         'unit_price': inventory[0].price,
                         'tax': Decimal('18.00'),
-                        'discount_description': 'Bulk discount 5%'
+                        'discount_description': 'Bulk discount 5%',
+                        'branch': warehouse_branch
                     },
                     {
                         'item_name': inventory[1].item_name,
@@ -851,7 +1030,8 @@ class Command(BaseCommand):
                         'quantity': Decimal('40.00'),
                         'unit_price': inventory[1].price,
                         'tax': Decimal('18.00'),
-                        'discount_description': None
+                        'discount_description': None,
+                        'branch': warehouse_branch
                     }
                 ]
             },
@@ -859,6 +1039,7 @@ class Command(BaseCommand):
                 'po_number': 'PO-2025-002',
                 'status': 'received',
                 'supplier': suppliers.last() if suppliers.count() > 1 else suppliers.first(),
+                'branch': warehouse_branch,
                 'order_date': date.today() - timedelta(days=20),
                 'expected_delivery_date': date.today() - timedelta(days=5),
                 'notes': 'Regular stock replenishment',
@@ -870,7 +1051,8 @@ class Command(BaseCommand):
                         'quantity': Decimal('30.00'),
                         'unit_price': inventory[2].price,
                         'tax': Decimal('18.00'),
-                        'discount_description': None
+                        'discount_description': None,
+                        'branch': warehouse_branch
                     }
                 ]
             },
@@ -878,6 +1060,7 @@ class Command(BaseCommand):
                 'po_number': 'PO-2025-003',
                 'status': 'draft',
                 'supplier': suppliers.first(),
+                'branch': warehouse_branch,
                 'order_date': date.today(),
                 'expected_delivery_date': date.today() + timedelta(days=14),
                 'notes': 'Draft order pending approval',
@@ -889,7 +1072,8 @@ class Command(BaseCommand):
                         'quantity': Decimal('60.00'),
                         'unit_price': inventory[3].price,
                         'tax': Decimal('18.00'),
-                        'discount_description': None
+                        'discount_description': None,
+                        'branch': warehouse_branch
                     }
                 ]
             }
@@ -916,7 +1100,8 @@ class Command(BaseCommand):
                             'quantity': item_data['quantity'],
                             'unit_price': item_data['unit_price'],
                             'tax': item_data['tax'],
-                            'discount_description': item_data.get('discount_description')
+                            'discount_description': item_data.get('discount_description'),
+                            'branch': item_data.get('branch')
                         }
                     )
                     self.stdout.write(f"    - Added item: {item_data['item_name']}")
@@ -928,6 +1113,8 @@ class Command(BaseCommand):
         self.stdout.write('Seeding Bank Accounts...')
         
         tenants = Tenant.objects.all()
+        main_branch = Branch.objects.filter(branch_code='MAIN001').first()
+        warehouse_branch = Branch.objects.filter(branch_code='WH001').first() or main_branch
         
         if not tenants:
             self.stdout.write("  - No tenants found, skipping bank accounts seeding")
@@ -943,7 +1130,7 @@ class Command(BaseCommand):
                 'bank_name': 'First National Bank',
                 'account_number': 'ACC-001234567890',
                 'account_holders_name': 'ServeIQ Demo Co',
-                'tenant': primary_tenant
+                'branch': main_branch
             },
             {
                 'account_type': 'bank_account',
@@ -951,20 +1138,20 @@ class Command(BaseCommand):
                 'bank_name': 'First National Bank',
                 'account_number': 'ACC-009876543210',
                 'account_holders_name': 'ServeIQ Demo Co',
-                'tenant': primary_tenant
+                'branch': main_branch
             },
             {
                 'account_type': 'esewa',
                 'account_name': 'eSewa Merchant Account',
                 'account_number': 'ESEWA-123456',
                 'account_holders_name': 'ServeIQ Demo Co',
-                'tenant': primary_tenant
+                'branch': main_branch
             },
             {
                 'account_type': 'cash',
                 'account_name': 'Main Cash Register',
                 'account_holders_name': 'Cash Management',
-                'tenant': primary_tenant
+                'branch': main_branch
             }
         ]
         
@@ -976,18 +1163,17 @@ class Command(BaseCommand):
                     'bank_name': 'West Coast Bank',
                     'account_number': 'ACC-111222333444',
                     'account_holders_name': 'Parts Center Ltd',
-                    'tenant': secondary_tenant
+                    'branch': warehouse_branch
                 },
                 {
                     'account_type': 'cash',
                     'account_name': 'Store Cash Box',
                     'account_holders_name': 'Parts Center Ltd',
-                    'tenant': secondary_tenant
+                    'branch': warehouse_branch
                 }
             ])
         
         for account_data in accounts:
-            account_data.pop('tenant', None)  # Remove tenant if present
             account, created = BankAccount.objects.get_or_create(
                 account_number=account_data.get('account_number', account_data['account_name']),
                 defaults=account_data
@@ -1001,41 +1187,48 @@ class Command(BaseCommand):
         """Seed bills/invoices"""
         self.stdout.write('Seeding Bills...')
         
+        main_branch = Branch.objects.filter(branch_code='MAIN001').first()
+
         bills_data = [
             {
                 'customer_name': 'ABC Auto Workshop',
                 'address': '123 Workshop Lane, New York, NY 10001',
                 'phone_numbers': '+1111111111, +2222222222',
                 'pan_vat_number': 'AABBH1234A',
-                'customer_type': 'workshop'
+                'customer_type': 'workshop',
+                'branch': main_branch
             },
             {
                 'customer_name': 'Quick Fix Retail',
                 'address': '456 Retail Plaza, New York, NY 10002',
                 'phone_numbers': '+3333333333',
                 'pan_vat_number': 'CCDDP5678B',
-                'customer_type': 'retail'
+                'customer_type': 'retail',
+                'branch': main_branch
             },
             {
                 'customer_name': 'Premium Parts Wholesaler',
                 'address': '789 Wholesale Drive, Newark, NJ 07101',
                 'phone_numbers': '+4444444444, +5555555555',
                 'pan_vat_number': 'EEFFM9012C',
-                'customer_type': 'wholesaler'
+                'customer_type': 'wholesaler',
+                'branch': main_branch
             },
             {
                 'customer_name': 'National Auto Distributor',
                 'address': '321 Distribution Ave, Newark, NJ 07102',
                 'phone_numbers': '+6666666666',
                 'pan_vat_number': 'GGHHR3456D',
-                'customer_type': 'distributor'
+                'customer_type': 'distributor',
+                'branch': main_branch
             },
             {
                 'customer_name': 'Regional Parts Retailer',
                 'address': '654 Retail Road, Jersey City, NJ 07302',
                 'phone_numbers': '+7777777777, +8888888888',
                 'pan_vat_number': 'IIJJS7890E',
-                'customer_type': 'retailer'
+                'customer_type': 'retailer',
+                'branch': main_branch
             }
         ]
         
@@ -1057,6 +1250,7 @@ class Command(BaseCommand):
         
         customers = User.objects.filter(role=User.Role.CUSTOMER)
         inventory = Inventory.objects.all()
+        main_branch = Branch.objects.filter(branch_code='MAIN001').first()
         
         if not customers or not inventory:
             self.stdout.write("  - No customers or inventory found, skipping sales orders seeding")
@@ -1084,7 +1278,8 @@ class Command(BaseCommand):
                 'delivery_city': 'New York',
                 'delivery_state': 'NY',
                 'delivery_pincode': '10001',
-                'expected_delivery_date': date.today() + timedelta(days=5)
+                'expected_delivery_date': date.today() + timedelta(days=5),
+                'branch': main_branch
             }
             
             sales_order, created = SalesOrder.objects.get_or_create(
@@ -1104,7 +1299,8 @@ class Command(BaseCommand):
                         defaults={
                             'quantity': Decimal('2.00') + Decimal(item_idx),
                             'unit_price': inv_item.retail_pricing,
-                            'is_active': True
+                            'is_active': True,
+                            'branch': main_branch
                         }
                     )
                     self.stdout.write(f"    - Added item: {inv_item.item_name}")

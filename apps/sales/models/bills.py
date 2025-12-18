@@ -106,6 +106,15 @@ class Bill(BaseModel):
         null=True,
         help_text="Bill status: Draft, Pending, or Paid"
     )
+
+    branch = models.ForeignKey(
+        'branch.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bills',
+        help_text='Branch issuing this bill'
+    )
     
     class Meta:
         db_table = 'bill'

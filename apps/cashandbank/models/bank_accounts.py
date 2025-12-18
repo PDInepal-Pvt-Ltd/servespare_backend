@@ -46,6 +46,15 @@ class BankAccount(BaseModel):
         null=True,
         help_text='Name of the account holder'
     )
+
+    branch = models.ForeignKey(
+        'branch.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bank_accounts',
+        help_text='Branch associated with this bank account'
+    )
     
     class Meta:
         db_table = 'bank_account'
