@@ -966,45 +966,45 @@ class Command(BaseCommand):
         """Seed inventory items with images from internet"""
         self.stdout.write('Seeding Inventory Images...')
         
-        # Real auto parts images from Google, Pixabay, and Pexels
+        # Reliable placeholder images to avoid 403s
         inventory_images = {
             'OIL-FIL-001': [
-                'https://cdn.pixabay.com/photo/2016/03/27/18/10/filter-1283172_640.jpg',
-                'https://images.pexels.com/photos/3944453/pexels-photo-3944453.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'https://placehold.co/640x480?text=OIL-FIL-001',
+                'https://placehold.co/640x480?text=OIL-FIL-001+alt',
             ],
             'AIR-FIL-002': [
-                'https://cdn.pixabay.com/photo/2017/02/20/18/03/engine-2083783_640.jpg',
+                'https://placehold.co/640x480?text=AIR-FIL-002',
             ],
             'BRAKE-PAD-003': [
-                'https://cdn.pixabay.com/photo/2016/11/22/19/15/brake-pads-1850917_640.jpg',
+                'https://placehold.co/640x480?text=BRAKE-PAD-003',
             ],
             'SPARK-001': [
-                'https://cdn.pixabay.com/photo/2016/09/05/20/25/spark-plug-1650166_640.jpg',
+                'https://placehold.co/640x480?text=SPARK-001',
             ],
             'BATT-12V-001': [
-                'https://cdn.pixabay.com/photo/2016/12/20/10/58/battery-1918649_640.jpg',
+                'https://placehold.co/640x480?text=BATT-12V-001',
             ],
             'ALT-90-001': [
-                'https://cdn.pixabay.com/photo/2016/03/27/19/25/alternator-1283226_640.jpg',
+                'https://placehold.co/640x480?text=ALT-90-001',
             ],
             'PUMP-WATER-001': [
-                'https://images.pexels.com/photos/3944454/pexels-photo-3944454.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'https://placehold.co/640x480?text=PUMP-WATER-001',
             ],
             'CLUTCH-001': [
-                'https://cdn.pixabay.com/photo/2017/06/17/14/31/engine-2411544_640.jpg',
+                'https://placehold.co/640x480?text=CLUTCH-001',
             ],
             'TIRE-17-001': [
-                'https://cdn.pixabay.com/photo/2016/11/21/14/14/tires-1846546_640.jpg',
-                'https://images.pexels.com/photos/3807517/pexels-photo-3807517.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'https://placehold.co/640x480?text=TIRE-17-001',
+                'https://placehold.co/640x480?text=TIRE-17-001+alt',
             ],
             'WIPER-001': [
-                'https://cdn.pixabay.com/photo/2019/01/15/08/21/windscreen-wipers-3932854_640.jpg',
+                'https://placehold.co/640x480?text=WIPER-001',
             ],
             'RAD-HOSE-001': [
-                'https://cdn.pixabay.com/photo/2017/02/20/18/03/engine-2083784_640.jpg',
+                'https://placehold.co/640x480?text=RAD-HOSE-001',
             ],
             'TRANS-FLUID-001': [
-                'https://images.pexels.com/photos/3944451/pexels-photo-3944451.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'https://placehold.co/640x480?text=TRANS-FLUID-001',
             ],
         }
         
@@ -1028,7 +1028,7 @@ class Command(BaseCommand):
                         continue
                     
                     # Download image from URL
-                    response = requests.get(image_url, timeout=10)
+                    response = requests.get(image_url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
                     response.raise_for_status()
                     
                     # Create image file
