@@ -12,13 +12,13 @@ class SalesOrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalesOrderItem
         fields = [
-            'id', 'inventory', 'inventory_name', 'item_name', 'part_number',
+            'id', 'tenant', 'branch', 'inventory', 'inventory_name', 'item_name', 'part_number',
             'quantity', 'unit_price', 'discount_percentage', 'discount_amount',
             'tax_percentage', 'tax_amount', 'line_total', 'warranty_period',
             'notes', 'available_stock'
         ]
         read_only_fields = [
-            'id', 'item_name', 'part_number', 'discount_amount', 
+            'id', 'tenant', 'item_name', 'part_number', 'discount_amount', 
             'tax_amount', 'line_total', 'warranty_period'
         ]
     
@@ -56,13 +56,13 @@ class SalesOrderListSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalesOrder
         fields = [
-            'id', 'order_number', 'order_date', 'customer', 'customer_name',
+            'id', 'tenant', 'branch', 'order_number', 'order_date', 'customer', 'customer_name',
             'order_status', 'order_status_display', 'payment_status', 'payment_status_display',
             'total_amount', 'paid_amount', 'balance_amount',
             'total_items', 'total_quantity',
             'expected_delivery_date', 'created', 'modified'
         ]
-        read_only_fields = ['id', 'order_number', 'order_date', 'created', 'modified']
+        read_only_fields = ['id', 'tenant', 'order_number', 'order_date', 'created', 'modified']
 
 
 class SalesOrderDetailSerializer(serializers.ModelSerializer):
@@ -85,7 +85,7 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalesOrder
         fields = [
-            'id', 'order_number', 'order_date', 
+            'id', 'tenant', 'branch', 'order_number', 'order_date', 
             'customer', 'customer_name', 'customer_phone', 'customer_type',
             'order_status', 'order_status_display', 'status_display_description',
             'subtotal', 'discount_percentage', 'discount_amount',
@@ -101,7 +101,7 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
             'created', 'modified', 'is_active'
         ]
         read_only_fields = [
-            'id', 'order_number', 'order_date', 'subtotal', 'discount_amount',
+            'id', 'tenant', 'order_number', 'order_date', 'subtotal', 'discount_amount',
             'tax_amount', 'total_amount', 'balance_amount', 'created', 'modified'
         ]
 
@@ -112,7 +112,7 @@ class SalesOrderItemCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalesOrderItem
         fields = [
-            'inventory', 'quantity', 'unit_price', 
+            'inventory', 'quantity', 'unit_price', 'branch',
             'discount_percentage', 'tax_percentage', 'notes'
         ]
     
@@ -131,7 +131,7 @@ class SalesOrderCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalesOrder
         fields = [
-            'customer', 'order_status',
+            'customer', 'order_status', 'branch',
             'discount_percentage', 'tax_percentage', 'shipping_charges',
             'payment_method', 'paid_amount',
             'delivery_address', 'delivery_city', 'delivery_state', 'delivery_pincode',
@@ -168,13 +168,16 @@ class SalesOrderCreateSerializer(serializers.ModelSerializer):
         created_by = self.context['request'].user if 'request' in self.context else None
         if created_by:
             validated_data['created_by'] = created_by
+            validated_data.setdefault('tenant', created_by.tenant)
+            if 'branch' not in validated_data and getattr(created_by, 'branch', None):
+                validated_data['branch'] = created_by.branch
         
         # Create order
         order = SalesOrder.objects.create(**validated_data)
         
         # Create order items
         for item_data in items_data:
-            SalesOrderItem.objects.create(order=order, **item_data)
+            SalesOrderItem.objects.create(order=order, tenant=order.tenant, branch=item_data.get('branch') or order.branch, **{k: v for k, v in item_data.items() if k not in ['branch']})
         
         # Calculate totals
         order.calculate_totals()

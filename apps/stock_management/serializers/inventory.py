@@ -16,11 +16,23 @@ class InventoryImageSerializer(serializers.ModelSerializer):
             'image',
             'description',
             'is_primary',
+            'tenant',
+            'branch',
             'is_active',
             'created',
             'modified'
         ]
-        read_only_fields = ['id', 'inventory', 'created', 'modified']
+        read_only_fields = ['id', 'inventory', 'tenant', 'created', 'modified']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            validated_data.setdefault('tenant', request.user.tenant)
+        # Default branch from inventory if not provided
+        if 'branch' not in validated_data and validated_data.get('inventory'):
+            inv = validated_data['inventory']
+            validated_data['branch'] = getattr(inv, 'branch', None)
+        return super().create(validated_data)
 
 
 class InventorySerializer(serializers.ModelSerializer):
@@ -35,6 +47,7 @@ class InventorySerializer(serializers.ModelSerializer):
         model = Inventory
         fields = [
             'id',
+            'tenant',
             'item_name',
             'category',
             'vehicle_type',
@@ -55,6 +68,7 @@ class InventorySerializer(serializers.ModelSerializer):
             'vehicle_bike_details',
             'model',
             'type',
+            'branch',
             'images',
             'is_low_stock',
             'is_active',
@@ -63,6 +77,7 @@ class InventorySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id',
+            'tenant',
             'created',
             'modified',
             'party_detail',
@@ -111,12 +126,17 @@ class InventorySerializer(serializers.ModelSerializer):
     def _create_images(self, inventory, images_data):
         """Create inventory images from nested payload."""
         for image_data in images_data:
-            serializer = InventoryImageSerializer(data={**image_data, 'inventory': inventory.id})
+            serializer = InventoryImageSerializer(context=self.context, data={**image_data, 'inventory': inventory.id})
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
     def create(self, validated_data):
         images_data = validated_data.pop('images', [])
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            validated_data.setdefault('tenant', request.user.tenant)
+            if 'branch' not in validated_data and getattr(request.user, 'branch', None):
+                validated_data['branch'] = request.user.branch
         inventory = super().create(validated_data)
         if images_data:
             self._create_images(inventory, images_data)
@@ -124,6 +144,8 @@ class InventorySerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         images_data = validated_data.pop('images', None)
+        # Prevent tenant override through serializer
+        validated_data.pop('tenant', None)
         inventory = super().update(instance, validated_data)
 
         # If images are provided, replace existing set with the new payload

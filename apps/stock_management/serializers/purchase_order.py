@@ -15,6 +15,7 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
         model = PurchaseOrderItem
         fields = [
             'id',
+            'tenant',
             'purchase_order',
             'item_name',
             'part_number',
@@ -22,6 +23,7 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
             'unit_price',
             'tax',
             'discount_description',
+            'branch',
             'subtotal',
             'tax_amount',
             'total_price',
@@ -29,7 +31,7 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
             'created',
             'modified'
         ]
-        read_only_fields = ['id', 'created', 'modified', 'subtotal', 'tax_amount', 'total_price']
+        read_only_fields = ['id', 'tenant', 'created', 'modified', 'subtotal', 'tax_amount', 'total_price']
     
     def validate_quantity(self, value):
         """Validate quantity"""
@@ -49,6 +51,21 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Tax cannot be negative.")
         return value
 
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            validated_data.setdefault('tenant', request.user.tenant)
+        # Default branch from purchase order if not provided
+        if 'branch' not in validated_data and validated_data.get('purchase_order'):
+            po = validated_data['purchase_order']
+            validated_data['branch'] = getattr(po, 'branch', None)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # Prevent tenant override
+        validated_data.pop('tenant', None)
+        return super().update(instance, validated_data)
+
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
     """
@@ -63,6 +80,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         model = PurchaseOrder
         fields = [
             'id',
+            'tenant',
             'po_number',
             'status',
             'supplier',
@@ -72,6 +90,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             'purchase_invoice',
             'notes',
             'terms_and_condition',
+            'branch',
             'items',
             'total_amount',
             'total_tax',
@@ -81,6 +100,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id',
+            'tenant',
             'created',
             'modified',
             'supplier_detail',
@@ -101,4 +121,18 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
                 })
         
         return data
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            validated_data.setdefault('tenant', request.user.tenant)
+            # Default branch to user's branch if not provided
+            if 'branch' not in validated_data and getattr(request.user, 'branch', None):
+                validated_data['branch'] = request.user.branch
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # Prevent tenant override via serializer
+        validated_data.pop('tenant', None)
+        return super().update(instance, validated_data)
 

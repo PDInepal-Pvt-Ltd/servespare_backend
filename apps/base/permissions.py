@@ -71,7 +71,7 @@ class IsCustomer(permissions.BasePermission):
     """
     Permission class for Customer access.
     
-    Customers have access like Super Admin (all resources).
+    Customers have read-only access to products and can manage their own cart/orders.
     """
     message = _('Only Customer users can access this resource.')
     
@@ -82,6 +82,28 @@ class IsCustomer(permissions.BasePermission):
             and request.user.is_authenticated 
             and request.user.role == User.Role.CUSTOMER
         )
+    
+    def has_object_permission(self, request, view, obj):
+        """
+        Customers can only view objects, not modify them.
+        Exception: can modify their own user profile, cart, and orders.
+        """
+        from apps.users.models import User
+        from apps.carts.models import Cart, CartItem
+        
+        # Customers can access their own user profile
+        if isinstance(obj, User):
+            return obj == request.user
+        
+        # Customers can manage their own cart and cart items
+        if isinstance(obj, Cart):
+            return obj.user == request.user
+        
+        if isinstance(obj, CartItem):
+            return obj.cart.user == request.user
+        
+        # For all other objects, only allow read operations
+        return request.method in permissions.SAFE_METHODS
 
 
 class IsTenantUser(permissions.BasePermission):
@@ -175,7 +197,8 @@ class IsSuperAdminOrCustomer(permissions.BasePermission):
     """
     Permission for Super Admin or Customer.
     
-    Both have full access to all resources.
+    Super Admin has full access.
+    Customer has read-only access to public resources.
     """
     message = _('Only Super Admin or Customer can access this resource.')
     
@@ -186,6 +209,102 @@ class IsSuperAdminOrCustomer(permissions.BasePermission):
             return False
         
         return request.user.role in [User.Role.SUPER_ADMIN, User.Role.CUSTOMER]
+    
+    def has_object_permission(self, request, view, obj):
+        """
+        Super Admin can do everything.
+        Customer can only read objects.
+        """
+        from apps.users.models import User
+        
+        # Super Admin has full access
+        if request.user.role == User.Role.SUPER_ADMIN:
+            return True
+        
+        # Customer has read-only access
+        if request.user.role == User.Role.CUSTOMER:
+            return request.method in permissions.SAFE_METHODS
+        
+        return False
+
+
+class CanViewInventory(permissions.BasePermission):
+    """
+    Permission for viewing inventory (products).
+    
+    - Super Admin, Tenant Admin, Inventory Manager: Full access to manage inventory
+    - Customer: Read-only access to view products
+    """
+    message = _('You do not have permission to access inventory.')
+    
+    def has_permission(self, request, view):
+        from apps.users.models import User
+        
+        if not (request.user and request.user.is_authenticated):
+            return False
+        
+        # Super Admin, Tenant Admin, Inventory Manager can manage inventory
+        if request.user.role in [User.Role.SUPER_ADMIN, User.Role.ADMIN, User.Role.INVENTORY_MANAGER]:
+            return True
+        
+        # Customers can only view (read-only)
+        if request.user.role == User.Role.CUSTOMER:
+            return request.method in permissions.SAFE_METHODS
+        
+        return False
+
+
+class CanViewOwnOrders(permissions.BasePermission):
+    """
+    Permission for managing orders and bills.
+    
+    - Super Admin, Tenant Admin, Branch Manager: Full access to all orders
+    - Customer: Full CRUD access to their own orders only
+    """
+    message = _('You do not have permission to access this order.')
+    
+    def has_permission(self, request, view):
+        from apps.users.models import User
+        
+        if not (request.user and request.user.is_authenticated):
+            return False
+        
+        # Management roles have full access
+        if request.user.role in [User.Role.SUPER_ADMIN, User.Role.ADMIN, User.Role.BRANCH_MANAGER]:
+            return True
+        
+        # Customers can create and manage their own orders
+        if request.user.role == User.Role.CUSTOMER:
+            return True
+        
+        return False
+    
+    def has_object_permission(self, request, view, obj):
+        """
+        Check object-level permissions for orders.
+        """
+        from apps.users.models import User
+        
+        # Super Admin has full access
+        if request.user.role == User.Role.SUPER_ADMIN:
+            return True
+        
+        # Tenant Admin can access their tenant's orders
+        if request.user.role == User.Role.ADMIN:
+            if hasattr(obj, 'tenant'):
+                return obj.tenant == request.user.tenant
+        
+        # Branch Manager can access their branch's orders
+        if request.user.role == User.Role.BRANCH_MANAGER:
+            if hasattr(obj, 'branch'):
+                return obj.branch == request.user.branch
+        
+        # Customers can manage their own orders
+        if request.user.role == User.Role.CUSTOMER:
+            if hasattr(obj, 'customer'):
+                return obj.customer == request.user
+        
+        return False
 
 
 class CanManageTenantUsers(permissions.BasePermission):
@@ -218,7 +337,6 @@ class CanManageTenantUsers(permissions.BasePermission):
         Check if user can manage the specific user object.
         """
         from apps.users.models import User as UserModel
-        from apps.tenant.models import Tenant
         
         # Super Admin can manage all users
         if request.user.role == UserModel.Role.SUPER_ADMIN:

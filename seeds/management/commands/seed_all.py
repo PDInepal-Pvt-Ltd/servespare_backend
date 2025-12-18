@@ -48,6 +48,9 @@ class Command(BaseCommand):
         
         # Seed Inventory
         self.seed_inventory()
+
+        # Seed additional bulk inventory for read-heavy scenarios
+        self.seed_bulk_inventory_samples(target_count=100, reset=True)
         
         # Seed Inventory Images
         self.seed_inventory_images()
@@ -600,6 +603,14 @@ class Command(BaseCommand):
             ])
         
         for party_data in parties_data:
+            # Ensure tenant is set from branch if available
+            if 'tenant' not in party_data:
+                try:
+                    branch = party_data.get('branch')
+                    if branch and getattr(branch, 'tenant', None):
+                        party_data['tenant'] = branch.tenant
+                except Exception:
+                    pass
             party, created = Party.objects.get_or_create(
                 party_name=party_data['party_name'],
                 defaults=party_data
@@ -890,6 +901,14 @@ class Command(BaseCommand):
         ]
         
         for item_data in inventory_items:
+            # Ensure tenant is set from branch if available
+            if 'tenant' not in item_data:
+                try:
+                    branch = item_data.get('branch')
+                    if branch and getattr(branch, 'tenant', None):
+                        item_data['tenant'] = branch.tenant
+                except Exception:
+                    pass
             item, created = Inventory.objects.get_or_create(
                 part_number=item_data['part_number'],
                 defaults=item_data
@@ -899,49 +918,110 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(f"  - Inventory already exists: {item.item_name}")
 
+    def seed_bulk_inventory_samples(self, target_count=100, reset=False):
+        """Seed additional inventory items to support read-heavy RBAC testing."""
+        self.stdout.write(f'Seeding Bulk Inventory Samples (target {target_count})...')
+
+        suppliers = list(Party.objects.filter(party_type='supplier'))
+        branches = list(Branch.objects.all())
+
+        if not suppliers or not branches:
+            self.stdout.write("  - Skipping bulk inventory seeding (suppliers or branches missing)")
+            return
+
+        if reset:
+            deleted_count, _ = Inventory.objects.filter(part_number__startswith='BULK-INV-').delete()
+            self.stdout.write(f"  - Cleared {deleted_count} existing bulk inventory records")
+
+        existing_bulk = Inventory.objects.filter(part_number__startswith='BULK-INV-').count()
+        to_create = max(target_count - existing_bulk, 0)
+
+        if to_create == 0:
+            self.stdout.write(f"  - Bulk inventory already at target ({existing_bulk})")
+            return
+
+        warranties = ['6_month', '12_month', '24_month']
+        categories = ['local', 'original']
+        vehicle_types = ['two_wheeler', 'four_wheeler']
+        bulk_items = []
+
+        for idx in range(existing_bulk, existing_bulk + to_create):
+            price_base = Decimal('10.00') + Decimal(idx % 25)
+            distributor_price = price_base
+            wholesale_price = distributor_price + Decimal('2.50')
+            retail_price = wholesale_price + Decimal('3.50')
+            mrp = retail_price + Decimal('5.00')
+
+            bulk_items.append(Inventory(
+                item_name=f"Bulk Inventory Item {idx + 1}",
+                category=categories[idx % len(categories)],
+                vehicle_type=vehicle_types[idx % len(vehicle_types)],
+                part_number=f"BULK-INV-{idx:05d}",
+                barcode=f"999000{idx:07d}",
+                hsn_code='87089900',
+                quantity=Decimal('10.00') + Decimal(idx % 30),
+                min_stock_level=Decimal('3.00'),
+                price=distributor_price,
+                mrp=mrp,
+                retail_pricing=retail_price,
+                wholesale_price=wholesale_price,
+                distributor_price=distributor_price,
+                storage_location=f"Aisle {chr(65 + (idx % 26))}{idx % 10}",
+                warranty_period=warranties[idx % len(warranties)],
+                vehicle_bike_details='Compatible with multiple models',
+                model=f"Model-{idx % 150}",
+                type='Bulk Auto Part',
+                party=suppliers[idx % len(suppliers)],
+                branch=branches[idx % len(branches)],
+                tenant=branches[idx % len(branches)].tenant if getattr(branches[idx % len(branches)], 'tenant', None) else None
+            ))
+
+        Inventory.objects.bulk_create(bulk_items, ignore_conflicts=True)
+        self.stdout.write(f"  ✓ Added {len(bulk_items)} bulk inventory items (target {target_count})")
+
     def seed_inventory_images(self):
         """Seed inventory items with images from internet"""
         self.stdout.write('Seeding Inventory Images...')
         
-        # Real auto parts images from Google, Pixabay, and Pexels
+        # Reliable placeholder images to avoid 403s
         inventory_images = {
             'OIL-FIL-001': [
-                'https://cdn.pixabay.com/photo/2016/03/27/18/10/filter-1283172_640.jpg',
-                'https://images.pexels.com/photos/3944453/pexels-photo-3944453.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'https://placehold.co/640x480?text=OIL-FIL-001',
+                'https://placehold.co/640x480?text=OIL-FIL-001+alt',
             ],
             'AIR-FIL-002': [
-                'https://cdn.pixabay.com/photo/2017/02/20/18/03/engine-2083783_640.jpg',
+                'https://placehold.co/640x480?text=AIR-FIL-002',
             ],
             'BRAKE-PAD-003': [
-                'https://cdn.pixabay.com/photo/2016/11/22/19/15/brake-pads-1850917_640.jpg',
+                'https://placehold.co/640x480?text=BRAKE-PAD-003',
             ],
             'SPARK-001': [
-                'https://cdn.pixabay.com/photo/2016/09/05/20/25/spark-plug-1650166_640.jpg',
+                'https://placehold.co/640x480?text=SPARK-001',
             ],
             'BATT-12V-001': [
-                'https://cdn.pixabay.com/photo/2016/12/20/10/58/battery-1918649_640.jpg',
+                'https://placehold.co/640x480?text=BATT-12V-001',
             ],
             'ALT-90-001': [
-                'https://cdn.pixabay.com/photo/2016/03/27/19/25/alternator-1283226_640.jpg',
+                'https://placehold.co/640x480?text=ALT-90-001',
             ],
             'PUMP-WATER-001': [
-                'https://images.pexels.com/photos/3944454/pexels-photo-3944454.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'https://placehold.co/640x480?text=PUMP-WATER-001',
             ],
             'CLUTCH-001': [
-                'https://cdn.pixabay.com/photo/2017/06/17/14/31/engine-2411544_640.jpg',
+                'https://placehold.co/640x480?text=CLUTCH-001',
             ],
             'TIRE-17-001': [
-                'https://cdn.pixabay.com/photo/2016/11/21/14/14/tires-1846546_640.jpg',
-                'https://images.pexels.com/photos/3807517/pexels-photo-3807517.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'https://placehold.co/640x480?text=TIRE-17-001',
+                'https://placehold.co/640x480?text=TIRE-17-001+alt',
             ],
             'WIPER-001': [
-                'https://cdn.pixabay.com/photo/2019/01/15/08/21/windscreen-wipers-3932854_640.jpg',
+                'https://placehold.co/640x480?text=WIPER-001',
             ],
             'RAD-HOSE-001': [
-                'https://cdn.pixabay.com/photo/2017/02/20/18/03/engine-2083784_640.jpg',
+                'https://placehold.co/640x480?text=RAD-HOSE-001',
             ],
             'TRANS-FLUID-001': [
-                'https://images.pexels.com/photos/3944451/pexels-photo-3944451.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'https://placehold.co/640x480?text=TRANS-FLUID-001',
             ],
         }
         
@@ -965,7 +1045,7 @@ class Command(BaseCommand):
                         continue
                     
                     # Download image from URL
-                    response = requests.get(image_url, timeout=10)
+                    response = requests.get(image_url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
                     response.raise_for_status()
                     
                     # Create image file
@@ -978,7 +1058,8 @@ class Command(BaseCommand):
                         image=image_content,
                         description=f"Image {idx + 1} for {inventory.item_name}",
                         is_primary=(idx == 0),
-                        branch=inventory.branch
+                        branch=inventory.branch,
+                        tenant=getattr(inventory, 'tenant', None)
                     )
                     
                     status = "PRIMARY" if inventory_image.is_primary else "secondary"
@@ -1082,9 +1163,17 @@ class Command(BaseCommand):
         for po in po_data:
             items_data = po.pop('items', [])
             
+            # Ensure tenant set from branch
+            po_defaults = dict(po)
+            try:
+                br = po.get('branch')
+                if br and getattr(br, 'tenant', None):
+                    po_defaults['tenant'] = br.tenant
+            except Exception:
+                pass
             purchase_order, created = PurchaseOrder.objects.get_or_create(
                 po_number=po['po_number'],
-                defaults=po
+                defaults=po_defaults
             )
             
             if created:
@@ -1101,7 +1190,8 @@ class Command(BaseCommand):
                             'unit_price': item_data['unit_price'],
                             'tax': item_data['tax'],
                             'discount_description': item_data.get('discount_description'),
-                            'branch': item_data.get('branch')
+                            'branch': item_data.get('branch'),
+                            'tenant': getattr(purchase_order, 'tenant', None) or (getattr(item_data.get('branch'), 'tenant', None) if item_data.get('branch') else None)
                         }
                     )
                     self.stdout.write(f"    - Added item: {item_data['item_name']}")
@@ -1174,9 +1264,17 @@ class Command(BaseCommand):
             ])
         
         for account_data in accounts:
+            # Ensure tenant is set from branch
+            acc_defaults = dict(account_data)
+            try:
+                br = acc_defaults.get('branch')
+                if br and getattr(br, 'tenant', None):
+                    acc_defaults['tenant'] = br.tenant
+            except Exception:
+                pass
             account, created = BankAccount.objects.get_or_create(
                 account_number=account_data.get('account_number', account_data['account_name']),
-                defaults=account_data
+                defaults=acc_defaults
             )
             if created:
                 self.stdout.write(f"  ✓ Created bank account: {account.account_name}")
@@ -1233,9 +1331,17 @@ class Command(BaseCommand):
         ]
         
         for bill_data in bills_data:
+            # Ensure tenant is set from branch
+            bill_defaults = dict(bill_data)
+            try:
+                br = bill_defaults.get('branch')
+                if br and getattr(br, 'tenant', None):
+                    bill_defaults['tenant'] = br.tenant
+            except Exception:
+                pass
             bill, created = Bill.objects.get_or_create(
                 customer_name=bill_data['customer_name'],
-                defaults=bill_data
+                defaults=bill_defaults
             )
             if created:
                 self.stdout.write(f"  ✓ Created bill: {bill.customer_name} ({bill.get_customer_type_display()})")
@@ -1279,7 +1385,8 @@ class Command(BaseCommand):
                 'delivery_state': 'NY',
                 'delivery_pincode': '10001',
                 'expected_delivery_date': date.today() + timedelta(days=5),
-                'branch': main_branch
+                'branch': main_branch,
+                'tenant': getattr(main_branch, 'tenant', None)
             }
             
             sales_order, created = SalesOrder.objects.get_or_create(
@@ -1300,7 +1407,8 @@ class Command(BaseCommand):
                             'quantity': Decimal('2.00') + Decimal(item_idx),
                             'unit_price': inv_item.retail_pricing,
                             'is_active': True,
-                            'branch': main_branch
+                            'branch': main_branch,
+                            'tenant': getattr(sales_order, 'tenant', None)
                         }
                     )
                     self.stdout.write(f"    - Added item: {inv_item.item_name}")

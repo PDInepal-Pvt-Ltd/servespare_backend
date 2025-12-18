@@ -3,15 +3,17 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 
 from apps.carts.models import Cart, CartItem
 from apps.carts.serializers import (
     CartSerializer,
     AddToCartSerializer,
     UpdateCartItemSerializer,
+    CheckoutSerializer,
 )
 from apps.stock_management.models import Inventory
-from apps.base.permission_utils import can_manage_user
+from apps.sales.models import SalesOrder, SalesOrderItem
 
 
 class CartViewSet(viewsets.ViewSet):
@@ -228,3 +230,105 @@ class CartViewSet(viewsets.ViewSet):
             },
             status=status.HTTP_200_OK
         )
+
+    @action(detail=False, methods=['post'], url_path='checkout')
+    def checkout(self, request):
+        """
+        Create an order from cart items and clear the cart.
+
+        Body (optional):
+        {
+            "payment_method": "cash|card|upi|bank_transfer|credit",
+            "delivery_address": "...",
+            "delivery_city": "...",
+            "delivery_state": "...",
+            "delivery_pincode": "...",
+            "notes": "..."
+        }
+        """
+        # Validate input data
+        checkout_serializer = CheckoutSerializer(data=request.data)
+        if not checkout_serializer.is_valid():
+            return Response(
+                checkout_serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        checkout_data = checkout_serializer.validated_data
+
+        cart = self.get_or_create_cart(request.user)
+        cart_items = cart.items.select_related('inventory').all()
+        
+        # Validate cart is not empty
+        if not cart_items.exists():
+            return Response(
+                {'error': 'Cart is empty. Add items before checkout.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate stock availability for all items
+        for cart_item in cart_items:
+            if cart_item.inventory.quantity < cart_item.quantity:
+                return Response(
+                    {
+                        'error': f'Insufficient stock for {cart_item.inventory.item_name}',
+                        'item': cart_item.inventory.item_name,
+                        'required': float(cart_item.quantity),
+                        'available': float(cart_item.inventory.quantity)
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        try:
+            with transaction.atomic():
+                # Create order
+                order_data = {
+                    'customer': request.user,
+                    'created_by': request.user,
+                    'tenant': request.user.tenant,
+                    'payment_method': checkout_data.get('payment_method', 'cash'),
+                    'delivery_address': checkout_data.get('delivery_address', ''),
+                    'delivery_city': checkout_data.get('delivery_city', ''),
+                    'delivery_state': checkout_data.get('delivery_state', ''),
+                    'delivery_pincode': checkout_data.get('delivery_pincode', ''),
+                    'notes': checkout_data.get('notes', ''),
+                }
+                
+                # Set branch if user has one
+                if hasattr(request.user, 'branch') and request.user.branch:
+                    order_data['branch'] = request.user.branch
+                
+                order = SalesOrder.objects.create(**order_data)
+                
+                # Create order items from cart
+                for cart_item in cart_items:
+                    SalesOrderItem.objects.create(
+                        order=order,
+                        tenant=order.tenant,
+                        branch=order.branch,
+                        inventory=cart_item.inventory,
+                        quantity=cart_item.quantity,
+                        unit_price=cart_item.price,
+                    )
+                
+                # Calculate order totals
+                order.calculate_totals()
+                
+                # Clear cart
+                cart_items.delete()
+                
+                # Return order details
+                from apps.sales.serializers import SalesOrderDetailSerializer
+                order_serializer = SalesOrderDetailSerializer(order)
+                
+                return Response({
+                    'message': 'Order placed successfully!',
+                    'order': order_serializer.data,
+                    'order_number': order.order_number
+                }, status=status.HTTP_201_CREATED)
+                
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to create order: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )

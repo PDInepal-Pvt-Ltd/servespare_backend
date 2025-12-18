@@ -4,6 +4,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models import Sum
 from decimal import Decimal
 from apps.base.models import BaseModel
+from apps.base.managers import TenantManager
 import uuid
 
 
@@ -35,6 +36,16 @@ class SalesOrder(BaseModel):
         ('credit', 'Credit'),
     ]
     
+    # Tenant Context
+    tenant = models.ForeignKey(
+        'tenant.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='sales_orders',
+        help_text='Tenant that owns this sales order'
+    )
+
     # Order Information
     order_number = models.CharField(
         max_length=50,
@@ -224,7 +235,11 @@ class SalesOrder(BaseModel):
             models.Index(fields=['payment_status']),
             models.Index(fields=['order_date']),
             models.Index(fields=['-order_date']),
+            models.Index(fields=['tenant']),
+            models.Index(fields=['branch']),
         ]
+
+    objects = TenantManager()
     
     def save(self, *args, **kwargs):
         """Generate order number if not exists and calculate totals"""
@@ -367,6 +382,16 @@ class SalesOrderItem(BaseModel):
     """
     Model to store individual items in a sales order
     """
+    # Tenant Context
+    tenant = models.ForeignKey(
+        'tenant.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='sales_order_items',
+        help_text='Tenant that owns this sales order item'
+    )
+
     # Order Reference
     order = models.ForeignKey(
         SalesOrder,
@@ -476,6 +501,8 @@ class SalesOrderItem(BaseModel):
         indexes = [
             models.Index(fields=['order']),
             models.Index(fields=['inventory']),
+            models.Index(fields=['tenant']),
+            models.Index(fields=['branch']),
         ]
     
     def save(self, *args, **kwargs):
