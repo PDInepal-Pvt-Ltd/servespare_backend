@@ -41,10 +41,8 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         
         queryset = Inventory.objects.select_related('party').prefetch_related('images').all()
         
-        # Customers can only see active inventory
-        if self.request.user.role == User.Role.CUSTOMER:
-            queryset = queryset.filter(is_active=True)
-        else:
+        # Customers should see everything (no active or branch filtering)
+        if self.request.user.role != User.Role.CUSTOMER:
             # Apply branch-level filtering based on user role for staff
             queryset = get_branch_queryset_for_user(self.request.user, queryset)
         

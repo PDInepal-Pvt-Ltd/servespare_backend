@@ -29,6 +29,14 @@ class TenantViewSetMixin:
         if user is None or not getattr(user, 'is_authenticated', False):
             return qs
 
+        # Customers should see all tenant data similar to superusers
+        try:
+            from apps.users.models import User
+            if getattr(user, 'role', None) == User.Role.CUSTOMER:
+                return qs
+        except Exception:
+            pass
+
         if getattr(user, 'is_superuser', False):
             return qs
 
@@ -62,6 +70,14 @@ class TenantFilterBackend(BaseFilterBackend):
         # If no authenticated user or superuser, don't filter
         if user is None or not getattr(user, 'is_authenticated', False):
             return queryset
+
+        # Customers should see all tenant data similar to superusers
+        try:
+            from apps.users.models import User
+            if getattr(user, 'role', None) == User.Role.CUSTOMER:
+                return queryset
+        except Exception:
+            pass
 
         if getattr(user, 'is_superuser', False):
             return queryset
