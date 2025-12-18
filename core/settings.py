@@ -22,10 +22,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-a*iz)9%+@ja6bpla^c!ll#+3f39d1)bu-sl*e3^&e%p7_u+ste'
+# Read from environment; fallback to existing value for local dev
+SECRET_KEY = config(
+    'SECRET_KEY',
+    default='django-insecure-a*iz)9%+@ja6bpla^c!ll#+3f39d1)bu-sl*e3^&e%p7_u+ste'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Controlled via environment. Example in env.example: DEBUG=True
+DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = [
     'localhost',
@@ -174,7 +179,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'users.User'
 # Site ID for django.contrib.sites (required by django-allauth)
-from core.configuration.auth import SITE_ID
 
 # Email configuration
 # If SMTP creds are missing while DEBUG is True, fall back to console backend so emails are visible during development.

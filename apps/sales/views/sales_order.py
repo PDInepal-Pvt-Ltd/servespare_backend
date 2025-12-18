@@ -17,7 +17,7 @@ from apps.sales.serializers import (
     AddPaymentSerializer,
 )
 from apps.base.drf import TenantViewSetMixin
-from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager
+from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager, CanViewOwnOrders
 from apps.base.permission_utils import get_tenant_queryset_for_user, get_branch_queryset_for_user
 
 
@@ -26,15 +26,19 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     ViewSet for Sales Order CRUD operations.
     
     Provides endpoints for:
-    - list: Get all orders
-    - retrieve: Get single order
-    - create: Create new order
-    - update/partial_update: Update order
-    - destroy: Cancel order
-    - update_status: Update order status
-    - add_payment: Add payment to order
+    - list: Get all orders (management) or own orders (customer)
+    - retrieve: Get single order (management) or own order (customer)
+    - create: Create new order (all authenticated users)
+    - update/partial_update: Update own order (customer) or any order (management)
+    - destroy: Cancel own order (customer) or any order (management)
+    - update_status: Update order status (management only)
+    - add_payment: Add payment to order (management only)
     - cancel: Cancel order
     - stats: Get order statistics
+    
+    Permissions:
+    - Super Admin, Tenant Admin, Branch Manager: Full CRUD access to all orders
+    - Customer: Full CRUD access to their own orders only
     """
     
     queryset = SalesOrder.objects.filter(is_removed=False).select_related('customer', 'created_by')
@@ -45,7 +49,7 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     pagination_class = StandardResultsSetPagination
-    permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdminOrBranchManager]
+    permission_classes = [IsAuthenticated, CanViewOwnOrders]
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
@@ -62,8 +66,14 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         return SalesOrderDetailSerializer
     
     def get_queryset(self):
-        """Get queryset with optional date filtering"""
+        """Get queryset with optional date filtering and customer filtering"""
+        from apps.users.models import User
+        
         queryset = super().get_queryset()
+        
+        # Customers can only see their own orders
+        if self.request.user.role == User.Role.CUSTOMER:
+            queryset = queryset.filter(customer=self.request.user)
         
         # Filter by date range if provided
         start_date = self.request.query_params.get('start_date')

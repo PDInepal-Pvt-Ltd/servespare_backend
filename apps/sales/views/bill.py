@@ -6,23 +6,40 @@ from rest_framework.response import Response
 from apps.sales.models import Bill
 from apps.sales.serializers import BillSerializer
 from apps.base.drf import TenantViewSetMixin
-from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager
-from apps.base.permission_utils import get_tenant_queryset_for_user, get_branch_queryset_for_user
+from apps.base.permissions import CanViewOwnOrders
 
 
 class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing bills with RBAC
+    
+    Permissions:
+    - Super Admin, Tenant Admin, Branch Manager: Full CRUD access to all bills
+    - Customer: Full CRUD access to their own bills (bills with their user info)
     """
     queryset = Bill.objects.all()
     serializer_class = BillSerializer
-    permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdminOrBranchManager]
+    permission_classes = [IsAuthenticated, CanViewOwnOrders]
     
     def get_queryset(self):
         """
         Optionally filter by customer_type, is_active, status, payment_method and search
+        
+        For customers: Only show bills with their name/phone/email (matching their user info)
         """
+        from apps.users.models import User
+        
         queryset = Bill.objects.all()
+        
+        # Customers can only see bills matching their information
+        # Since bills don't have a direct FK to User, we filter by customer_name, phone, email
+        if self.request.user.role == User.Role.CUSTOMER:
+            user = self.request.user
+            queryset = queryset.filter(
+                Q(customer_name__icontains=user.full_name or user.username) |
+                Q(phone_numbers__icontains=user.phone if hasattr(user, 'phone') and user.phone else '') |
+                Q(customer_name__icontains=user.email)
+            )
         
         # Filter by customer_type
         customer_type = self.request.query_params.get('customer_type', None)
