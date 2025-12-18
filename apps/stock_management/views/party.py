@@ -1,17 +1,21 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from apps.stock_management.models import Party
 from apps.stock_management.serializers import PartySerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager
+from apps.base.permission_utils import get_tenant_queryset_for_user
 
 
 class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
-    ViewSet for managing parties (suppliers and customers)
+    ViewSet for managing parties (suppliers and customers) with RBAC
     """
     queryset = Party.objects.all()
     serializer_class = PartySerializer
+    permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdminOrBranchManager]
     
     def get_queryset(self):
         """

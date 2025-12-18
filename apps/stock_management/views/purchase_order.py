@@ -1,19 +1,23 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Sum, F, DecimalField
 from django.db.models.functions import Coalesce
 from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem
 from apps.stock_management.serializers import PurchaseOrderSerializer, PurchaseOrderItemSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager
+from apps.base.permission_utils import get_tenant_queryset_for_user, get_branch_queryset_for_user
 
 
 class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
-    ViewSet for managing purchase orders
+    ViewSet for managing purchase orders with RBAC
     """
     queryset = PurchaseOrder.objects.select_related('supplier').prefetch_related('items').all()
     serializer_class = PurchaseOrderSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdminOrBranchManager]
     
     def get_queryset(self):
         """

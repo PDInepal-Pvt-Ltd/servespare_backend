@@ -1,24 +1,45 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from apps.tenant.models import Tenant
 from apps.tenant.serializers import TenantSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.permissions import (
+    IsSuperAdminOrTenantAdmin, 
+    IsSuperAdmin,
+    CanEditTenantDetails
+)
+from apps.base.permission_utils import get_tenant_queryset_for_user
 from django.db.models import Count
 
 
 class TenantViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
-    ViewSet for managing tenants
+    ViewSet for managing tenants.
+    
+    Permissions:
+    - Super Admin: Can view, create, update, delete all tenants
+    - Tenant Admin: Can only view and update their own tenant
+    - Customer: Can view all tenants
+    - Others: Cannot access
     """
     queryset = Tenant.objects.select_related('package').all()
     serializer_class = TenantSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdmin]
     
     def get_queryset(self):
         """
-        Optionally filter by status, package, or is_active
+        Filter tenants based on user's role.
+        
+        - Super Admin: See all tenants
+        - Tenant Admin: See only their own tenant
+        - Customer: See all tenants
         """
         queryset = Tenant.objects.select_related('package').all()
+        
+        # Apply role-based filtering
+        queryset = get_tenant_queryset_for_user(self.request.user, queryset)
         
         # Filter by status
         status_filter = self.request.query_params.get('status', None)
@@ -46,6 +67,24 @@ class TenantViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             )
         
         return queryset
+    
+    def perform_update(self, serializer):
+        """
+        Update tenant - applies permission checks.
+        """
+        self.check_object_permissions(self.request, serializer.instance)
+        super().perform_update(serializer)
+    
+    def perform_destroy(self, instance):
+        """
+        Delete tenant - only Super Admin can delete.
+        """
+        from apps.base.permissions import IsSuperAdmin
+        permission = IsSuperAdmin()
+        if not permission.has_permission(self.request, self):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Only Super Admin can delete tenants.")
+        super().perform_destroy(instance)
     
     @action(detail=False, methods=['get'])
     def active(self, request):

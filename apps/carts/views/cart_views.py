@@ -11,14 +11,15 @@ from apps.carts.serializers import (
     UpdateCartItemSerializer,
 )
 from apps.stock_management.models import Inventory
+from apps.base.permission_utils import can_manage_user
 
 
 class CartViewSet(viewsets.ViewSet):
     """
-    ViewSet for managing shopping cart operations
+    ViewSet for managing shopping cart operations with user-level access control
     
     Endpoints:
-    - GET /cart/ - View current cart
+    - GET /cart/ - View current cart (own user's cart)
     - POST /cart/add/ - Add item to cart
     - PATCH /cart/items/{id}/update/ - Update item quantity
     - DELETE /cart/items/{id}/remove/ - Remove item from cart

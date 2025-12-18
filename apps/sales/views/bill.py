@@ -1,18 +1,22 @@
 from django.db.models import Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from apps.sales.models import Bill
 from apps.sales.serializers import BillSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager
+from apps.base.permission_utils import get_tenant_queryset_for_user, get_branch_queryset_for_user
 
 
 class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
-    ViewSet for managing bills
+    ViewSet for managing bills with RBAC
     """
     queryset = Bill.objects.all()
     serializer_class = BillSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdminOrBranchManager]
     
     def get_queryset(self):
         """

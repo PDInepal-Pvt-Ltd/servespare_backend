@@ -1,18 +1,22 @@
 from django.db.models import Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from apps.cashandbank.models import BankAccount
 from apps.cashandbank.serializers import BankAccountSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.permissions import CanManageBranchResources
+from apps.base.permission_utils import get_branch_queryset_for_user
 
 
 class BankAccountViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
-    ViewSet for managing bank accounts
+    ViewSet for managing bank accounts with RBAC
     """
     queryset = BankAccount.objects.all()
     serializer_class = BankAccountSerializer
+    permission_classes = [IsAuthenticated, CanManageBranchResources]
     
     def get_queryset(self):
         """

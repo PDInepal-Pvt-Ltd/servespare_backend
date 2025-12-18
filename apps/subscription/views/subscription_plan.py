@@ -1,17 +1,20 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from apps.subscription.models import SubscriptionPlan
 from apps.subscription.serializers import SubscriptionPlanSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.permissions import IsSuperAdmin
 
 
 class SubscriptionPlanViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
-    ViewSet for managing subscription plans
+    ViewSet for managing subscription plans (Super Admin only)
     """
     queryset = SubscriptionPlan.objects.all()
     serializer_class = SubscriptionPlanSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
     
     def get_queryset(self):
         """

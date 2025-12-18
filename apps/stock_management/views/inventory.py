@@ -5,24 +5,41 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, F, Sum, DecimalField
 from apps.stock_management.models import Inventory, InventoryImage, Party
 from apps.stock_management.serializers import InventorySerializer, InventoryImageSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.permissions import CanManageBranchResources
+from apps.base.permission_utils import get_branch_queryset_for_user
 
 
 class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
-    ViewSet for managing inventory items
+    ViewSet for managing inventory items with branch-level access control.
+    
+    Permissions:
+    - Super Admin: Can manage inventory in all branches
+    - Tenant Admin: Can manage inventory in all branches of their tenant
+    - Inventory Manager: Can manage inventory only in their assigned branch
+    - Others: No access
     """
     queryset = Inventory.objects.select_related('party').prefetch_related('images').all()
     serializer_class = InventorySerializer
+    permission_classes = [IsAuthenticated, CanManageBranchResources]
     
     def get_queryset(self):
         """
-        Optionally filter by category, vehicle_type, party, or stock level
+        Filter inventory based on user's role and branch access.
+        
+        - Super Admin: See all inventory
+        - Tenant Admin: See inventory from all branches in their tenant
+        - Inventory Manager: See only inventory in their branch
         """
         queryset = Inventory.objects.select_related('party').prefetch_related('images').all()
+        
+        # Apply branch-level filtering based on user role
+        queryset = get_branch_queryset_for_user(self.request.user, queryset)
         
         # Filter by category
         category = self.request.query_params.get('category', None)

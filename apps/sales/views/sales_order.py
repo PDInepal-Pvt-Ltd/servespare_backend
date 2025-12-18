@@ -17,6 +17,8 @@ from apps.sales.serializers import (
     AddPaymentSerializer,
 )
 from apps.base.drf import TenantViewSetMixin
+from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager
+from apps.base.permission_utils import get_tenant_queryset_for_user, get_branch_queryset_for_user
 
 
 class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
@@ -43,7 +45,7 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     pagination_class = StandardResultsSetPagination
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdminOrBranchManager]
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
