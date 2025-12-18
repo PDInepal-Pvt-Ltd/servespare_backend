@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from decimal import Decimal
 from apps.base.models import BaseModel
+from apps.base.managers import TenantManager
 
 
 class Inventory(BaseModel):
@@ -32,6 +33,16 @@ class Inventory(BaseModel):
         ('24_month', '24 Month'),
     ]
     
+    # Tenant Context
+    tenant = models.ForeignKey(
+        'tenant.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='inventory_items',
+        help_text='Tenant that owns this inventory item'
+    )
+
     # Basic Information
     item_name = models.CharField(
         max_length=255,
@@ -187,7 +198,11 @@ class Inventory(BaseModel):
             models.Index(fields=['vehicle_type']),
             models.Index(fields=['part_number']),
             models.Index(fields=['barcode']),
+            models.Index(fields=['tenant']),
+            models.Index(fields=['branch']),
         ]
+
+    objects = TenantManager()
     
     def clean(self):
         """Validate pricing hierarchy: Distributor < Wholesale < Retail < MRP"""
@@ -240,6 +255,15 @@ class InventoryImage(BaseModel):
     """
     Model to store multiple images for inventory items
     """
+    tenant = models.ForeignKey(
+        'tenant.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='inventory_images',
+        help_text='Tenant that owns this inventory image'
+    )
+
     inventory = models.ForeignKey(
         Inventory,
         on_delete=models.CASCADE,
@@ -275,6 +299,8 @@ class InventoryImage(BaseModel):
         verbose_name = 'Inventory Image'
         verbose_name_plural = 'Inventory Images'
         ordering = ['-is_primary', 'created']
+
+    objects = TenantManager()
     
     def save(self, *args, **kwargs):
         # If this is set as primary, unset other primary images
