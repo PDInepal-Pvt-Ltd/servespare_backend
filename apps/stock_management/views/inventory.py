@@ -5,12 +5,11 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, F, Sum, DecimalField
 from apps.stock_management.models import Inventory, InventoryImage, Party
 from apps.stock_management.serializers import InventorySerializer, InventoryImageSerializer
 from apps.base.drf import TenantViewSetMixin
-from apps.base.permissions import CanViewInventory, CanManageBranchResources
+from apps.base.permissions import CanViewInventory
 from apps.base.permission_utils import get_branch_queryset_for_user
 from apps.base.pagination import StandardResultsSetPagination
 
