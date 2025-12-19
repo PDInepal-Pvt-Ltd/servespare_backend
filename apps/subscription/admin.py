@@ -4,8 +4,8 @@ from apps.subscription.models import SubscriptionPlan, Subscription
 
 @admin.register(SubscriptionPlan)
 class SubscriptionPlanAdmin(admin.ModelAdmin):
-    list_display = ['plan_name', 'plan_price', 'no_of_user', 'no_of_branch', 'support_type', 'is_active', 'created', 'modified']
-    list_filter = ['is_active', 'support_type', 'created', 'modified']
+    list_display = ['plan_name', 'plan_price', 'no_of_user', 'no_of_branch', 'is_active', 'created', 'modified']
+    list_filter = ['is_active',  'created', 'modified']
     search_fields = ['plan_name']
     readonly_fields = ['created', 'modified']
     fieldsets = (
@@ -14,9 +14,6 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
         }),
         ('Limits', {
             'fields': ('no_of_user', 'no_of_branch')
-        }),
-        ('Support', {
-            'fields': ('support_type',)
         }),
         ('Timestamps', {
             'fields': ('created', 'modified'),
