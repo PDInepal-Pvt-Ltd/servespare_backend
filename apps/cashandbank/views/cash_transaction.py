@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from apps.cashandbank.models import CashTransaction
 from apps.cashandbank.serializers import CashTransactionSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.pagination import StandardResultsSetPagination
 from apps.base.permissions import CanManageBranchResources
 from apps.base.permission_utils import get_branch_queryset_for_user
 
@@ -24,6 +25,7 @@ class CashTransactionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     queryset = CashTransaction.objects.all()
     serializer_class = CashTransactionSerializer
     permission_classes = [IsAuthenticated, CanManageBranchResources]
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         """

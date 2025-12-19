@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from apps.sales.models import Bill
 from apps.sales.serializers import BillSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.pagination import StandardResultsSetPagination
 from apps.base.permissions import CanViewOwnOrders
 
 
@@ -20,6 +21,7 @@ class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     queryset = Bill.objects.all()
     serializer_class = BillSerializer
     permission_classes = [IsAuthenticated, CanViewOwnOrders]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         """

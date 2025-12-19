@@ -5,13 +5,13 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, F, Sum, DecimalField
 from apps.stock_management.models import Inventory, InventoryImage, Party
 from apps.stock_management.serializers import InventorySerializer, InventoryImageSerializer
 from apps.base.drf import TenantViewSetMixin
-from apps.base.permissions import CanViewInventory, CanManageBranchResources
+from apps.base.permissions import CanViewInventory
 from apps.base.permission_utils import get_branch_queryset_for_user
+from apps.base.pagination import StandardResultsSetPagination
 
 
 class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
@@ -26,7 +26,26 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     queryset = Inventory.objects.select_related('party').prefetch_related('images').all()
     serializer_class = InventorySerializer
-    permission_classes = [IsAuthenticated, CanViewInventory]
+    permission_classes = [CanViewInventory]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_authenticators(self):
+        """
+        Bypass authentication for GET requests.
+        This allows GET requests without JWT token.
+        """
+        if self.request and self.request.method == 'GET':
+            return []
+        return super().get_authenticators()
+    
+    def get_permissions(self):
+        """
+        Allow unauthenticated access for list and retrieve actions.
+        Require authentication for create, update, delete, and other actions.
+        """
+        if self.action in ['list', 'retrieve']:
+            return []
+        return [permission() for permission in self.permission_classes]
     
     def get_queryset(self):
         """
@@ -42,7 +61,8 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         queryset = Inventory.objects.select_related('party').prefetch_related('images').all()
         
         # Customers should see everything (no active or branch filtering)
-        if self.request.user.role != User.Role.CUSTOMER:
+        # For authenticated users who are not customers, apply branch filtering
+        if self.request.user.is_authenticated and self.request.user.role != User.Role.CUSTOMER:
             # Apply branch-level filtering based on user role for staff
             queryset = get_branch_queryset_for_user(self.request.user, queryset)
         
@@ -439,6 +459,7 @@ class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     queryset = InventoryImage.objects.select_related('inventory').all()
     serializer_class = InventoryImageSerializer
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         """

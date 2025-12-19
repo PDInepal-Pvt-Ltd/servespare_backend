@@ -8,6 +8,7 @@ import calendar
 from apps.subscription.models import Subscription
 from apps.subscription.serializers import SubscriptionSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.pagination import StandardResultsSetPagination
 from apps.base.permissions import IsSuperAdminOrTenantAdmin
 from apps.base.permission_utils import get_tenant_queryset_for_user
 
@@ -19,6 +20,7 @@ class SubscriptionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     queryset = Subscription.objects.select_related('tenant', 'subscription_plan').all()
     serializer_class = SubscriptionSerializer
     permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdmin]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         """
