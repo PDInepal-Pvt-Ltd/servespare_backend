@@ -9,6 +9,7 @@ from datetime import timedelta
 from apps.base.permissions import IsSuperAdmin
 from .models import AuditLog
 from .serializers import AuditLogSerializer
+from apps.base.pagination import StandardResultsSetPagination
 
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
@@ -22,6 +23,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 	search_fields = ['path', 'entity', 'user__username', 'tenant__business_name', 'ip_address', 'user_agent']
 	ordering_fields = ['created', 'status_code', 'method', 'action']
 	ordering = ['-created']
+	pagination_class = StandardResultsSetPagination
 
 	@action(detail=False, methods=['get'], url_path='export')
 	def export(self, request):

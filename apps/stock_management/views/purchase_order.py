@@ -7,6 +7,7 @@ from django.db.models.functions import Coalesce
 from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem
 from apps.stock_management.serializers import PurchaseOrderSerializer, PurchaseOrderItemSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.pagination import StandardResultsSetPagination
 from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager
 from apps.base.permission_utils import get_tenant_queryset_for_user, get_branch_queryset_for_user
 
@@ -18,6 +19,7 @@ class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     queryset = PurchaseOrder.objects.select_related('supplier').prefetch_related('items').all()
     serializer_class = PurchaseOrderSerializer
     permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdminOrBranchManager]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         """
@@ -138,6 +140,7 @@ class PurchaseOrderItemViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     queryset = PurchaseOrderItem.objects.select_related('purchase_order').all()
     serializer_class = PurchaseOrderItemSerializer
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         """

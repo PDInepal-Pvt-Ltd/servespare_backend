@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from apps.tenant.models import Tenant
 from apps.tenant.serializers import TenantSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.pagination import StandardResultsSetPagination
 from apps.base.permissions import (
     IsSuperAdminOrTenantAdmin, 
     IsSuperAdmin,
@@ -27,6 +28,7 @@ class TenantViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     queryset = Tenant.objects.select_related('package').all()
     serializer_class = TenantSerializer
     permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdmin]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         """
