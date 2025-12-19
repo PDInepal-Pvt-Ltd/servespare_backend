@@ -21,7 +21,7 @@ class Subscription(BaseModel):
 
     subscription_date = models.DateField()
     finish_date = models.DateField()
-    renew_date = models.DateField(null=True, blank=True)
+   
     
     class Meta:
         db_table = 'subscription'
@@ -37,12 +37,7 @@ class Subscription(BaseModel):
                 raise ValidationError({
                     'finish_date': 'Finish date must be after subscription date.'
                 })
-        if self.renew_date and self.finish_date:
-            if self.renew_date < self.finish_date:
-                raise ValidationError({
-                    'renew_date': 'Renew date should be on or after finish date.'
-                })
-    
+      
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
