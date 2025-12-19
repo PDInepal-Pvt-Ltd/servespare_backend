@@ -34,7 +34,7 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         Bypass authentication for GET requests.
         This allows GET requests without JWT token.
         """
-        if self.request.method == 'GET':
+        if self.request and self.request.method == 'GET':
             return []
         return super().get_authenticators()
     
