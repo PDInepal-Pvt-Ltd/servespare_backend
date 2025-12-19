@@ -24,7 +24,7 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
 
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
-    list_display = ['tenant', 'subscription_plan', 'subscription_date', 'finish_date', 'renew_date', 'is_active', 'created', 'modified']
+    list_display = ['tenant', 'subscription_plan', 'subscription_date', 'finish_date', 'is_active', 'created', 'modified']
     list_filter = ['is_active', 'subscription_date', 'finish_date', 'created', 'modified']
     search_fields = ['tenant__business_name', 'tenant__email', 'subscription_plan__plan_name']
     readonly_fields = ['created', 'modified']
@@ -33,7 +33,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
             'fields': ('tenant', 'subscription_plan', 'is_active')
         }),
         ('Dates', {
-            'fields': ('subscription_date', 'finish_date', 'renew_date')
+            'fields': ('subscription_date', 'finish_date')
         }),
         ('Timestamps', {
             'fields': ('created', 'modified'),

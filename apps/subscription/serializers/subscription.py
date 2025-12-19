@@ -28,7 +28,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'subscription_plan_detail',
             'subscription_date',
             'finish_date',
-            'renew_date',
             'is_active',
             'created',
             'modified'
@@ -39,19 +38,12 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         """Validate dates"""
         subscription_date = data.get('subscription_date')
         finish_date = data.get('finish_date')
-        renew_date = data.get('renew_date')
+       
         
         if finish_date and subscription_date:
             if finish_date <= subscription_date:
                 raise serializers.ValidationError({
                     'finish_date': 'Finish date must be after subscription date.'
                 })
-        
-        if renew_date and finish_date:
-            if renew_date < finish_date:
-                raise serializers.ValidationError({
-                    'renew_date': 'Renew date should be on or after finish date.'
-                })
-        
         return data
 
