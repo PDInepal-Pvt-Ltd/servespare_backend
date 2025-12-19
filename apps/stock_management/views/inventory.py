@@ -30,6 +30,15 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [CanViewInventory]
     pagination_class = StandardResultsSetPagination
     
+    def get_authenticators(self):
+        """
+        Bypass authentication for GET requests.
+        This allows GET requests without JWT token.
+        """
+        if self.request.method == 'GET':
+            return []
+        return super().get_authenticators()
+    
     def get_permissions(self):
         """
         Allow unauthenticated access for list and retrieve actions.
