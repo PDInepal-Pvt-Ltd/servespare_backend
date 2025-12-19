@@ -26,7 +26,16 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     queryset = Inventory.objects.select_related('party').prefetch_related('images').all()
     serializer_class = InventorySerializer
-    permission_classes = [IsAuthenticated, CanViewInventory]
+    permission_classes = [CanViewInventory]
+    
+    def get_permissions(self):
+        """
+        Allow unauthenticated access for list and retrieve actions.
+        Require authentication for create, update, delete, and other actions.
+        """
+        if self.action in ['list', 'retrieve']:
+            return []
+        return [permission() for permission in self.permission_classes]
     
     def get_queryset(self):
         """
