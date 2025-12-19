@@ -15,7 +15,8 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
             'plan_price',
             'no_of_user',
             'no_of_branch',
-            'support_type',
+            'no_of_product',
+            'no_of_user',
             'is_active',
             'created',
             'modified'
