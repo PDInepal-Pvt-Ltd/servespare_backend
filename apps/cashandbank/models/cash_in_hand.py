@@ -3,6 +3,7 @@ from django.db.models import Sum, F, Case, When, DecimalField
 from django.utils import timezone
 
 from apps.base.models import BaseModel
+from apps.base.managers import TenantManager
 from apps.cashandbank.models.bank_accounts import BankAccount
 
 
@@ -42,6 +43,16 @@ class CashTransaction(BaseModel):
 		('cash_out', 'Cash Out'),
 		('transfer', 'Transfer'),
 	]
+
+	# Tenant Context
+	tenant = models.ForeignKey(
+		'tenant.Tenant',
+		on_delete=models.CASCADE,
+		null=True,
+		blank=True,
+		related_name='cash_transactions',
+		help_text='Tenant that owns this cash transaction'
+	)
 
 	transaction_type = models.CharField(
 		max_length=20,
@@ -105,6 +116,8 @@ class CashTransaction(BaseModel):
 			models.Index(fields=['transaction_type']),
 			models.Index(fields=['transaction_date']),
 			models.Index(fields=['is_active']),
+			models.Index(fields=['tenant']),
+			models.Index(fields=['branch']),
 		]
 
 	def __str__(self):
@@ -121,3 +134,5 @@ class CashTransaction(BaseModel):
 		from django.core.exceptions import ValidationError
 		if self.amount is None or self.amount < 0:
 			raise ValidationError({'amount': 'Amount must be a non-negative value.'})
+
+	objects = TenantManager()

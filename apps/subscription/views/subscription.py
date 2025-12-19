@@ -1,19 +1,23 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
 from datetime import date
 from apps.subscription.models import Subscription
 from apps.subscription.serializers import SubscriptionSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.permissions import IsSuperAdminOrTenantAdmin
+from apps.base.permission_utils import get_tenant_queryset_for_user
 
 
 class SubscriptionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
-    ViewSet for managing subscriptions
+    ViewSet for managing subscriptions with RBAC
     """
     queryset = Subscription.objects.select_related('tenant', 'subscription_plan').all()
     serializer_class = SubscriptionSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdmin]
     
     def get_queryset(self):
         """

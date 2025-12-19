@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from apps.base.models import BaseModel
+from apps.base.managers import TenantManager
 
 
 class Party(BaseModel):
@@ -45,6 +46,16 @@ class Party(BaseModel):
         help_text='Type of customer (only applicable for customers)'
     )
     
+    # Tenant Context
+    tenant = models.ForeignKey(
+        'tenant.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='parties',
+        help_text='Tenant that owns this party'
+    )
+
     # Basic Information
     party_name = models.CharField(
         max_length=255,
@@ -131,7 +142,11 @@ class Party(BaseModel):
             models.Index(fields=['party_type']),
             models.Index(fields=['customer_type']),
             models.Index(fields=['party_name']),
+            models.Index(fields=['tenant']),
+            models.Index(fields=['branch']),
         ]
+
+    objects = TenantManager()
     
     def clean(self):
         """Validate that customer_type is set when party_type is customer"""

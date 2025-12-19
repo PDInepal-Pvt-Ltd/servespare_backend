@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
 from apps.users.views import UserViewSet, AuthViewSet, CustomTokenObtainPairView
+from apps.base.views import AuditLogViewSet
 
 # Create router
 router = DefaultRouter()
@@ -11,6 +12,7 @@ router = DefaultRouter()
 # Register viewsets
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'auth', AuthViewSet, basename='auth')
+router.register(r'audit-logs', AuditLogViewSet, basename='audit-log')
 
 urlpatterns = [
     path('docs/schema/', SpectacularAPIView.as_view(), name='schema'),

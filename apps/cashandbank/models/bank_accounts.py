@@ -1,5 +1,6 @@
 from django.db import models
 from apps.base.models import BaseModel
+from apps.base.managers import TenantManager
 
 
 class BankAccount(BaseModel):
@@ -20,6 +21,16 @@ class BankAccount(BaseModel):
         help_text='Type of account: Bank Account, eSewa, FonePay, or Cash'
     )
     
+    # Tenant Context
+    tenant = models.ForeignKey(
+        'tenant.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='bank_accounts',
+        help_text='Tenant that owns this bank account'
+    )
+
     # Account Information
     account_name = models.CharField(
         max_length=255,
@@ -65,9 +76,13 @@ class BankAccount(BaseModel):
             models.Index(fields=['account_type']),
             models.Index(fields=['account_name']),
             models.Index(fields=['is_active']),
+            models.Index(fields=['tenant']),
+            models.Index(fields=['branch']),
         ]
     
     def __str__(self):
         account_type_display = self.get_account_type_display()
         return f"{self.account_name} ({account_type_display})"
+
+    objects = TenantManager()
 

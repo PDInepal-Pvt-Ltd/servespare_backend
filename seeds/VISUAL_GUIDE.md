@@ -1,4 +1,4 @@
-# 📊 ServeIQ Seed Data - Visual Guide
+# 📊 Serve Spare Seed Data - Visual Guide
 
 ## 🎯 What Gets Created in One Command
 

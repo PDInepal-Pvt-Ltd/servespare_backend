@@ -12,6 +12,17 @@ from django_filters.rest_framework import DjangoFilterBackend
 from apps.base.pagination import StandardResultsSetPagination
 from apps.users.models import User
 from apps.base.drf import TenantViewSetMixin
+from apps.base.permissions import (
+    IsSuperAdmin,
+    CanManageTenantUsers,
+    IsSuperAdminOrCustomer
+)
+from apps.base.permission_utils import (
+    can_manage_user,
+    get_tenant_queryset_for_user,
+    is_super_admin,
+    is_tenant_admin
+)
 from apps.users.serializers import (
     UserListSerializer,
     UserDetailSerializer,
@@ -87,10 +98,16 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
-    ViewSet for User CRUD operations.
+    ViewSet for User CRUD operations with role-based access control.
+    
+    Permissions:
+    - Super Admin: Can manage all users globally
+    - Tenant Admin: Can create and manage users in their own tenant
+    - Tenant User (Sub Admin): Can view own profile and change own password
+    - Customer: Can view own profile and change own password
     
     Provides endpoints for:
-    - list: Get all users
+    - list: Get users (filtered by role)
     - retrieve: Get single user
     - create: Create new user
     - update/partial_update: Update user
@@ -141,24 +158,121 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         return UserDetailSerializer
     
     def get_permissions(self):
-        """Set permissions based on action."""
+        """
+        Set permissions based on action and user role.
+        
+        Permissions:
+        - me, update_profile, change_password: User must be authenticated
+        - list, retrieve: Must be authenticated, filtering applied by role
+        - create, update, destroy, reset_password: Super Admin or Tenant Admin
+        """
         if self.action in ['me', 'update_profile', 'change_password', 'first_time_password_change']:
+            # Any authenticated user can access their own profile
             permission_classes = [IsAuthenticated]
         elif self.action == 'get_password_change_token':
+            # Public endpoint
             permission_classes = [AllowAny]
         elif self.action in ['create', 'update', 'partial_update', 'destroy',
                              'reset_password', 'update_status', 'update_role', 'bulk_action']:
-            permission_classes = [IsAuthenticated, IsAdminUser]
+            # Only Super Admin or Tenant Admin can manage users
+            permission_classes = [IsAuthenticated, CanManageTenantUsers]
+        elif self.action in ['list', 'retrieve', 'admin_accounts']:
+            # Authenticated users can view, but filtering applied by role
+            permission_classes = [IsAuthenticated]
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
     
+    def get_queryset(self):
+        """
+        Filter users based on authenticated user's role.
+        
+        Rules:
+        - Super Admin: See all users
+        - Tenant Admin: See only users in their tenant
+        - Customer: See only their own user
+        - Tenant User: See only their own user
+        """
+        user = self.request.user
+        queryset = User.objects.filter(is_removed=False)
+        
+        if not user or not user.is_authenticated:
+            return queryset.none()
+        
+        # Super Admin sees all users
+        if is_super_admin(user):
+            return queryset
+        
+        # Customer sees only themselves
+        if user.role == User.Role.CUSTOMER:
+            return queryset.filter(id=user.id)
+        
+        # Tenant Admin sees only users in their tenant
+        if is_tenant_admin(user):
+            return queryset.filter(tenant=user.tenant)
+        
+        # Tenant User (Sub Admin) sees only themselves
+        if user.role == User.Role.SUB_ADMIN:
+            return queryset.filter(id=user.id)
+        
+        # Default: only own user
+        return queryset.filter(id=user.id)
+    
     def perform_create(self, serializer):
-        """Create user with created_by tracking."""
-        serializer.save(created_by=self.request.user)
+        """
+        Create user with role-based validation.
+        
+        - Super Admin: Can create users with any role in any tenant
+        - Tenant Admin: Can create users only in their own tenant
+        """
+        user = self.request.user
+        
+        # Validate tenant assignment
+        if is_tenant_admin(user):
+            # Tenant Admin can only create users in their own tenant
+            if serializer.validated_data.get('tenant') != user.tenant:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Tenant Admin can only create users in their own tenant.")
+        
+        serializer.save(created_by=user)
+    
+    def perform_update(self, serializer):
+        """
+        Update user with role-based validation.
+        
+        - Super Admin: Can update any user
+        - Tenant Admin: Can only update users in their tenant
+        """
+        user = self.request.user
+        target_user = serializer.instance
+        
+        # Check if user can manage the target user
+        if not can_manage_user(user, target_user):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to update this user.")
+        
+        # Tenant Admin cannot change user's tenant
+        if is_tenant_admin(user) and 'tenant' in serializer.validated_data:
+            if serializer.validated_data['tenant'] != user.tenant:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Tenant Admin cannot change user's tenant.")
+        
+        serializer.save()
     
     def perform_destroy(self, instance):
-        """Soft delete user."""
+        """
+        Delete (soft delete) user with role-based validation.
+        
+        - Super Admin: Can delete any user
+        - Tenant Admin: Can only delete users in their tenant
+        """
+        user = self.request.user
+        
+        # Check if user can manage the target user
+        if not can_manage_user(user, instance):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to delete this user.")
+        
         instance.is_removed = True
         instance.save(update_fields=['is_removed', 'modified'])
     

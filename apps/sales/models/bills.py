@@ -1,5 +1,6 @@
 from django.db import models
 from apps.base.models import BaseModel
+from apps.base.managers import TenantManager
 
 
 class Bill(BaseModel):
@@ -30,6 +31,16 @@ class Bill(BaseModel):
         ('workshop', 'Workshop'),
     ]
     
+    # Tenant Context
+    tenant = models.ForeignKey(
+        'tenant.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='bills',
+        help_text='Tenant that owns this bill'
+    )
+
     # Customer Information
     customer_name = models.CharField(
         max_length=255,
@@ -128,6 +139,8 @@ class Bill(BaseModel):
             models.Index(fields=['created']),
             models.Index(fields=['status']),
             models.Index(fields=['payment_method']),
+            models.Index(fields=['tenant']),
+            models.Index(fields=['branch']),
         ]
     
     def __str__(self):
@@ -176,4 +189,6 @@ class Bill(BaseModel):
                 raise ValidationError({
                     'discount_value': 'Discount amount cannot exceed the price.'
                 })
+
+    objects = TenantManager()
 

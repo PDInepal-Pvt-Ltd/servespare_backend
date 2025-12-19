@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from decimal import Decimal
 from apps.base.models import BaseModel
+from apps.base.managers import TenantManager
 
 
 class PurchaseOrder(BaseModel):
@@ -16,6 +17,16 @@ class PurchaseOrder(BaseModel):
         ('billed', 'Billed'),
     ]
     
+    # Tenant Context
+    tenant = models.ForeignKey(
+        'tenant.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='purchase_orders',
+        help_text='Tenant that owns this purchase order'
+    )
+
     # Basic Information
     po_number = models.CharField(
         max_length=100,
@@ -83,7 +94,11 @@ class PurchaseOrder(BaseModel):
             models.Index(fields=['status']),
             models.Index(fields=['order_date']),
             models.Index(fields=['supplier']),
+            models.Index(fields=['tenant']),
+            models.Index(fields=['branch']),
         ]
+
+    objects = TenantManager()
     
     def clean(self):
         """Validate dates"""
@@ -115,6 +130,15 @@ class PurchaseOrderItem(BaseModel):
     """
     Model to store items in a purchase order
     """
+    tenant = models.ForeignKey(
+        'tenant.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='purchase_order_items',
+        help_text='Tenant that owns this purchase order item'
+    )
+
     purchase_order = models.ForeignKey(
         PurchaseOrder,
         on_delete=models.CASCADE,
@@ -171,6 +195,8 @@ class PurchaseOrderItem(BaseModel):
         verbose_name = 'Purchase Order Item'
         verbose_name_plural = 'Purchase Order Items'
         ordering = ['purchase_order', 'id']
+
+    objects = TenantManager()
     
     def clean(self):
         """Validate item data"""

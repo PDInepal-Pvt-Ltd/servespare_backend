@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 from decouple import config
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,28 +22,33 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-a*iz)9%+@ja6bpla^c!ll#+3f39d1)bu-sl*e3^&e%p7_u+ste'
+# Read from environment; fallback to existing value for local dev
+SECRET_KEY = config(
+    'SECRET_KEY',
+    default='django-insecure-a*iz)9%+@ja6bpla^c!ll#+3f39d1)bu-sl*e3^&e%p7_u+ste'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Controlled via environment. Example in env.example: DEBUG=True
+DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
-    'bandoleered-toney-loveably.ngrok-free.dev',
+    'unopinionated-kiddingly-verline.ngrok-free.dev',
 ]
 
 # Allow localhost and ngrok host for CSRF and CORS (used by corsheaders middleware)
 # Include the scheme (https/http) as required by Django for CSRF_TRUSTED_ORIGINS
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
-    'https://bandoleered-toney-loveably.ngrok-free.dev',
+    'https://unopinionated-kiddingly-verline.ngrok-free.dev',
 ]
 
 # If you need cross-origin requests from frontend, explicitly allow it via django-cors-headers settings.
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
-    'https://bandoleered-toney-loveably.ngrok-free.dev',
+    'https://unopinionated-kiddingly-verline.ngrok-free.dev',
     
 ]
 
@@ -86,6 +92,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'apps.base.middleware.TenantMiddleware',
+    'apps.base.middleware.AuditMiddleware',
     'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -157,6 +164,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Media files (user uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -166,7 +179,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'users.User'
 # Site ID for django.contrib.sites (required by django-allauth)
-from core.configuration.auth import SITE_ID
 
 # Email configuration
 # If SMTP creds are missing while DEBUG is True, fall back to console backend so emails are visible during development.

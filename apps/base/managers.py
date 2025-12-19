@@ -1,3 +1,4 @@
+from django.contrib.auth.models import UserManager as DjangoUserManager
 from django.db import models
 from apps.base.tenant import get_current_tenant, get_current_user
 
@@ -23,7 +24,7 @@ class TenantQuerySet(models.QuerySet):
         return self
 
 
-class TenantManager(models.Manager):
+class TenantManager(DjangoUserManager):
     """Manager that applies tenant scoping automatically via thread-local tenant.
 
     Usage: set `objects = TenantManager()` on models that have a `tenant` FK
@@ -33,3 +34,10 @@ class TenantManager(models.Manager):
     def get_queryset(self):
         qs = TenantQuerySet(self.model, using=self._db)
         return qs._maybe_filter()
+
+    # Ensure compatibility with Django auth which calls
+    # `<User>._default_manager.get_by_natural_key(username)` during authentication
+    def get_by_natural_key(self, username):
+        # Resolve the model's username field dynamically (defaults to 'username' for User)
+        username_field = getattr(self.model, 'USERNAME_FIELD', 'username')
+        return self.get(**{username_field: username})
