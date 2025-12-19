@@ -41,3 +41,21 @@ class TenantManager(DjangoUserManager):
         # Resolve the model's username field dynamically (defaults to 'username' for User)
         username_field = getattr(self.model, 'USERNAME_FIELD', 'username')
         return self.get(**{username_field: username})
+
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        """Force CLI-created superusers to use the Super Admin role."""
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+
+        # Always pin the role to Super Admin so `createsuperuser` users get full access
+        if hasattr(self.model, 'Role') and hasattr(self.model.Role, 'SUPER_ADMIN'):
+            extra_fields['role'] = self.model.Role.SUPER_ADMIN
+        else:
+            extra_fields['role'] = 'super_admin'
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+
+        return super().create_superuser(username, email=email, password=password, **extra_fields)
