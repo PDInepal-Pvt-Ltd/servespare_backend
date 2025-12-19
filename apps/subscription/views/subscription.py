@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
 from datetime import date
+import calendar
 from apps.subscription.models import Subscription
 from apps.subscription.serializers import SubscriptionSerializer
 from apps.base.drf import TenantViewSetMixin
@@ -51,6 +52,19 @@ class SubscriptionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             )
         
         return queryset
+
+    def _add_months(self, original_date: date, months: int) -> date:
+        """Add months to a date, handling month overflow and end-of-month."""
+        if original_date is None:
+            return None
+        year = original_date.year
+        month = original_date.month + months
+        year += (month - 1) // 12
+        month = (month - 1) % 12 + 1
+        day = original_date.day
+        last_day = calendar.monthrange(year, month)[1]
+        day = min(day, last_day)
+        return date(year, month, day)
     
     @action(detail=False, methods=['get'])
     def active(self, request):
@@ -98,4 +112,30 @@ class SubscriptionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
 
         serializer = self.get_serializer(subscriptions, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def renew(self, request, pk=None):
+        """Renew a single subscription by a number of months.
+
+        Request body should include JSON: {"months": 6} where months is one of [6,12,24].
+        """
+        subscription = self.get_object()
+        months = request.data.get('months')
+        try:
+            months = int(months)
+        except (TypeError, ValueError):
+            return Response({"detail": "Invalid 'months' value."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if months not in (6, 12, 24):
+            return Response({"detail": "Allowed months are 6, 12, or 24."}, status=status.HTTP_400_BAD_REQUEST)
+
+        base_date = subscription.finish_date or subscription.subscription_date
+        if not base_date:
+            return Response({"detail": "Subscription has no valid base date to renew from."}, status=status.HTTP_400_BAD_REQUEST)
+
+        subscription.finish_date = self._add_months(base_date, months)
+        subscription.save()
+
+        serializer = self.get_serializer(subscription)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 

@@ -1,4 +1,9 @@
-from django.contrib import admin
+from datetime import date
+import calendar
+
+from django.contrib import admin, messages
+from django.utils.translation import ngettext
+
 from apps.subscription.models import SubscriptionPlan, Subscription
 
 
@@ -41,3 +46,55 @@ class SubscriptionAdmin(admin.ModelAdmin):
         }),
     )
     raw_id_fields = ['tenant', 'subscription_plan']
+
+    actions = ['renew_6_months', 'renew_12_months', 'renew_24_months']
+
+    def _add_months(self, original_date: date, months: int) -> date:
+        """Return a date with `months` added to `original_date`.
+
+        Handles month overflow and end-of-month correctly.
+        """
+        if original_date is None:
+            return None
+        year = original_date.year
+        month = original_date.month + months
+        # normalize year/month
+        year += (month - 1) // 12
+        month = (month - 1) % 12 + 1
+        day = original_date.day
+        last_day = calendar.monthrange(year, month)[1]
+        day = min(day, last_day)
+        return date(year, month, day)
+
+    def _renew_months(self, request, queryset, months: int):
+        updated = 0
+        for subscription in queryset:
+            base_date = subscription.finish_date or subscription.subscription_date
+            if not base_date:
+                continue
+            subscription.finish_date = self._add_months(base_date, months)
+            subscription.save()
+            updated += 1
+
+        self.message_user(request,
+                          ngettext(
+                              '%d subscription was successfully renewed by %d months.',
+                              '%d subscriptions were successfully renewed by %d months.',
+                              updated
+                          ) % (updated, months),
+                          messages.SUCCESS)
+
+    def renew_6_months(self, request, queryset):
+        return self._renew_months(request, queryset, 6)
+
+    renew_6_months.short_description = 'Renew selected subscriptions by 6 months'
+
+    def renew_12_months(self, request, queryset):
+        return self._renew_months(request, queryset, 12)
+
+    renew_12_months.short_description = 'Renew selected subscriptions by 12 months'
+
+    def renew_24_months(self, request, queryset):
+        return self._renew_months(request, queryset, 24)
+
+    renew_24_months.short_description = 'Renew selected subscriptions by 24 months'
