@@ -12,6 +12,7 @@ from apps.stock_management.serializers import InventorySerializer, InventoryImag
 from apps.base.drf import TenantViewSetMixin
 from apps.base.permissions import CanViewInventory, CanManageBranchResources
 from apps.base.permission_utils import get_branch_queryset_for_user
+from apps.base.pagination import StandardResultsSetPagination
 
 
 class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
@@ -26,7 +27,17 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     queryset = Inventory.objects.select_related('party').prefetch_related('images').all()
     serializer_class = InventorySerializer
-    permission_classes = [IsAuthenticated, CanViewInventory]
+    permission_classes = [CanViewInventory]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_permissions(self):
+        """
+        Allow unauthenticated access for list and retrieve actions.
+        Require authentication for create, update, delete, and other actions.
+        """
+        if self.action in ['list', 'retrieve']:
+            return []
+        return [permission() for permission in self.permission_classes]
     
     def get_queryset(self):
         """
@@ -439,6 +450,7 @@ class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     queryset = InventoryImage.objects.select_related('inventory').all()
     serializer_class = InventoryImageSerializer
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         """

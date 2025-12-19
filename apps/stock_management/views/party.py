@@ -7,6 +7,7 @@ from apps.stock_management.serializers import PartySerializer
 from apps.base.drf import TenantViewSetMixin
 from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager
 from apps.base.permission_utils import get_tenant_queryset_for_user
+from apps.base.pagination import StandardResultsSetPagination
 
 
 class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
@@ -16,6 +17,7 @@ class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     queryset = Party.objects.all()
     serializer_class = PartySerializer
     permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdminOrBranchManager]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         """

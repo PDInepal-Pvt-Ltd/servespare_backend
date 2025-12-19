@@ -4,6 +4,7 @@ from rest_framework.exceptions import PermissionDenied
 
 from apps.branch.models import Branch
 from apps.branch.serializers import BranchSerializer
+from apps.base.pagination import StandardResultsSetPagination
 from apps.base.permissions import IsSuperAdminOrTenantAdmin
 from apps.base.permission_utils import is_super_admin, is_tenant_admin
 
@@ -19,6 +20,7 @@ class BranchViewSet(viewsets.ModelViewSet):
 	queryset = Branch.objects.all()
 	serializer_class = BranchSerializer
 	permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdmin]
+	pagination_class = StandardResultsSetPagination
 
 	def get_queryset(self):
 		user = self.request.user

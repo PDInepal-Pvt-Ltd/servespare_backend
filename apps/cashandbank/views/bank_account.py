@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from apps.cashandbank.models import BankAccount
 from apps.cashandbank.serializers import BankAccountSerializer
 from apps.base.drf import TenantViewSetMixin
+from apps.base.pagination import StandardResultsSetPagination
 from apps.base.permissions import CanManageBranchResources
 from apps.base.permission_utils import get_branch_queryset_for_user
 
@@ -17,6 +18,7 @@ class BankAccountViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     queryset = BankAccount.objects.all()
     serializer_class = BankAccountSerializer
     permission_classes = [IsAuthenticated, CanManageBranchResources]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         """
