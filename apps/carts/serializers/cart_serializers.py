@@ -128,41 +128,17 @@ class UpdateCartItemSerializer(serializers.Serializer):
         if value <= 0:
             raise serializers.ValidationError("Quantity must be greater than zero.")
         return value
-
-
-class CheckoutSerializer(serializers.Serializer):
-    """Serializer for checkout from cart"""
-    payment_method = serializers.ChoiceField(
-        choices=[
-            ('cash', 'Cash'),
-            ('card', 'Card'),
-            ('upi', 'UPI'),
-            ('bank_transfer', 'Bank Transfer'),
-            ('credit', 'Credit'),
-        ],
-        default='cash'
-    )
-    delivery_address = serializers.CharField(
-        max_length=500,
-        required=False,
-        allow_blank=True
-    )
-    delivery_city = serializers.CharField(
-        max_length=100,
-        required=False,
-        allow_blank=True
-    )
-    delivery_state = serializers.CharField(
-        max_length=100,
-        required=False,
-        allow_blank=True
-    )
-    delivery_pincode = serializers.CharField(
-        max_length=20,
-        required=False,
-        allow_blank=True
-    )
-    notes = serializers.CharField(
-        required=False,
-        allow_blank=True
-    )
+    
+    def validate(self, data):
+        """Validate quantity against available stock"""
+        # Get the cart item instance being updated from context
+        instance = self.instance
+        if instance and hasattr(instance, 'inventory'):
+            inventory = instance.inventory
+            if data['quantity'] > inventory.quantity:
+                raise serializers.ValidationError({
+                    'quantity': f'Insufficient stock. Only {inventory.quantity} available.'
+                })
+        return data
+    
+    

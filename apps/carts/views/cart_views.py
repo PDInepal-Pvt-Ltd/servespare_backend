@@ -150,13 +150,6 @@ class CartViewSet(viewsets.ViewSet):
             "quantity": 3.00
         }
         """
-        serializer = UpdateCartItemSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(
-                serializer.errors,
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
         cart = self.get_or_create_cart(request.user)
         cart_item = get_object_or_404(
             CartItem,
@@ -164,18 +157,18 @@ class CartViewSet(viewsets.ViewSet):
             cart=cart
         )
         
-        new_quantity = serializer.validated_data['quantity']
-        
-        # Check stock availability
-        if cart_item.inventory.quantity < new_quantity:
+        # Pass the cart item instance to serializer for stock validation
+        serializer = UpdateCartItemSerializer(
+            cart_item,
+            data=request.data
+        )
+        if not serializer.is_valid():
             return Response(
-                {
-                    'error': 'Insufficient stock',
-                    'available_quantity': float(cart_item.inventory.quantity)
-                },
+                serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        new_quantity = serializer.validated_data['quantity']
         cart_item.quantity = new_quantity
         cart_item.save()
         
