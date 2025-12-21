@@ -8,9 +8,13 @@ class Bill(BaseModel):
     Model to store bills/invoices
     """
     STATUS_CHOICES = [
-        ("draft", "Draft"),
-        ("pending", "Pending"),
         ("paid", "Paid"),
+        ("pending", "Pending"),
+        ("on_hold", "On Hold"),
+        ("credit_sale", "Credit Sale"),
+        ("draft", "Draft"),
+        ("cancelled", "Cancelled"),
+        ("refunded", "Refunded"),
     ]
 
     PAYMENT_METHOD_CHOICES = [
@@ -110,12 +114,12 @@ class Bill(BaseModel):
     )
 
     status = models.CharField(
-        max_length=10,
+        max_length=20,
         choices=STATUS_CHOICES,
         default="draft",
         blank=True,
         null=True,
-        help_text="Bill status: Draft, Pending, or Paid"
+        help_text="Bill status: Draft, Pending, Paid, On Hold, Credit Sale, Cancelled, or Refunded"
     )
 
     branch = models.ForeignKey(
