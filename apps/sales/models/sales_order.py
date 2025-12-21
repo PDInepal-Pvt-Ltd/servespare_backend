@@ -22,20 +22,6 @@ class SalesOrder(BaseModel):
         ('cancelled', 'Cancelled'),
     ]
     
-    PAYMENT_STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('partial', 'Partial'),
-        ('paid', 'Paid'),
-    ]
-    
-    PAYMENT_METHOD_CHOICES = [
-        ('cash', 'Cash'),
-        ('card', 'Card'),
-        ('upi', 'UPI'),
-        ('bank_transfer', 'Bank Transfer'),
-        ('credit', 'Credit'),
-    ]
-    
     # Tenant Context
     tenant = models.ForeignKey(
         'tenant.Tenant',
@@ -134,28 +120,6 @@ class SalesOrder(BaseModel):
         help_text='Final total amount'
     )
     
-    # Payment Information
-    payment_status = models.CharField(
-        max_length=20,
-        choices=PAYMENT_STATUS_CHOICES,
-        default='pending',
-        help_text='Payment status'
-    )
-    payment_method = models.CharField(
-        max_length=20,
-        choices=PAYMENT_METHOD_CHOICES,
-        blank=True,
-        null=True,
-        help_text='Payment method'
-    )
-    paid_amount = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        validators=[MinValueValidator(Decimal('0.00'))],
-        help_text='Amount paid so far'
-    )
-    
     # Delivery Information
     delivery_address = models.TextField(
         help_text='Delivery address'
@@ -186,6 +150,8 @@ class SalesOrder(BaseModel):
         null=True,
         help_text='Actual delivery date'
     )
+    
+
     
     # Tracking Information
     tracking_number = models.CharField(
@@ -232,7 +198,6 @@ class SalesOrder(BaseModel):
             models.Index(fields=['order_number']),
             models.Index(fields=['customer']),
             models.Index(fields=['order_status']),
-            models.Index(fields=['payment_status']),
             models.Index(fields=['order_date']),
             models.Index(fields=['-order_date']),
             models.Index(fields=['tenant']),
@@ -279,17 +244,9 @@ class SalesOrder(BaseModel):
         # Calculate total
         self.total_amount = amount_after_discount + self.tax_amount + self.shipping_charges
         
-        # Update payment status
-        if self.paid_amount >= self.total_amount:
-            self.payment_status = 'paid'
-        elif self.paid_amount > 0:
-            self.payment_status = 'partial'
-        else:
-            self.payment_status = 'pending'
-        
         self.save(update_fields=[
             'subtotal', 'discount_amount', 'tax_amount', 'total_amount', 
-            'payment_status', 'modified'
+            'modified'
         ])
     
     def update_order_status(self, new_status):
@@ -303,51 +260,18 @@ class SalesOrder(BaseModel):
         if new_status == 'delivered' and not self.actual_delivery_date:
             from django.utils import timezone
             self.actual_delivery_date = timezone.now().date()
+
+        # On delivered, deduct inventory for all items not yet deducted
+        if new_status == 'delivered':
+            for item in self.items.select_related('inventory').all():
+                item.deduct_inventory()
         
         self.save(update_fields=['order_status', 'actual_delivery_date', 'modified'])
     
-    def add_payment(self, amount, payment_method=None):
-        """Add payment to order"""
-        if amount <= 0:
-            raise ValidationError("Payment amount must be positive")
-        
-        self.paid_amount += Decimal(str(amount))
-        
-        if payment_method:
-            self.payment_method = payment_method
-        
-        # Update payment status
-        if self.paid_amount >= self.total_amount:
-            self.payment_status = 'paid'
-        elif self.paid_amount > 0:
-            self.payment_status = 'partial'
-        
-        self.save(update_fields=['paid_amount', 'payment_method', 'payment_status', 'modified'])
-    
-    def cancel_order(self):
-        """Cancel order and restore inventory"""
-        if self.order_status == 'cancelled':
-            raise ValidationError("Order is already cancelled")
-        
-        if self.order_status in ['delivered']:
-            raise ValidationError("Cannot cancel delivered orders")
-        
-        # Restore inventory for all items
-        for item in self.items.all():
-            item.restore_inventory()
-        
-        self.order_status = 'cancelled'
-        self.save(update_fields=['order_status', 'modified'])
-    
+    # -------- Properties --------
     @property
     def balance_amount(self):
-        """Calculate remaining balance"""
-        return self.total_amount - self.paid_amount
-    
-    @property
-    def is_paid(self):
-        """Check if order is fully paid"""
-        return self.payment_status == 'paid'
+        return Decimal('0.00')
     
     @property
     def total_items(self):
@@ -373,9 +297,68 @@ class SalesOrder(BaseModel):
         }
         return status_descriptions.get(self.order_status, '')
     
+    def generate_invoice(self):
+        """Generate invoice from this sales order"""
+        from apps.sales.models import Invoice, InvoiceItem
+        
+        # Check if invoice already exists
+        if hasattr(self, 'invoice'):
+            return self.invoice
+        
+        # Create invoice
+        invoice = Invoice.objects.create(
+            tenant=self.tenant,
+            customer=self.customer,
+            branch=self.branch,
+            sales_order=self,
+            subtotal=self.subtotal,
+            discount_percentage=self.discount_percentage,
+            discount_amount=self.discount_amount,
+            tax_percentage=self.tax_percentage,
+            tax_amount=self.tax_amount,
+            shipping_charges=self.shipping_charges,
+            total_amount=self.total_amount,
+            created_by=self.created_by,
+        )
+        
+        # Create invoice items from order items
+        for order_item in self.items.all():
+            InvoiceItem.objects.create(
+                tenant=self.tenant,
+                invoice=invoice,
+                inventory=order_item.inventory,
+                item_name=order_item.item_name,
+                part_number=order_item.part_number,
+                quantity=order_item.quantity,
+                unit_price=order_item.unit_price,
+                discount_percentage=order_item.discount_percentage,
+                discount_amount=order_item.discount_amount,
+                tax_percentage=order_item.tax_percentage,
+                tax_amount=order_item.tax_amount,
+                line_total=order_item.line_total,
+                notes=order_item.notes,
+            )
+        
+        return invoice
+    
+    
+    def _map_payment_status_to_invoice(self):
+        """Map sales order payment status to invoice payment status"""
+        status_map = {
+            'paid': 'paid',
+            'partial': 'pending',
+            'pending': 'pending',
+            'on_hold': 'on_hold',
+            'credit_sale': 'credit_sale',
+            'cancelled': 'cancelled',
+            'refunded': 'refunded',
+        }
+        return status_map.get(self.payment_status, 'pending')
+
     def __str__(self):
         customer_name = self.customer.full_name or self.customer.username
         return f"{self.order_number} - {customer_name} - {self.get_order_status_display()}"
+
 
 
 class SalesOrderItem(BaseModel):
@@ -504,6 +487,11 @@ class SalesOrderItem(BaseModel):
             models.Index(fields=['tenant']),
             models.Index(fields=['branch']),
         ]
+    # Inventory deduction flag
+    inventory_deducted = models.BooleanField(
+        default=False,
+        help_text='Whether inventory has been deducted for this item upon delivery'
+    )
     
     def save(self, *args, **kwargs):
         """Calculate line totals and snapshot item details"""
@@ -536,28 +524,32 @@ class SalesOrderItem(BaseModel):
         is_new = self.pk is None
         super().save(*args, **kwargs)
         
-        # Deduct inventory if new item and order is confirmed
-        if is_new and self.order.order_status != 'cancelled':
-            self.deduct_inventory()
-        
+        # Do not deduct inventory at item creation; defer to delivery status
         # Recalculate order totals
         self.order.calculate_totals()
     
     def deduct_inventory(self):
-        """Deduct quantity from inventory"""
+        """Deduct quantity from inventory and mark as deducted"""
+        if self.inventory_deducted:
+            return
         if self.inventory.quantity < self.quantity:
             raise ValidationError(
                 f"Insufficient stock for {self.item_name}. "
                 f"Available: {self.inventory.quantity}, Required: {self.quantity}"
             )
-        
         self.inventory.quantity -= self.quantity
         self.inventory.save(update_fields=['quantity', 'modified'])
+        self.inventory_deducted = True
+        self.save(update_fields=['inventory_deducted', 'modified'])
     
     def restore_inventory(self):
-        """Restore quantity to inventory (used when order is cancelled)"""
+        """Restore quantity to inventory only if previously deducted"""
+        if not self.inventory_deducted:
+            return
         self.inventory.quantity += self.quantity
         self.inventory.save(update_fields=['quantity', 'modified'])
+        self.inventory_deducted = False
+        self.save(update_fields=['inventory_deducted', 'modified'])
     
     def __str__(self):
         return f"{self.order.order_number} - {self.item_name} x {self.quantity}"

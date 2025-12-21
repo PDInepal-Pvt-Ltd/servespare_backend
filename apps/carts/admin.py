@@ -16,17 +16,13 @@ class CartAdmin(admin.ModelAdmin):
             'fields': ('user', 'total_items', 'subtotal')
         }),
         ('Status', {
-            'fields': ('is_active', 'is_removed')
+            'fields': ('is_active',)
         }),
         ('Timestamps', {
             'fields': ('created', 'modified'),
             'classes': ('collapse',)
         }),
     )
-    
-    def has_add_permission(self, request):
-        """Disable manual cart creation in admin"""
-        return False
 
 
 @admin.register(CartItem)
@@ -48,7 +44,7 @@ class CartItemAdmin(admin.ModelAdmin):
         'inventory__item_name',
         'inventory__part_number'
     ]
-    readonly_fields = ['created', 'modified', 'total_price']
+    readonly_fields = ['created', 'modified', 'price', 'total_price']
     date_hierarchy = 'created'
     
     fieldsets = (
@@ -56,15 +52,11 @@ class CartItemAdmin(admin.ModelAdmin):
             'fields': ('cart', 'inventory', 'quantity', 'price', 'total_price')
         }),
         ('Status', {
-            'fields': ('is_active', 'is_removed')
+            'fields': ('is_active',)
         }),
         ('Timestamps', {
             'fields': ('created', 'modified'),
             'classes': ('collapse',)
         }),
     )
-    
-    def has_add_permission(self, request):
-        """Disable manual cart item creation in admin"""
-        return False
 

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from apps.sales.models import SalesOrder, SalesOrderItem, Bill
+from apps.sales.models import SalesOrder, SalesOrderItem, Bill, Invoice, InvoiceItem
 
 
 class SalesOrderItemInline(admin.TabularInline):
@@ -19,11 +19,10 @@ class SalesOrderAdmin(admin.ModelAdmin):
     
     list_display = [
         'order_number', 'customer', 'order_date', 'order_status', 
-        'payment_status', 'total_amount', 'paid_amount', 'created_by'
+        'total_amount', 'created_by'
     ]
     list_filter = [
-        'order_status', 'payment_status', 'payment_method', 
-        'order_date', 'is_active'
+        'order_status', 'order_date', 'is_active'
     ]
     search_fields = [
         'order_number', 'customer__username', 'customer__full_name',
@@ -44,9 +43,6 @@ class SalesOrderAdmin(admin.ModelAdmin):
                 'subtotal', 'discount_percentage', 'discount_amount',
                 'tax_percentage', 'tax_amount', 'shipping_charges', 'total_amount'
             )
-        }),
-        ('Payment Information', {
-            'fields': ('payment_status', 'payment_method', 'paid_amount')
         }),
         ('Delivery Address', {
             'fields': (
@@ -160,6 +156,118 @@ class BillAdmin(admin.ModelAdmin):
             'fields': ('pan_vat_number',)
         }),
         ('Timestamps', {
+            'fields': ('created', 'modified'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+class InvoiceItemInline(admin.TabularInline):
+    """Inline admin for InvoiceItem"""
+    model = InvoiceItem
+    extra = 1
+    fields = [
+        'inventory', 'quantity', 'unit_price', 
+        'discount_percentage', 'tax_percentage', 'line_total'
+    ]
+    readonly_fields = ['item_name', 'line_total']
+
+
+@admin.register(Invoice)
+class InvoiceAdmin(admin.ModelAdmin):
+    """Admin interface for Invoice model"""
+    
+    list_display = [
+        'invoice_number', 'customer', 'invoice_date', 'payment_date',
+        'total_amount', 'payment_status', 'payment_method', 'created_by'
+    ]
+    list_filter = [
+        'payment_status', 'payment_method', 'invoice_date', 'tenant', 'is_active'
+    ]
+    search_fields = [
+        'invoice_number', 'customer__username', 'customer__full_name',
+        'customer__email'
+    ]
+    readonly_fields = [
+        'invoice_number', 'invoice_date', 'subtotal', 'discount_amount',
+        'tax_amount', 'total_amount', 'created', 'modified'
+    ]
+    inlines = [InvoiceItemInline]
+    
+    fieldsets = (
+        ('Invoice Information', {
+            'fields': ('invoice_number', 'invoice_date', 'due_date', 'customer', 'is_active')
+        }),
+        ('Related Documents', {
+            'fields': ('sales_order', 'bill', 'branch', 'tenant')
+        }),
+        ('Financial Summary', {
+            'fields': (
+                'subtotal', 'discount_percentage', 'discount_amount',
+                'tax_percentage', 'tax_amount', 'shipping_charges', 'total_amount'
+            )
+        }),
+        ('Payment Information', {
+            'fields': (
+                'payment_status', 'payment_method', 'payment_date'
+            )
+        }),
+        ('Notes', {
+            'fields': ('notes',),
+            'classes': ('collapse',)
+        }),
+        ('Staff Information', {
+            'fields': ('created_by',),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created', 'modified'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def save_model(self, request, obj, form, change):
+        """Set created_by when saving"""
+        if not change:  # Only set on creation
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(InvoiceItem)
+class InvoiceItemAdmin(admin.ModelAdmin):
+    """Admin interface for InvoiceItem model"""
+    
+    list_display = [
+        'invoice', 'item_name', 'quantity', 'unit_price', 
+        'discount_amount', 'tax_amount', 'line_total'
+    ]
+    list_filter = ['created']
+    search_fields = ['invoice__invoice_number', 'item_name', 'part_number']
+    readonly_fields = [
+        'item_name', 'part_number',
+        'discount_amount', 'tax_amount', 'line_total', 
+        'created', 'modified'
+    ]
+    
+    fieldsets = (
+        ('Invoice Information', {
+            'fields': ('invoice',)
+        }),
+        ('Product Information', {
+            'fields': ('inventory', 'item_name', 'part_number')
+        }),
+        ('Pricing', {
+            'fields': (
+                'quantity', 'unit_price', 
+                'discount_percentage', 'discount_amount',
+                'tax_percentage', 'tax_amount', 'line_total'
+            )
+        }),
+        ('Additional Information', {
+            'fields': ('notes',),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
             'fields': ('created', 'modified'),
             'classes': ('collapse',)
         }),
