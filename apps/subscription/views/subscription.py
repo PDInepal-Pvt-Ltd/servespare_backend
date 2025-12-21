@@ -141,3 +141,71 @@ class SubscriptionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         serializer = self.get_serializer(subscription)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['post'])
+    def change_plan(self, request):
+        """Change the active subscription plan for a tenant.
+
+        Request JSON: {
+            "tenant_id": <int>,
+            "new_plan_id": <int>,
+            "months": <int, optional>  # length of new subscription in months (default 12)
+        }
+
+        Behavior:
+        - Deactivates the tenant's current active subscription (if any).
+        - Creates a new Subscription starting today for the given months.
+        """
+        from apps.tenant.models import Tenant
+        from apps.subscription.models import SubscriptionPlan
+
+        tenant_id = request.data.get('tenant_id')
+        new_plan_id = request.data.get('new_plan_id')
+        months = request.data.get('months', 12)
+
+        if not tenant_id or not new_plan_id:
+            return Response({"detail": "Both 'tenant_id' and 'new_plan_id' are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            months = int(months)
+        except (TypeError, ValueError):
+            return Response({"detail": "Invalid 'months' value."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if months <= 0:
+            return Response({"detail": "'months' must be a positive integer."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            tenant = Tenant.objects.get(pk=tenant_id)
+        except Tenant.DoesNotExist:
+            return Response({"detail": "Tenant not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            plan = SubscriptionPlan.objects.get(pk=new_plan_id)
+        except SubscriptionPlan.DoesNotExist:
+            return Response({"detail": "Subscription plan not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        today = date.today()
+
+        # Deactivate any currently active subscription for the tenant
+        active_sub = Subscription.objects.filter(
+            tenant=tenant,
+            is_active=True,
+            subscription_date__lte=today,
+            finish_date__gte=today
+        ).first()
+
+        if active_sub:
+            active_sub.is_active = False
+            active_sub.save()
+
+        # Create new subscription starting today
+        finish_date = self._add_months(today, months)
+        new_subscription = Subscription.objects.create(
+            tenant=tenant,
+            subscription_plan=plan,
+            subscription_date=today,
+            finish_date=finish_date
+        )
+
+        serializer = self.get_serializer(new_subscription)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
