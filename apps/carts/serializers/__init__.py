@@ -5,14 +5,6 @@ from .cart_serializers import (
     UpdateCartItemSerializer,
     CheckoutSerializer,
 )
-
-__all__ = [
-    'CartItemSerializer',
-    'CartSerializer',
-    'AddToCartSerializer',
-    'UpdateCartItemSerializer',
-    'CheckoutSerializer',
-]
 from .favourite_serializers import (
     FavoriteSerializer,
     FavoriteListSerializer,
@@ -25,6 +17,7 @@ __all__ = [
     'CartSerializer',
     'AddToCartSerializer',
     'UpdateCartItemSerializer',
+    'CheckoutSerializer',
     'FavoriteSerializer',
     'FavoriteListSerializer',
     'AddToFavoriteSerializer',

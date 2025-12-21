@@ -303,6 +303,11 @@ class SalesOrder(BaseModel):
         if new_status == 'delivered' and not self.actual_delivery_date:
             from django.utils import timezone
             self.actual_delivery_date = timezone.now().date()
+
+        # On delivered, deduct inventory for all items not yet deducted
+        if new_status == 'delivered':
+            for item in self.items.select_related('inventory').all():
+                item.deduct_inventory()
         
         self.save(update_fields=['order_status', 'actual_delivery_date', 'modified'])
     
@@ -504,6 +509,11 @@ class SalesOrderItem(BaseModel):
             models.Index(fields=['tenant']),
             models.Index(fields=['branch']),
         ]
+    # Inventory deduction flag
+    inventory_deducted = models.BooleanField(
+        default=False,
+        help_text='Whether inventory has been deducted for this item upon delivery'
+    )
     
     def save(self, *args, **kwargs):
         """Calculate line totals and snapshot item details"""
@@ -536,28 +546,32 @@ class SalesOrderItem(BaseModel):
         is_new = self.pk is None
         super().save(*args, **kwargs)
         
-        # Deduct inventory if new item and order is confirmed
-        if is_new and self.order.order_status != 'cancelled':
-            self.deduct_inventory()
-        
+        # Do not deduct inventory at item creation; defer to delivery status
         # Recalculate order totals
         self.order.calculate_totals()
     
     def deduct_inventory(self):
-        """Deduct quantity from inventory"""
+        """Deduct quantity from inventory and mark as deducted"""
+        if self.inventory_deducted:
+            return
         if self.inventory.quantity < self.quantity:
             raise ValidationError(
                 f"Insufficient stock for {self.item_name}. "
                 f"Available: {self.inventory.quantity}, Required: {self.quantity}"
             )
-        
         self.inventory.quantity -= self.quantity
         self.inventory.save(update_fields=['quantity', 'modified'])
+        self.inventory_deducted = True
+        self.save(update_fields=['inventory_deducted', 'modified'])
     
     def restore_inventory(self):
-        """Restore quantity to inventory (used when order is cancelled)"""
+        """Restore quantity to inventory only if previously deducted"""
+        if not self.inventory_deducted:
+            return
         self.inventory.quantity += self.quantity
         self.inventory.save(update_fields=['quantity', 'modified'])
+        self.inventory_deducted = False
+        self.save(update_fields=['inventory_deducted', 'modified'])
     
     def __str__(self):
         return f"{self.order.order_number} - {self.item_name} x {self.quantity}"

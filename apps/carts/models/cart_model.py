@@ -104,9 +104,8 @@ class CartItem(TimeStampedModel):
             })
     
     def save(self, *args, **kwargs):
-        # Set price from inventory retail pricing if not set
-        if not self.price:
-            self.price = self.inventory.retail_pricing
+        # Always mirror the current inventory retail pricing
+        self.price = self.inventory.retail_pricing
         
         self.full_clean()
         super().save(*args, **kwargs)
@@ -114,6 +113,9 @@ class CartItem(TimeStampedModel):
     @property
     def total_price(self):
         """Calculate total price for this item"""
+        if self.price is None:
+            # Gracefully handle unsaved admin forms where price is not set yet
+            return Decimal('0.00') if self.quantity is None else self.quantity * Decimal('0.00')
         return self.quantity * self.price
     
     def __str__(self):

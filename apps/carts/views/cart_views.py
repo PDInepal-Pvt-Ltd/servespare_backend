@@ -250,7 +250,22 @@ class CartViewSet(viewsets.ViewSet):
         checkout_data = checkout_serializer.validated_data
 
         cart = self.get_or_create_cart(request.user)
-        cart_items = cart.items.select_related('inventory').all()
+        # Support selecting specific cart items via IDs
+        selected_ids = checkout_data.get('selected_item_ids') or []
+        if selected_ids:
+            cart_items = cart.items.select_related('inventory').filter(id__in=selected_ids)
+            # Ensure all provided IDs belong to this cart
+            missing = set(selected_ids) - set(cart_items.values_list('id', flat=True))
+            if missing:
+                return Response(
+                    {
+                        'error': 'Some selected items were not found in your cart.',
+                        'missing_item_ids': list(missing)
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            cart_items = cart.items.select_related('inventory').all()
         
         # Validate cart is not empty
         if not cart_items.exists():
@@ -259,7 +274,7 @@ class CartViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Validate stock availability for all items
+        # Validate stock availability for selected items
         for cart_item in cart_items:
             if cart_item.inventory.quantity < cart_item.quantity:
                 return Response(
@@ -293,9 +308,9 @@ class CartViewSet(viewsets.ViewSet):
                 
                 order = SalesOrder.objects.create(**order_data)
                 
-                # Create order items from cart
+                # Create order items from selected cart items and deduct inventory
                 for cart_item in cart_items:
-                    SalesOrderItem.objects.create(
+                    order_item = SalesOrderItem.objects.create(
                         order=order,
                         tenant=order.tenant,
                         branch=order.branch,
@@ -303,11 +318,13 @@ class CartViewSet(viewsets.ViewSet):
                         quantity=cart_item.quantity,
                         unit_price=cart_item.price,
                     )
+                    # Deduct inventory immediately upon checkout
+                    order_item.deduct_inventory()
                 
                 # Calculate order totals
                 order.calculate_totals()
                 
-                # Clear cart
+                # Remove only the selected items from the cart
                 cart_items.delete()
                 
                 # Return order details
@@ -317,7 +334,8 @@ class CartViewSet(viewsets.ViewSet):
                 return Response({
                     'message': 'Order placed successfully!',
                     'order': order_serializer.data,
-                    'order_number': order.order_number
+                    'order_number': order.order_number,
+                    'items_count': cart.items.count()
                 }, status=status.HTTP_201_CREATED)
                 
         except Exception as e:

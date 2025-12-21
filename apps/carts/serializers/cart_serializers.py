@@ -2,6 +2,7 @@ from rest_framework import serializers
 from decimal import Decimal
 from apps.carts.models import Cart, CartItem
 from apps.stock_management.models import Inventory
+from apps.sales.models import SalesOrder
 
 
 class InventoryBasicSerializer(serializers.ModelSerializer):
@@ -141,4 +142,45 @@ class UpdateCartItemSerializer(serializers.Serializer):
                 })
         return data
     
-    
+
+class CheckoutSerializer(serializers.Serializer):
+    """Validate checkout details before creating an order from the cart"""
+
+    payment_method = serializers.CharField(required=False, allow_blank=True)
+    delivery_address = serializers.CharField(required=False, allow_blank=True)
+    delivery_city = serializers.CharField(required=False, allow_blank=True)
+    delivery_state = serializers.CharField(required=False, allow_blank=True)
+    delivery_pincode = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    selected_item_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        allow_empty=True,
+        help_text='Optional list of cart item IDs to checkout. If omitted, all items are used.'
+    )
+
+    def validate_payment_method(self, value):
+        """Ensure provided payment method is supported"""
+        if not value:
+            return 'cash'
+        valid_methods = {choice[0] for choice in SalesOrder.PAYMENT_METHOD_CHOICES}
+        if value not in valid_methods:
+            raise serializers.ValidationError(
+                f"Invalid payment method. Choose from: {', '.join(sorted(valid_methods))}."
+            )
+        return value
+
+    def validate(self, data):
+        """Fill optional fields with safe defaults"""
+        data.setdefault('payment_method', 'cash')
+        data.setdefault('delivery_address', '')
+        data.setdefault('delivery_city', '')
+        data.setdefault('delivery_state', '')
+        data.setdefault('delivery_pincode', '')
+        data.setdefault('notes', '')
+        # Normalize selected_item_ids if provided
+        if 'selected_item_ids' in data and data['selected_item_ids'] is None:
+            data['selected_item_ids'] = []
+        return data
+
+
