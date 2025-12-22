@@ -1,5 +1,5 @@
 from django.contrib import admin
-from apps.sales.models import SalesOrder, SalesOrderItem, Bill, Invoice, InvoiceItem
+from apps.sales.models import SalesOrder, SalesOrderItem, Bill, Invoice, InvoiceItem, PurchaseItem
 
 
 class SalesOrderItemInline(admin.TabularInline):
@@ -273,3 +273,64 @@ class InvoiceItemAdmin(admin.ModelAdmin):
         }),
     )
 
+
+class PurchaseItemInline(admin.TabularInline):
+    """Inline admin for PurchaseItem"""
+    model = PurchaseItem
+    extra = 1
+    fields = ['product_name', 'quantity', 'price']
+    readonly_fields = []
+
+
+@admin.register(Bill)
+class BillAdmin(admin.ModelAdmin):
+    """Admin interface for Bill model"""
+    
+    list_display = [
+        'id', 'customer_name', 'customer_type', 'payment_method', 'status', 'created'
+    ]
+    list_filter = [
+        'status', 'payment_method', 'customer_type', 'created'
+    ]
+    search_fields = [
+        'customer_name', 'pan_vat_number', 'phone_numbers'
+    ]
+    readonly_fields = [
+        'created', 'modified'
+    ]
+    inlines = [PurchaseItemInline]
+    
+    fieldsets = (
+        ('Customer Information', {
+            'fields': ('customer_name', 'customer_type', 'address', 'phone_numbers', 'pan_vat_number')
+        }),
+        ('Billing Details', {
+            'fields': ('price', 'discount_method', 'discount_value', 'payment_method', 'status')
+        }),
+        ('Metadata', {
+            'fields': ('created', 'modified'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(PurchaseItem)
+class PurchaseItemAdmin(admin.ModelAdmin):
+    """Admin interface for PurchaseItem model"""
+    
+    list_display = [
+        'id', 'bill', 'product_name', 'quantity', 'price'
+    ]
+    list_filter = [
+        'bill', 'product_name'
+    ]
+    search_fields = [
+        'product_name', 'bill__customer_name'
+    ]
+    readonly_fields = []
+    
+    fieldsets = (
+        ('Purchase Information', {
+            'fields': ('bill', 'product_name', 'quantity', 'price')
+        }),
+    )

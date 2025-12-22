@@ -1,6 +1,7 @@
 from django.db import models
 from apps.base.models import BaseModel
 from apps.base.managers import TenantManager
+from apps.stock_management.models import InventoryProduct
 
 
 class Bill(BaseModel):
@@ -195,4 +196,49 @@ class Bill(BaseModel):
                 })
 
     objects = TenantManager()
+
+    # Removed the previous inventory product relationship
+    # Updated methods to handle purchase items instead
+    def calculate_total(self):
+        total = self.price or 0
+        for item in self.purchase_items.all():
+            total += item.total_price()  # Calculate total based on purchase items
+        return total
+
+    def update_bill(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+        self.save()
+
+    @classmethod
+    def get_bill(cls, bill_id):
+        return cls.objects.get(id=bill_id)
+
+    @classmethod
+    def delete_bill(cls, bill_id):
+        cls.objects.filter(id=bill_id).delete()
+
+    def decrease_inventory(self):
+        for item in self.purchase_items.all():
+            product = InventoryProduct.objects.get(name=item.product_name)  # Assuming product name is unique
+            product.quantity -= item.quantity
+            product.save()
+
+
+class PurchaseItem(models.Model):
+    """
+    Model to store details of products purchased in a bill
+    """
+    bill = models.ForeignKey(
+        'Bill',
+        on_delete=models.CASCADE,
+        related_name='purchase_items',
+        help_text='Bill associated with this purchase item'
+    )
+    product_name = models.CharField(max_length=255, help_text='Name of the product')
+    quantity = models.PositiveIntegerField(help_text='Quantity of the product')
+    price = models.DecimalField(max_digits=12, decimal_places=2, help_text='Price of the product')
+
+    def total_price(self):
+        return self.price * self.quantity
 
