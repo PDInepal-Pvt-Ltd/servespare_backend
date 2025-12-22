@@ -61,7 +61,7 @@ class BillSerializer(serializers.ModelSerializer):
         child=serializers.DictField(),
         write_only=True,
         required=False,
-        help_text='List of items to add to the bill. Each item should have: inventory_id (int), quantity (decimal), price (decimal)'
+        help_text='List of items to add to the bill. Each item must have: inventory_id (int) and quantity (decimal). Price is automatically populated from inventory.'
     )
     
     class Meta:
@@ -136,6 +136,7 @@ class BillSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """
         Create bill and associated purchase items
+        Price is always auto-populated from inventory
         """
         # Extract purchase items data before creating bill
         purchase_items_data = validated_data.pop('purchase_items_data', [])
@@ -156,11 +157,11 @@ class BillSerializer(serializers.ModelSerializer):
             for item_data in purchase_items_data:
                 inventory_id = item_data.get('inventory_id')
                 quantity = item_data.get('quantity')
-                price = item_data.get('price')
                 
-                if not all([inventory_id, quantity, price]):
+                # Only inventory_id and quantity are required
+                if not inventory_id or quantity is None:
                     raise serializers.ValidationError(
-                        'Each purchase item must have inventory_id, quantity, and price'
+                        'Each purchase item must have inventory_id and quantity'
                     )
                 
                 try:
@@ -170,11 +171,12 @@ class BillSerializer(serializers.ModelSerializer):
                         f'Inventory with id {inventory_id} does not exist'
                     )
                 
+                # Create purchase item without price - it will be auto-populated from inventory in save()
                 PurchaseItem.objects.create(
                     bill=bill,
                     inventory=inventory,
-                    quantity=quantity,
-                    price=price
+                    quantity=quantity
+                    # price is NOT set here - will be auto-populated from inventory in model's save()
                 )
         
         return bill
