@@ -31,7 +31,7 @@ class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         from apps.users.models import User
         
-        queryset = Bill.objects.prefetch_related('purchase_items').all()
+        queryset = Bill.objects.prefetch_related('purchase_items', 'purchase_items__inventory').all()
         
         # Customers can only see bills matching their information
         # Since bills don't have a direct FK to User, we filter by customer_name, phone, email
@@ -93,7 +93,7 @@ class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        bills = self.filter_queryset(Bill.objects.prefetch_related('purchase_items').filter(
+        bills = self.filter_queryset(Bill.objects.prefetch_related('purchase_items', 'purchase_items__inventory').filter(
             customer_type=customer_type,
             is_active=True
         ))
@@ -113,7 +113,7 @@ class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        bills = self.filter_queryset(Bill.objects.prefetch_related('purchase_items').filter(
+        bills = self.filter_queryset(Bill.objects.prefetch_related('purchase_items', 'purchase_items__inventory').filter(
             status=bill_status,
             is_active=True
         ))
@@ -133,7 +133,7 @@ class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        bills = self.filter_queryset(Bill.objects.prefetch_related('purchase_items').filter(
+        bills = self.filter_queryset(Bill.objects.prefetch_related('purchase_items', 'purchase_items__inventory').filter(
             payment_method=payment_method,
             is_active=True
         ))

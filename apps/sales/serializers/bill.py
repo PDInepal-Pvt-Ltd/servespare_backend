@@ -41,7 +41,9 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
 class BillSerializer(serializers.ModelSerializer):
     """
     Serializer for Bill model with nested purchase items
+    Supports creating purchase items during bill creation via inventory_id field
     """
+    subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     discount_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     total_after_discount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     purchase_items = PurchaseItemSerializer(many=True, read_only=True)
@@ -49,6 +51,14 @@ class BillSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     payment_method_display = serializers.CharField(source='get_payment_method_display', read_only=True)
     discount_method_display = serializers.CharField(source='get_discount_method_display', read_only=True)
+    
+    # Writable field for adding purchase items during creation
+    purchase_items_data = serializers.ListField(
+        child=serializers.DictField(),
+        write_only=True,
+        required=False,
+        help_text='List of items to add to the bill. Each item should have: inventory_id (int), quantity (decimal), price (decimal)'
+    )
     
     class Meta:
         model = Bill
@@ -63,6 +73,7 @@ class BillSerializer(serializers.ModelSerializer):
             'customer_type',
             'customer_type_display',
             'price',
+            'subtotal',
             'discount_method',
             'discount_method_display',
             'discount_value',
@@ -73,6 +84,7 @@ class BillSerializer(serializers.ModelSerializer):
             'status',
             'status_display',
             'purchase_items',
+            'purchase_items_data',
             'is_active',
             'created',
             'modified'
@@ -82,6 +94,7 @@ class BillSerializer(serializers.ModelSerializer):
             'tenant',
             'created',
             'modified',
+            'subtotal',
             'discount_amount',
             'total_after_discount',
             'purchase_items',
@@ -117,12 +130,50 @@ class BillSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        """
+        Create bill and associated purchase items
+        """
+        # Extract purchase items data before creating bill
+        purchase_items_data = validated_data.pop('purchase_items_data', [])
+        
         request = self.context.get('request')
         if request and request.user and request.user.is_authenticated:
             validated_data.setdefault('tenant', request.user.tenant)
             if 'branch' not in validated_data and getattr(request.user, 'branch', None):
                 validated_data['branch'] = request.user.branch
-        return super().create(validated_data)
+        
+        # Create the bill
+        bill = super().create(validated_data)
+        
+        # Create purchase items if provided
+        if purchase_items_data:
+            from apps.stock_management.models import Inventory
+            
+            for item_data in purchase_items_data:
+                inventory_id = item_data.get('inventory_id')
+                quantity = item_data.get('quantity')
+                price = item_data.get('price')
+                
+                if not all([inventory_id, quantity, price]):
+                    raise serializers.ValidationError(
+                        'Each purchase item must have inventory_id, quantity, and price'
+                    )
+                
+                try:
+                    inventory = Inventory.objects.get(id=inventory_id)
+                except Inventory.DoesNotExist:
+                    raise serializers.ValidationError(
+                        f'Inventory with id {inventory_id} does not exist'
+                    )
+                
+                PurchaseItem.objects.create(
+                    bill=bill,
+                    inventory=inventory,
+                    quantity=quantity,
+                    price=price
+                )
+        
+        return bill
 
     def update(self, instance, validated_data):
         validated_data.pop('tenant', None)

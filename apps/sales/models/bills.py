@@ -153,16 +153,28 @@ class Bill(BaseModel):
         return f"{self.customer_name} ({customer_type_display})"
 
     @property
+    def subtotal(self):
+        """Calculate subtotal from all purchase items"""
+        from decimal import Decimal
+        total = Decimal('0.00')
+        for item in self.purchase_items.all():
+            total += item.total_price()
+        return total
+
+    @property
     def discount_amount(self):
+        """Calculate discount amount based on subtotal and discount method"""
+        subtotal = self.subtotal
         if self.discount_method == 'percentage':
-            return (self.price or 0) * (self.discount_value or 0) / 100
+            return subtotal * (self.discount_value or 0) / 100
         return self.discount_value or 0
 
     @property
     def total_after_discount(self):
-        base = self.price or 0
-        disc = self.discount_amount or 0
-        total = base - disc
+        """Calculate total after applying discount"""
+        subtotal = self.subtotal
+        disc = self.discount_amount
+        total = subtotal - disc
         return total if total >= 0 else 0
 
     def clean(self):
