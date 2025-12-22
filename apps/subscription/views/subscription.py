@@ -197,14 +197,28 @@ class SubscriptionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             active_sub.is_active = False
             active_sub.save()
 
-        # Create new subscription starting today
+        # Create new subscription starting today — reuse existing same-day record if present
         finish_date = self._add_months(today, months)
-        new_subscription = Subscription.objects.create(
+
+        existing_same_day = Subscription.objects.filter(
             tenant=tenant,
             subscription_plan=plan,
-            subscription_date=today,
-            finish_date=finish_date
-        )
+            subscription_date=today
+        ).first()
+
+        if existing_same_day:
+            # Update existing record instead of creating a duplicate
+            existing_same_day.finish_date = finish_date
+            existing_same_day.is_active = True
+            existing_same_day.save()
+            new_subscription = existing_same_day
+        else:
+            new_subscription = Subscription.objects.create(
+                tenant=tenant,
+                subscription_plan=plan,
+                subscription_date=today,
+                finish_date=finish_date
+            )
 
         serializer = self.get_serializer(new_subscription)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
