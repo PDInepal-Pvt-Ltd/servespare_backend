@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.db import transaction
+from django.utils import timezone
 from apps.sales.models import SalesOrder, SalesOrderItem
 
 
@@ -96,6 +97,110 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
             'id', 'tenant', 'order_number', 'order_date', 'subtotal', 'discount_amount',
             'tax_amount', 'total_amount', 'created', 'modified'
         ]
+
+
+class CustomerOrderStatusSerializer(serializers.ModelSerializer):
+    """
+    Customer-friendly serializer for viewing order status and tracking.
+    Shows detailed order information with status timeline and delivery tracking.
+    """
+    
+    order_status_display = serializers.CharField(source='get_order_status_display', read_only=True)
+    status_description = serializers.CharField(source='status_display_description', read_only=True)
+    items = SalesOrderItemSerializer(many=True, read_only=True)
+    total_items = serializers.IntegerField(read_only=True)
+    total_quantity = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    # Status progression tracking
+    status_progress = serializers.SerializerMethodField()
+    is_cancellable = serializers.SerializerMethodField()
+    estimated_delivery_days = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SalesOrder
+        fields = [
+            'id', 'order_number', 'order_date',
+            'order_status', 'order_status_display', 'status_description',
+            'status_progress', 'is_cancellable',
+            'subtotal', 'discount_percentage', 'discount_amount',
+            'tax_percentage', 'tax_amount', 'shipping_charges', 'total_amount',
+            'delivery_address', 'delivery_city', 'delivery_state', 'delivery_pincode',
+            'expected_delivery_date', 'actual_delivery_date', 'estimated_delivery_days',
+            'tracking_number', 'courier_partner',
+            'notes',
+            'items', 'total_items', 'total_quantity',
+            'created', 'modified'
+        ]
+        read_only_fields = ['id', 'order_number', 'order_date', 'created', 'modified']
+    
+    def get_status_progress(self, obj):
+        """
+        Return status progression with completion indicators.
+        Shows which stages are completed and current stage.
+        """
+        status_order = [
+            'confirmed', 'ready_to_pack', 'packed', 
+            'ready_to_depart', 'in_transit', 'delivered'
+        ]
+        
+        # If cancelled, return special status
+        if obj.order_status == 'cancelled':
+            return {
+                'current_stage': 'cancelled',
+                'current_stage_display': 'Order Cancelled',
+                'progress_percentage': 0,
+                'stages': []
+            }
+        
+        # Find current stage index
+        try:
+            current_index = status_order.index(obj.order_status)
+        except ValueError:
+            current_index = 0
+        
+        # Calculate progress percentage
+        progress_percentage = int((current_index / (len(status_order) - 1)) * 100)
+        
+        # Build stages with completion status
+        stages = []
+        for i, status_code in enumerate(status_order):
+            stage = {
+                'status': status_code,
+                'display': dict(SalesOrder.ORDER_STATUS_CHOICES).get(status_code, status_code),
+                'is_completed': i < current_index,
+                'is_current': i == current_index,
+                'order': i + 1
+            }
+            stages.append(stage)
+        
+        return {
+            'current_stage': obj.order_status,
+            'current_stage_display': obj.get_order_status_display(),
+            'progress_percentage': progress_percentage,
+            'stages': stages
+        }
+    
+    def get_is_cancellable(self, obj):
+        """
+        Check if order can still be cancelled.
+        Orders can be cancelled if not yet delivered or already cancelled.
+        """
+        non_cancellable_statuses = ['delivered', 'cancelled', 'in_transit']
+        return obj.order_status not in non_cancellable_statuses
+    
+    def get_estimated_delivery_days(self, obj):
+        """
+        Calculate estimated days until delivery.
+        """
+        if obj.actual_delivery_date:
+            return 0  # Already delivered
+        
+        if obj.expected_delivery_date:
+            today = timezone.now().date()
+            delta = obj.expected_delivery_date - today
+            return max(0, delta.days)
+        
+        return None  # No estimate available
 
 
 class SalesOrderItemCreateSerializer(serializers.ModelSerializer):
