@@ -335,6 +335,43 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         serializer = CustomerProfileSerializer(request.user)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def customer_status(self, request):
+        """
+        Get the authenticated customer's account status summary.
+
+        Returns a minimal payload focused on status fields:
+        - status: Internal status value (active/inactive/suspended)
+        - status_display: Human-readable status
+        - role: Internal role value
+        - role_display: Human-readable role
+        - is_active: Django active flag
+        - must_change_password: Whether user must change password before login
+
+        GET /api/users/customer_status/
+        """
+        user = request.user
+        ACTIVE_ORDER_STATUSES = [
+            'confirmed',
+            'ready_to_pack',
+            'packed',
+            'ready_to_depart',
+            'in_transit',
+        ]
+
+        data = {
+            'status': user.status,
+            'status_display': user.get_status_display(),
+            'role': user.role,
+            'role_display': user.get_role_display(),
+            'is_active': user.is_active,
+            'must_change_password': user.must_change_password,
+            'total_orders': user.sales_orders.count(),
+            'active_orders': user.sales_orders.filter(order_status__in=ACTIVE_ORDER_STATUSES).count(),
+            'favorites_count': user.favorites.filter(is_active=True).count(),
+        }
+        return Response(data)
     
     @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated])
     def update_profile(self, request):
