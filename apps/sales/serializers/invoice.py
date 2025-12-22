@@ -123,8 +123,20 @@ class InvoiceDetailSerializer(serializers.Serializer):
     
     def get_payments(self, obj):
         """Get all payments for this invoice"""
+        # Return empty list if no payments relation exists
+        if not hasattr(obj, 'payments'):
+            return []
         payments = obj.payments.all().order_by('-created')
-        return PaymentSerializer(payments, many=True).data
+        # Return payment data as dictionaries instead of using PaymentSerializer
+        return [
+            {
+                'id': p.id,
+                'paid_amount': float(p.paid_amount),
+                'payment_date': p.payment_date,
+                'payment_method': p.payment_method,
+            }
+            for p in payments
+        ] if payments.exists() else []
 
 
 class InvoiceCreateSerializer(serializers.Serializer):
@@ -174,5 +186,4 @@ class InvoiceUpdatePaymentSerializer(serializers.Serializer):
             instance.payment_method = payment_method
         instance.save()
         
-        return instance
         return instance

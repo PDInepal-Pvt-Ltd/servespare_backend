@@ -16,8 +16,7 @@ from apps.sales.serializers import (
     SalesOrderStatusUpdateSerializer,
 )
 from apps.base.drf import TenantViewSetMixin
-from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager, CanViewOwnOrders
-from apps.base.permission_utils import get_tenant_queryset_for_user, get_branch_queryset_for_user
+from apps.base.permissions import CanViewOwnOrders
 
 
 class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
