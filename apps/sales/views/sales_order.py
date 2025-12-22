@@ -224,6 +224,31 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         serializer = CustomerOrderStatusSerializer(queryset, many=True)
         return Response(serializer.data)
     
+    @action(detail=True, methods=['get'], url_path='my_orders')
+    def my_orders_detail(self, request, pk=None):
+        """
+        Get a specific order for the current user.
+        This endpoint allows customers to view detailed information about a specific order.
+        
+        GET /api/sales/orders/my_orders/{id}/
+        
+        Returns detailed order information only if the order belongs to the current user.
+        Returns 404 if order doesn't exist or doesn't belong to the user.
+        """
+        from django.shortcuts import get_object_or_404
+        
+        # Get the order and ensure it belongs to the current user
+        order = get_object_or_404(
+            SalesOrder,
+            pk=pk,
+            customer=request.user,
+            is_removed=False
+        )
+        
+        # Use the customer order status serializer for detailed tracking info
+        serializer = CustomerOrderStatusSerializer(order)
+        return Response(serializer.data)
+    
     @action(detail=True, methods=['get'])
     def track(self, request, pk=None):
         """
