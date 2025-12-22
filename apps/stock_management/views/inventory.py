@@ -197,6 +197,24 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         serializer = self.get_serializer(items, many=True)
         return Response(serializer.data)
     
+    @action(detail=True, methods=['get'])
+    def pricing(self, request, pk=None):
+        """
+        Get pricing details for a specific inventory item
+        Used by bill admin to auto-populate prices
+        """
+        inventory = self.get_object()
+        pricing_data = {
+            'id': inventory.id,
+            'item_name': inventory.item_name,
+            'price': float(inventory.price) if inventory.price else 0,
+            'mrp': float(inventory.mrp) if inventory.mrp else 0,
+            'retail_pricing': float(inventory.retail_pricing) if inventory.retail_pricing else 0,
+            'wholesale_price': float(inventory.wholesale_price) if inventory.wholesale_price else 0,
+            'distributor_price': float(inventory.distributor_price) if inventory.distributor_price else 0,
+        }
+        return Response(pricing_data)
+    
     @action(detail=True, methods=['post'])
     def add_image(self, request, pk=None):
         """

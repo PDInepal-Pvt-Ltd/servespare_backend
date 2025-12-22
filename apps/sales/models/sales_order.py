@@ -268,6 +268,21 @@ class SalesOrder(BaseModel):
         
         self.save(update_fields=['order_status', 'actual_delivery_date', 'modified'])
     
+    def cancel_order(self):
+        """Cancel order and restore inventory"""
+        if self.order_status == 'cancelled':
+            raise ValidationError("Order is already cancelled")
+        if self.order_status == 'delivered':
+            raise ValidationError("Cannot cancel a delivered order")
+        
+        # Restore inventory for all items that were deducted
+        for item in self.items.select_related('inventory').all():
+            if item.inventory_deducted:
+                item.restore_inventory()
+        
+        self.order_status = 'cancelled'
+        self.save(update_fields=['order_status', 'modified'])
+    
     # -------- Properties --------
     @property
     def balance_amount(self):

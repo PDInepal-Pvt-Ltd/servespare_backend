@@ -270,7 +270,7 @@ class CanViewOwnOrders(permissions.BasePermission):
             return False
         
         # Management roles have full access
-        if request.user.role in [User.Role.SUPER_ADMIN, User.Role.ADMIN, User.Role.BRANCH_MANAGER]:
+        if request.user.role in [User.Role.SUPER_ADMIN, User.Role.ADMIN, User.Role.SUB_ADMIN]:
             return True
         
         # Customers can create and manage their own orders
@@ -294,8 +294,8 @@ class CanViewOwnOrders(permissions.BasePermission):
             if hasattr(obj, 'tenant'):
                 return obj.tenant == request.user.tenant
         
-        # Branch Manager can access their branch's orders
-        if request.user.role == User.Role.BRANCH_MANAGER:
+        # Sub Admin can access their branch's orders
+        if request.user.role == User.Role.SUB_ADMIN:
             if hasattr(obj, 'branch'):
                 return obj.branch == request.user.branch
         
