@@ -235,6 +235,8 @@ class InventoryImageInline(admin.TabularInline):
 class InventoryAdmin(admin.ModelAdmin):
     list_display = [
         'item_name',
+        'tenant',
+        'branch',
         'category',
         'vehicle_type',
         'part_number',
@@ -252,6 +254,8 @@ class InventoryAdmin(admin.ModelAdmin):
         'warranty_period',
         'is_active',
         'party',
+        'tenant',
+        'branch',
         'created',
         'modified'
     ]
@@ -264,10 +268,13 @@ class InventoryAdmin(admin.ModelAdmin):
         'type'
     ]
     readonly_fields = ['created', 'modified', 'is_low_stock']
-    raw_id_fields = ['party']
+    raw_id_fields = ['party', 'tenant', 'branch']
     inlines = [InventoryImageInline]
     
     fieldsets = (
+        ('Context', {
+            'fields': ('tenant', 'branch')
+        }),
         ('Basic Information', {
             'fields': ('item_name', 'category', 'vehicle_type', 'party', 'is_active')
         }),
@@ -295,6 +302,9 @@ class InventoryAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+    # Mirror fieldsets on the add form so tenant/branch are available when creating
+    add_fieldsets = fieldsets
     
     def get_urls(self):
         urls = super().get_urls()
