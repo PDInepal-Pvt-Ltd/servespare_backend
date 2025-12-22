@@ -4,24 +4,38 @@ from apps.sales.models import Bill, PurchaseItem
 
 class PurchaseItemSerializer(serializers.ModelSerializer):
     """
-    Serializer for PurchaseItem model
+    Serializer for PurchaseItem model with nested inventory information
     """
     total_price = serializers.SerializerMethodField(read_only=True)
+    product_name = serializers.CharField(source='inventory.item_name', read_only=True)
+    inventory_id = serializers.IntegerField(write_only=True, required=False)
 
     class Meta:
         model = PurchaseItem
         fields = [
             'id',
             'bill',
+            'inventory',
+            'inventory_id',
             'product_name',
             'quantity',
             'price',
-            'total_price'
+            'total_price',
+            'created',
+            'modified'
         ]
-        read_only_fields = ['id', 'total_price']
+        read_only_fields = ['id', 'total_price', 'created', 'modified', 'product_name']
 
     def get_total_price(self, obj):
         return obj.total_price()
+
+    def create(self, validated_data):
+        """Handle inventory_id during creation"""
+        inventory_id = validated_data.pop('inventory_id', None)
+        if inventory_id:
+            from apps.stock_management.models import Inventory
+            validated_data['inventory_id'] = inventory_id
+        return super().create(validated_data)
 
 
 class BillSerializer(serializers.ModelSerializer):

@@ -145,6 +145,13 @@ class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     def add_purchase_item(self, request, pk=None):
         """
         Add a purchase item to a bill
+        
+        Expected request body:
+        {
+            "inventory": <inventory_id>,
+            "quantity": <quantity>,
+            "price": <price>
+        }
         """
         bill = self.get_object()
         
@@ -169,11 +176,14 @@ class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def mark_paid(self, request, pk=None):
         """
-        Mark a bill as paid
+        Mark a bill as paid and decrease inventory quantities
         """
         bill = self.get_object()
         bill.status = 'paid'
         bill.save()
+        
+        # Decrease inventory for all purchase items
+        bill.decrease_inventory()
         
         serializer = self.get_serializer(bill)
         return Response(serializer.data)

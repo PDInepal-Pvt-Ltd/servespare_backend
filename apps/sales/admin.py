@@ -234,7 +234,7 @@ class PurchaseItemInline(admin.TabularInline):
     """Inline admin for PurchaseItem"""
     model = PurchaseItem
     extra = 1
-    fields = ['product_name', 'quantity', 'price']
+    fields = ['inventory', 'quantity', 'price']
     readonly_fields = []
 
 
@@ -278,15 +278,20 @@ class PurchaseItemAdmin(admin.ModelAdmin):
         'id', 'bill', 'product_name', 'quantity', 'price'
     ]
     list_filter = [
-        'bill', 'product_name'
+        'bill', 'inventory__item_name'
     ]
     search_fields = [
-        'product_name', 'bill__customer_name'
+        'inventory__item_name', 'bill__customer_name'
     ]
     readonly_fields = []
     
     fieldsets = (
         ('Purchase Information', {
-            'fields': ('bill', 'product_name', 'quantity', 'price')
+            'fields': ('bill', 'inventory', 'quantity', 'price')
         }),
     )
+    
+    def product_name(self, obj):
+        """Display the product name from related inventory"""
+        return obj.inventory.item_name if obj.inventory else '-'
+    product_name.short_description = 'Product Name'

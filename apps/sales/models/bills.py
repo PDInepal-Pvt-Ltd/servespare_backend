@@ -219,10 +219,15 @@ class Bill(BaseModel):
         cls.objects.filter(id=bill_id).delete()
 
     def decrease_inventory(self):
+        """Decrease inventory quantities for all purchase items in this bill"""
+        from decimal import Decimal
         for item in self.purchase_items.all():
-            product = Inventory.objects.get(item_name=item.product_name)  # Assuming product name is unique
-            product.quantity -= item.quantity
-            product.save()
+            if item.inventory and item.quantity > 0:
+                item.inventory.quantity = max(
+                    Decimal('0.00'),
+                    item.inventory.quantity - item.quantity
+                )
+                item.inventory.save(update_fields=['quantity', 'modified'])
 
 
 class PurchaseItem(models.Model):
@@ -235,9 +240,37 @@ class PurchaseItem(models.Model):
         related_name='purchase_items',
         help_text='Bill associated with this purchase item'
     )
-    product_name = models.CharField(max_length=255, help_text='Name of the product')
-    quantity = models.PositiveIntegerField(help_text='Quantity of the product')
-    price = models.DecimalField(max_digits=12, decimal_places=2, help_text='Price of the product')
+    inventory = models.ForeignKey(
+        Inventory,
+        on_delete=models.CASCADE,
+        related_name='purchase_items',
+        help_text='Inventory item being purchased'
+    )
+    quantity = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text='Quantity of the product'
+    )
+    price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text='Price of the product at the time of purchase'
+    )
+    created = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    modified = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    class Meta:
+        db_table = 'purchase_item'
+        verbose_name = 'Purchase Item'
+        verbose_name_plural = 'Purchase Items'
+        ordering = ['-created']
+        indexes = [
+            models.Index(fields=['bill']),
+            models.Index(fields=['inventory']),
+        ]
+
+    def __str__(self):
+        return f"{self.inventory.item_name} x {self.quantity}"
 
     def total_price(self):
         return self.price * self.quantity
