@@ -14,6 +14,7 @@ from apps.carts.serializers import (
 )
 from apps.stock_management.models import Inventory
 from apps.sales.models import SalesOrder, SalesOrderItem
+from decimal import Decimal, ROUND_HALF_UP
 
 
 class CartViewSet(viewsets.ViewSet):
@@ -75,7 +76,9 @@ class CartViewSet(viewsets.ViewSet):
             )
         
         inventory_id = serializer.validated_data['inventory_id']
+        # Normalize quantity to 2 decimal places
         quantity = serializer.validated_data['quantity']
+        quantity = (quantity or Decimal('0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         
         # Get inventory item
         inventory = get_object_or_404(
@@ -110,7 +113,8 @@ class CartViewSet(viewsets.ViewSet):
         
         if not created:
             # Update quantity if item already exists
-            new_quantity = cart_item.quantity + quantity
+            new_quantity = (cart_item.quantity or Decimal('0.00')) + quantity
+            new_quantity = new_quantity.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             
             # Check if new quantity exceeds available stock
             if new_quantity > inventory.quantity:
@@ -169,6 +173,7 @@ class CartViewSet(viewsets.ViewSet):
             )
         
         new_quantity = serializer.validated_data['quantity']
+        new_quantity = (new_quantity or Decimal('0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         cart_item.quantity = new_quantity
         cart_item.save()
         

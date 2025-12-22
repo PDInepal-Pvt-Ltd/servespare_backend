@@ -45,11 +45,13 @@ class InventoryBasicSerializer(serializers.ModelSerializer):
 class CartItemSerializer(serializers.ModelSerializer):
     """Serializer for cart items"""
     inventory = InventoryBasicSerializer(read_only=True)
-    total_price = serializers.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        read_only=True
-    )
+    total_price = serializers.SerializerMethodField()
+    
+    def get_total_price(self, obj):
+        """Get total price for this cart item (2 decimal places)"""
+        from decimal import Decimal, ROUND_HALF_UP
+        total = obj.total_price or Decimal('0.00')
+        return total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     
     class Meta:
         model = CartItem
@@ -68,12 +70,19 @@ class CartItemSerializer(serializers.ModelSerializer):
 class CartSerializer(serializers.ModelSerializer):
     """Serializer for cart with all items"""
     items = CartItemSerializer(many=True, read_only=True)
-    total_items = serializers.IntegerField(read_only=True)
-    subtotal = serializers.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        read_only=True
-    )
+    total_items = serializers.SerializerMethodField()
+    subtotal = serializers.SerializerMethodField()
+    
+    def get_total_items(self, obj):
+        """Get total items; return count of distinct items"""
+        # Some UIs expect an integer count, not decimal sum of quantities
+        return obj.items.count()
+    
+    def get_subtotal(self, obj):
+        """Get cart subtotal (2 decimal places)"""
+        from decimal import Decimal, ROUND_HALF_UP
+        total = obj.subtotal or Decimal('0.00')
+        return total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     
     class Meta:
         model = Cart
