@@ -1,7 +1,7 @@
 from django.db import models
 from apps.base.models import BaseModel
 from apps.base.managers import TenantManager
-from apps.stock_management.models import InventoryProduct
+from apps.stock_management.models import Inventory
 
 
 class Bill(BaseModel):
@@ -220,7 +220,7 @@ class Bill(BaseModel):
 
     def decrease_inventory(self):
         for item in self.purchase_items.all():
-            product = InventoryProduct.objects.get(name=item.product_name)  # Assuming product name is unique
+            product = Inventory.objects.get(item_name=item.product_name)  # Assuming product name is unique
             product.quantity -= item.quantity
             product.save()
 
