@@ -231,15 +231,20 @@ class Bill(BaseModel):
         cls.objects.filter(id=bill_id).delete()
 
     def decrease_inventory(self):
-        """Decrease inventory quantities for all purchase items in this bill"""
+        """
+        Decrease inventory quantities for all purchase items in this bill
+        Note: This is now primarily handled via signals on bill creation and purchase item addition.
+        This method can still be called explicitly if needed.
+        """
         from decimal import Decimal
         for item in self.purchase_items.all():
             if item.inventory and item.quantity > 0:
-                item.inventory.quantity = max(
-                    Decimal('0.00'),
-                    item.inventory.quantity - item.quantity
-                )
-                item.inventory.save(update_fields=['quantity', 'modified'])
+                current_qty = item.inventory.quantity
+                new_qty = max(Decimal('0.00'), current_qty - item.quantity)
+                # Only update if quantity actually needs to decrease
+                if new_qty < current_qty:
+                    item.inventory.quantity = new_qty
+                    item.inventory.save(update_fields=['quantity', 'modified'])
 
 
 class PurchaseItem(models.Model):
