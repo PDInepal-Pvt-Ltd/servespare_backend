@@ -292,3 +292,10 @@ class PurchaseItem(models.Model):
             # Use retail_pricing if available, otherwise use base price
             self.price = self.inventory.retail_pricing or self.inventory.price or 0
         super().save(*args, **kwargs)
+
+    def total_price(self):
+        """Calculate total price for this purchase item (quantity * price)"""
+        from decimal import Decimal
+        quantity = self.quantity or Decimal('0.00')
+        price = self.price or Decimal('0.00')
+        return quantity * price
