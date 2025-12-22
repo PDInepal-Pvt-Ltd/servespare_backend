@@ -42,7 +42,18 @@ class InvoiceListSerializer(serializers.Serializer):
     balance_amount = serializers.SerializerMethodField()
     payment_status = serializers.CharField(read_only=True)
     payment_method = serializers.CharField(read_only=True, allow_null=True)
+    tenant = serializers.IntegerField(required=False)
+    tenant_name = serializers.SerializerMethodField()
     branch = serializers.IntegerField(required=False)
+    branch_name = serializers.SerializerMethodField()
+    
+    def get_tenant_name(self, obj):
+        """Get tenant name"""
+        return obj.tenant.name if obj.tenant else None
+    
+    def get_branch_name(self, obj):
+        """Get branch name"""
+        return obj.branch.name if obj.branch else None
     
     def get_customer_name(self, obj):
         """Get customer full name"""
@@ -76,6 +87,8 @@ class InvoiceDetailSerializer(serializers.Serializer):
     customer_email = serializers.SerializerMethodField()
     customer_phone = serializers.SerializerMethodField()
     sales_order_number = serializers.SerializerMethodField()
+    tenant = serializers.IntegerField(required=False)
+    tenant_name = serializers.SerializerMethodField()
     branch = serializers.IntegerField(required=False)
     branch_name = serializers.SerializerMethodField()
     subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
@@ -101,6 +114,10 @@ class InvoiceDetailSerializer(serializers.Serializer):
     def get_sales_order_number(self, obj):
         """Get associated sales order number"""
         return obj.sales_order.order_number if obj.sales_order else None
+    
+    def get_tenant_name(self, obj):
+        """Get tenant name"""
+        return obj.tenant.name if obj.tenant else None
     
     def get_branch_name(self, obj):
         """Get branch name"""

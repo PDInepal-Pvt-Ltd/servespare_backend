@@ -51,11 +51,13 @@ class SalesOrderListSerializer(serializers.ModelSerializer):
     order_status_display = serializers.CharField(source='get_order_status_display', read_only=True)
     total_items = serializers.IntegerField(read_only=True)
     total_quantity = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    tenant_name = serializers.CharField(source='tenant.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
     
     class Meta:
         model = SalesOrder
         fields = [
-            'id', 'tenant', 'branch', 'order_number', 'order_date', 'customer', 'customer_name',
+            'id', 'tenant', 'tenant_name', 'branch', 'branch_name', 'order_number', 'order_date', 'customer', 'customer_name',
             'order_status', 'order_status_display',
             'total_amount',
             'total_items', 'total_quantity',
@@ -76,11 +78,13 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
     total_quantity = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     status_display_description = serializers.CharField(read_only=True)
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+    tenant_name = serializers.CharField(source='tenant.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
     
     class Meta:
         model = SalesOrder
         fields = [
-            'id', 'tenant', 'branch', 'order_number', 'order_date', 
+            'id', 'tenant', 'tenant_name', 'branch', 'branch_name', 'order_number', 'order_date', 
             'customer', 'customer_name', 'customer_phone', 'customer_type',
             'order_status', 'order_status_display', 'status_display_description',
             'subtotal', 'discount_percentage', 'discount_amount',
