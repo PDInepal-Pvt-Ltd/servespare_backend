@@ -74,6 +74,34 @@ def sync_bill_status_to_invoice(sender, instance, created, **kwargs):
     return
 
 
+@receiver(post_save, sender='sales.Bill')
+def decrease_inventory_on_bill_creation(sender, instance, created, **kwargs):
+    """
+    Automatically decrease inventory when a bill is created
+    Inventory is decreased when bill is created (regardless of status)
+    """
+    if created:
+        # Bill was just created, decrease inventory for all purchase items
+        instance.decrease_inventory()
+
+
+@receiver(post_save, sender='sales.PurchaseItem')
+def decrease_inventory_on_purchase_item_creation(sender, instance, created, **kwargs):
+    """
+    Automatically decrease inventory when a purchase item is added to a bill
+    """
+    if created and instance.inventory and instance.quantity > 0:
+        from decimal import Decimal
+        # Decrease inventory immediately when purchase item is created
+        # Convert quantity to Decimal to avoid type mismatch
+        quantity_to_decrease = Decimal(str(instance.quantity))
+        instance.inventory.quantity = max(
+            Decimal('0.00'),
+            instance.inventory.quantity - quantity_to_decrease
+        )
+        instance.inventory.save(update_fields=['quantity', 'modified'])
+
+
 def ready():
     """
     Called when Django app is ready
