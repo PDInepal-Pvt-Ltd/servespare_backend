@@ -1,5 +1,9 @@
 from django.contrib import admin
+from django import forms
+from django.urls import path
+from django.http import JsonResponse
 from apps.sales.models import SalesOrder, SalesOrderItem, Bill, Invoice, InvoiceItem, PurchaseItem
+from apps.stock_management.models import Inventory
 
 
 class SalesOrderItemInline(admin.TabularInline):
@@ -230,9 +234,38 @@ class InvoiceItemAdmin(admin.ModelAdmin):
     )
 
 
+class PurchaseItemForm(forms.ModelForm):
+    """Custom form for PurchaseItem with price auto-population"""
+    
+    class Meta:
+        model = PurchaseItem
+        fields = ['bill', 'inventory', 'quantity', 'price']
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make price field optional since it will be auto-populated
+        self.fields['price'].required = False
+        self.fields['price'].help_text = 'Auto-populated from inventory. Leave blank to auto-fill.'
+        self.fields['quantity'].help_text = 'Quantity of items'
+        
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        
+        # Auto-populate price from inventory if not provided
+        if 'inventory' in cleaned_data and cleaned_data.get('inventory'):
+            inventory = cleaned_data['inventory']
+            if not cleaned_data.get('price'):
+                # Use retail_pricing if available, otherwise use base price
+                cleaned_data['price'] = inventory.retail_pricing or inventory.price or 0
+        
+        return cleaned_data
+
+
 class PurchaseItemInline(admin.TabularInline):
-    """Inline admin for PurchaseItem"""
+    """Inline admin for PurchaseItem with auto-price from inventory"""
     model = PurchaseItem
+    form = PurchaseItemForm
     extra = 1
     fields = ['inventory', 'quantity', 'price']
     readonly_fields = []
@@ -240,7 +273,7 @@ class PurchaseItemInline(admin.TabularInline):
 
 @admin.register(Bill)
 class BillAdmin(admin.ModelAdmin):
-    """Admin interface for Bill model"""
+    """Admin interface for Bill model with purchase items inline"""
     
     list_display = [
         'id', 'customer_name', 'customer_type', 'payment_method', 'status', 'created'
@@ -268,14 +301,29 @@ class BillAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def save_formset(self, request, form, formset, change):
+        """Auto-populate prices for purchase items before saving"""
+        instances = formset.save(commit=False)
+        
+        for instance in instances:
+            # Auto-populate price from inventory if not provided
+            if not instance.price and instance.inventory:
+                # Use retail_pricing if available, otherwise use base price
+                instance.price = instance.inventory.retail_pricing or instance.inventory.price or 0
+            instance.save()
+        
+        formset.save_m2m()
+        super().save_formset(request, form, formset, change)
 
 
 @admin.register(PurchaseItem)
 class PurchaseItemAdmin(admin.ModelAdmin):
-    """Admin interface for PurchaseItem model"""
+    """Admin interface for PurchaseItem model with auto-price from inventory"""
     
+    form = PurchaseItemForm
     list_display = [
-        'id', 'bill', 'product_name', 'quantity', 'price'
+        'id', 'bill', 'product_name', 'quantity', 'price', 'get_total_price'
     ]
     list_filter = [
         'bill', 'inventory__item_name'
@@ -283,11 +331,11 @@ class PurchaseItemAdmin(admin.ModelAdmin):
     search_fields = [
         'inventory__item_name', 'bill__customer_name'
     ]
-    readonly_fields = []
+    readonly_fields = ['get_total_price']
     
     fieldsets = (
         ('Purchase Information', {
-            'fields': ('bill', 'inventory', 'quantity', 'price')
+            'fields': ('bill', 'inventory', 'quantity', 'price', 'get_total_price')
         }),
     )
     
@@ -295,3 +343,17 @@ class PurchaseItemAdmin(admin.ModelAdmin):
         """Display the product name from related inventory"""
         return obj.inventory.item_name if obj.inventory else '-'
     product_name.short_description = 'Product Name'
+    
+    def get_total_price(self, obj):
+        """Display the calculated total price (quantity × price)"""
+        if obj.id:
+            return f"₹{obj.total_price()}"
+        return '-'
+    get_total_price.short_description = 'Total Price (Qty × Price)'
+    
+    def save_model(self, request, obj, form, change):
+        """Auto-populate price from inventory if not provided"""
+        if not obj.price and obj.inventory:
+            # Use retail_pricing if available, otherwise use base price
+            obj.price = obj.inventory.retail_pricing or obj.inventory.price or 0
+        super().save_model(request, obj, form, change)

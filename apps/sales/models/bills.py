@@ -266,7 +266,9 @@ class PurchaseItem(models.Model):
     price = models.DecimalField(
         max_digits=12,
         decimal_places=2,
-        help_text='Price of the product at the time of purchase'
+        null=True,
+        blank=True,
+        help_text='Price of the product at the time of purchase (auto-populated from inventory)'
     )
     created = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     modified = models.DateTimeField(auto_now=True, null=True, blank=True)
@@ -283,7 +285,10 @@ class PurchaseItem(models.Model):
 
     def __str__(self):
         return f"{self.inventory.item_name} x {self.quantity}"
-
-    def total_price(self):
-        return self.price * self.quantity
-
+    
+    def save(self, *args, **kwargs):
+        """Auto-populate price from inventory if not provided"""
+        if not self.price and self.inventory:
+            # Use retail_pricing if available, otherwise use base price
+            self.price = self.inventory.retail_pricing or self.inventory.price or 0
+        super().save(*args, **kwargs)

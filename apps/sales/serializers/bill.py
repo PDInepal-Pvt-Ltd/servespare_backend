@@ -5,10 +5,12 @@ from apps.sales.models import Bill, PurchaseItem
 class PurchaseItemSerializer(serializers.ModelSerializer):
     """
     Serializer for PurchaseItem model with nested inventory information
+    Price auto-populates from inventory if not provided
     """
     total_price = serializers.SerializerMethodField(read_only=True)
     product_name = serializers.CharField(source='inventory.item_name', read_only=True)
     inventory_id = serializers.IntegerField(write_only=True, required=False)
+    price = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
 
     class Meta:
         model = PurchaseItem
@@ -35,6 +37,8 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
         if inventory_id:
             from apps.stock_management.models import Inventory
             validated_data['inventory_id'] = inventory_id
+        
+        # Price will be auto-populated in the model's save() method
         return super().create(validated_data)
 
 
