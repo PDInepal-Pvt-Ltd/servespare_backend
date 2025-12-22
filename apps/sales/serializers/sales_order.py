@@ -48,17 +48,15 @@ class SalesOrderListSerializer(serializers.ModelSerializer):
     
     customer_name = serializers.CharField(source='customer.customer_name', read_only=True)
     order_status_display = serializers.CharField(source='get_order_status_display', read_only=True)
-    payment_status_display = serializers.CharField(source='get_payment_status_display', read_only=True)
     total_items = serializers.IntegerField(read_only=True)
     total_quantity = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    balance_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     
     class Meta:
         model = SalesOrder
         fields = [
             'id', 'tenant', 'branch', 'order_number', 'order_date', 'customer', 'customer_name',
-            'order_status', 'order_status_display', 'payment_status', 'payment_status_display',
-            'total_amount', 'paid_amount', 'balance_amount',
+            'order_status', 'order_status_display',
+            'total_amount',
             'total_items', 'total_quantity',
             'expected_delivery_date', 'created', 'modified'
         ]
@@ -72,13 +70,9 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
     customer_phone = serializers.CharField(source='customer.phone', read_only=True)
     customer_type = serializers.CharField(source='customer.customer_type', read_only=True)
     order_status_display = serializers.CharField(source='get_order_status_display', read_only=True)
-    payment_status_display = serializers.CharField(source='get_payment_status_display', read_only=True)
-    payment_method_display = serializers.CharField(source='get_payment_method_display', read_only=True)
     items = SalesOrderItemSerializer(many=True, read_only=True)
     total_items = serializers.IntegerField(read_only=True)
     total_quantity = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    balance_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    is_paid = serializers.BooleanField(read_only=True)
     status_display_description = serializers.CharField(read_only=True)
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
     
@@ -90,8 +84,6 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
             'order_status', 'order_status_display', 'status_display_description',
             'subtotal', 'discount_percentage', 'discount_amount',
             'tax_percentage', 'tax_amount', 'shipping_charges', 'total_amount',
-            'payment_status', 'payment_status_display', 'payment_method', 'payment_method_display',
-            'paid_amount', 'balance_amount', 'is_paid',
             'delivery_address', 'delivery_city', 'delivery_state', 'delivery_pincode',
             'expected_delivery_date', 'actual_delivery_date',
             'tracking_number', 'courier_partner',
@@ -102,7 +94,7 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'tenant', 'order_number', 'order_date', 'subtotal', 'discount_amount',
-            'tax_amount', 'total_amount', 'balance_amount', 'created', 'modified'
+            'tax_amount', 'total_amount', 'created', 'modified'
         ]
 
 
@@ -133,7 +125,6 @@ class SalesOrderCreateSerializer(serializers.ModelSerializer):
         fields = [
             'customer', 'order_status', 'branch',
             'discount_percentage', 'tax_percentage', 'shipping_charges',
-            'payment_method', 'paid_amount',
             'delivery_address', 'delivery_city', 'delivery_state', 'delivery_pincode',
             'expected_delivery_date', 'tracking_number', 'courier_partner',
             'notes', 'internal_notes', 'items'
@@ -147,16 +138,6 @@ class SalesOrderCreateSerializer(serializers.ModelSerializer):
     
     def validate(self, attrs):
         """Validate order data"""
-        # Validate that customer has sufficient credit if using credit payment
-        customer = attrs.get('customer')
-        payment_method = attrs.get('payment_method')
-        
-        if payment_method == 'credit' and customer:
-            if not customer.is_credit_available:
-                raise serializers.ValidationError({
-                    'payment_method': 'Customer has no available credit'
-                })
-        
         return attrs
     
     @transaction.atomic
@@ -192,7 +173,6 @@ class SalesOrderUpdateSerializer(serializers.ModelSerializer):
         model = SalesOrder
         fields = [
             'order_status', 'discount_percentage', 'tax_percentage', 'shipping_charges',
-            'payment_status', 'payment_method', 'paid_amount',
             'delivery_address', 'delivery_city', 'delivery_state', 'delivery_pincode',
             'expected_delivery_date', 'actual_delivery_date',
             'tracking_number', 'courier_partner',
@@ -259,51 +239,4 @@ class SalesOrderStatusUpdateSerializer(serializers.Serializer):
         return instance
 
 
-class AddPaymentSerializer(serializers.Serializer):
-    """Serializer for adding payment to order"""
-    
-    amount = serializers.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        required=True
-    )
-    payment_method = serializers.ChoiceField(
-        choices=SalesOrder.PAYMENT_METHOD_CHOICES,
-        required=True
-    )
-    notes = serializers.CharField(required=False, allow_blank=True)
-    
-    def validate_amount(self, value):
-        """Validate payment amount is positive"""
-        if value <= 0:
-            raise serializers.ValidationError("Payment amount must be greater than 0")
-        return value
-    
-    def validate(self, attrs):
-        """Validate payment doesn't exceed balance"""
-        order = self.context.get('order')
-        amount = attrs.get('amount')
-        
-        if order and amount > order.balance_amount:
-            raise serializers.ValidationError({
-                'amount': f'Payment amount exceeds balance. Balance: {order.balance_amount}'
-            })
-        
-        return attrs
-    
-    def save(self):
-        """Add payment to order"""
-        order = self.context['order']
-        amount = self.validated_data['amount']
-        payment_method = self.validated_data['payment_method']
-        notes = self.validated_data.get('notes')
-        
-        # Add payment
-        order.add_payment(amount, payment_method)
-        
-        # Add note if provided
-        if notes:
-            order.internal_notes = f"{order.internal_notes or ''}\nPayment: {amount} via {payment_method} - {notes}".strip()
-            order.save(update_fields=['internal_notes', 'modified'])
-        
-        return order
+

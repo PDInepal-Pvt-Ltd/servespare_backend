@@ -14,11 +14,9 @@ from apps.sales.serializers import (
     SalesOrderCreateSerializer,
     SalesOrderUpdateSerializer,
     SalesOrderStatusUpdateSerializer,
-    AddPaymentSerializer,
 )
 from apps.base.drf import TenantViewSetMixin
-from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager, CanViewOwnOrders
-from apps.base.permission_utils import get_tenant_queryset_for_user, get_branch_queryset_for_user
+from apps.base.permissions import CanViewOwnOrders
 
 
 class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
@@ -32,9 +30,11 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     - update/partial_update: Update own order (customer) or any order (management)
     - destroy: Cancel own order (customer) or any order (management)
     - update_status: Update order status (management only)
-    - add_payment: Add payment to order (management only)
     - cancel: Cancel order
     - stats: Get order statistics
+    - pending: Get pending orders (not delivered or cancelled)
+    
+    Note: Payment management is handled via Invoice endpoints only.
     
     Permissions:
     - Super Admin, Tenant Admin, Branch Manager: Full CRUD access to all orders
@@ -42,7 +42,7 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     
     queryset = SalesOrder.objects.filter(is_removed=False).select_related('customer', 'created_by')
-    filterset_fields = ['customer', 'order_status', 'payment_status', 'payment_method', 'created_by']
+    filterset_fields = ['customer', 'order_status', 'created_by']
     search_fields = ['order_number', 'customer__customer_name', 'customer__phone', 'tracking_number']
     ordering_fields = ['created', 'order_date', 'total_amount', 'order_number']
     ordering = ['-order_date', '-created']
@@ -61,8 +61,6 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             return SalesOrderUpdateSerializer
         elif self.action == 'update_status':
             return SalesOrderStatusUpdateSerializer
-        elif self.action == 'add_payment':
-            return AddPaymentSerializer
         return SalesOrderDetailSerializer
     
     def get_queryset(self):
@@ -120,29 +118,6 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         })
     
     @action(detail=True, methods=['post'])
-    def add_payment(self, request, pk=None):
-        """
-        Add payment to order.
-        
-        POST /api/sales-orders/{id}/add_payment/
-        Body: {amount, payment_method, notes (optional)}
-        """
-        order = self.get_object()
-        serializer = self.get_serializer(
-            data=request.data,
-            context={'order': order}
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        
-        # Return updated order
-        response_serializer = SalesOrderDetailSerializer(order)
-        return Response({
-            'message': f'Payment of {request.data["amount"]} added successfully',
-            'order': response_serializer.data
-        })
-    
-    @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         """
         Cancel order and restore inventory.
@@ -174,8 +149,6 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         # Calculate statistics
         total_orders = queryset.count()
         total_revenue = queryset.aggregate(total=Sum('total_amount'))['total'] or 0
-        total_paid = queryset.aggregate(total=Sum('paid_amount'))['total'] or 0
-        total_outstanding = total_revenue - total_paid
         
         # Calculate average order value
         avg_order_value = float(total_revenue) / total_orders if total_orders > 0 else 0
@@ -189,15 +162,12 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         stats = {
             'total_orders': total_orders,
             'total_revenue': float(total_revenue),
-            'total_paid': float(total_paid),
-            'total_outstanding': float(total_outstanding),
             'avg_order_value': avg_order_value,
             'today': {
                 'sales': today_sales,
                 'revenue': float(today_revenue),
             },
             'by_status': {},
-            'by_payment_status': {},
             'this_month': {
                 'orders': 0,
                 'revenue': 0,
@@ -211,15 +181,6 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             stats['by_status'][status_code] = {
                 'count': count,
                 'label': status_choice[1]
-            }
-        
-        # Orders by payment status
-        for payment_status in SalesOrder.PAYMENT_STATUS_CHOICES:
-            status_code = payment_status[0]
-            count = queryset.filter(payment_status=status_code).count()
-            stats['by_payment_status'][status_code] = {
-                'count': count,
-                'label': payment_status[1]
             }
         
         # This month's stats
@@ -240,23 +201,6 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         queryset = self.get_queryset().exclude(
             Q(order_status='delivered') | Q(order_status='cancelled')
         )
-        
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = SalesOrderListSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        
-        serializer = SalesOrderListSerializer(queryset, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def unpaid(self, request):
-        """
-        Get unpaid or partially paid orders.
-        
-        GET /api/sales-orders/unpaid/
-        """
-        queryset = self.get_queryset().exclude(payment_status='paid')
         
         page = self.paginate_queryset(queryset)
         if page is not None:

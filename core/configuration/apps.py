@@ -29,7 +29,7 @@ LOCAL_APPS = [
     'apps.subscription',
     'apps.tenant',
     'apps.stock_management',
-    'apps.sales',
+    'apps.sales.apps.SalesConfig',
     'apps.cashandbank',
     'apps.carts',
     'seeds',

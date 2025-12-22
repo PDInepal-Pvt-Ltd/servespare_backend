@@ -1,5 +1,9 @@
 from django.contrib import admin
-from apps.sales.models import SalesOrder, SalesOrderItem, Bill
+from django import forms
+from django.urls import path
+from django.http import JsonResponse
+from apps.sales.models import SalesOrder, SalesOrderItem, Bill, Invoice, InvoiceItem, PurchaseItem
+from apps.stock_management.models import Inventory
 
 
 class SalesOrderItemInline(admin.TabularInline):
@@ -19,11 +23,10 @@ class SalesOrderAdmin(admin.ModelAdmin):
     
     list_display = [
         'order_number', 'customer', 'order_date', 'order_status', 
-        'payment_status', 'total_amount', 'paid_amount', 'created_by'
+        'total_amount', 'created_by'
     ]
     list_filter = [
-        'order_status', 'payment_status', 'payment_method', 
-        'order_date', 'is_active'
+        'order_status', 'order_date', 'is_active'
     ]
     search_fields = [
         'order_number', 'customer__username', 'customer__full_name',
@@ -44,9 +47,6 @@ class SalesOrderAdmin(admin.ModelAdmin):
                 'subtotal', 'discount_percentage', 'discount_amount',
                 'tax_percentage', 'tax_amount', 'shipping_charges', 'total_amount'
             )
-        }),
-        ('Payment Information', {
-            'fields': ('payment_status', 'payment_method', 'paid_amount')
         }),
         ('Delivery Address', {
             'fields': (
@@ -122,46 +122,238 @@ class SalesOrderItemAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(Bill)
-class BillAdmin(admin.ModelAdmin):
-    """Admin interface for Bill model"""
+class InvoiceItemInline(admin.TabularInline):
+    """Inline admin for InvoiceItem"""
+    model = InvoiceItem
+    extra = 1
+    fields = [
+        'inventory', 'quantity', 'unit_price', 
+        'discount_percentage', 'tax_percentage', 'line_total'
+    ]
+    readonly_fields = ['item_name', 'line_total']
+
+
+@admin.register(Invoice)
+class InvoiceAdmin(admin.ModelAdmin):
+    """Admin interface for Invoice model"""
     
     list_display = [
-        'customer_name',
-        'customer_type',
-        'phone_numbers',
-        'pan_vat_number',
-        'is_active',
-        'created',
-        'modified'
+        'invoice_number', 'customer', 'invoice_date', 'payment_date',
+        'total_amount', 'payment_status', 'payment_method', 'created_by'
     ]
     list_filter = [
-        'customer_type',
-        'is_active',
-        'created',
-        'modified'
+        'payment_status', 'payment_method', 'invoice_date', 'tenant', 'is_active'
     ]
     search_fields = [
-        'customer_name',
-        'phone_numbers',
-        'pan_vat_number',
-        'address'
+        'invoice_number', 'customer__username', 'customer__full_name',
+        'customer__email'
     ]
-    readonly_fields = ['created', 'modified']
+    readonly_fields = [
+        'invoice_number', 'invoice_date', 'subtotal', 'discount_amount',
+        'tax_amount', 'total_amount', 'created', 'modified'
+    ]
+    inlines = [InvoiceItemInline]
     
     fieldsets = (
-        ('Customer Information', {
-            'fields': ('customer_name', 'customer_type', 'is_active')
+        ('Invoice Information', {
+            'fields': ('invoice_number', 'invoice_date', 'due_date', 'customer', 'is_active')
         }),
-        ('Contact Details', {
-            'fields': ('address', 'phone_numbers')
+        ('Related Documents', {
+            'fields': ('sales_order', 'bill', 'branch', 'tenant')
         }),
-        ('Tax Information', {
-            'fields': ('pan_vat_number',)
+        ('Financial Summary', {
+            'fields': (
+                'subtotal', 'discount_percentage', 'discount_amount',
+                'tax_percentage', 'tax_amount', 'shipping_charges', 'total_amount'
+            )
         }),
-        ('Timestamps', {
+        ('Payment Information', {
+            'fields': (
+                'payment_status', 'payment_method', 'payment_date'
+            )
+        }),
+        ('Notes', {
+            'fields': ('notes',),
+            'classes': ('collapse',)
+        }),
+        ('Staff Information', {
+            'fields': ('created_by',),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created', 'modified'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def save_model(self, request, obj, form, change):
+        """Set created_by when saving"""
+        if not change:  # Only set on creation
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(InvoiceItem)
+class InvoiceItemAdmin(admin.ModelAdmin):
+    """Admin interface for InvoiceItem model"""
+    
+    list_display = [
+        'invoice', 'item_name', 'quantity', 'unit_price', 
+        'discount_amount', 'tax_amount', 'line_total'
+    ]
+    list_filter = ['created']
+    search_fields = ['invoice__invoice_number', 'item_name', 'part_number']
+    readonly_fields = [
+        'item_name', 'part_number',
+        'discount_amount', 'tax_amount', 'line_total', 
+        'created', 'modified'
+    ]
+    
+    fieldsets = (
+        ('Invoice Information', {
+            'fields': ('invoice',)
+        }),
+        ('Product Information', {
+            'fields': ('inventory', 'item_name', 'part_number')
+        }),
+        ('Pricing', {
+            'fields': (
+                'quantity', 'unit_price', 
+                'discount_percentage', 'discount_amount',
+                'tax_percentage', 'tax_amount', 'line_total'
+            )
+        }),
+        ('Additional Information', {
+            'fields': ('notes',),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
             'fields': ('created', 'modified'),
             'classes': ('collapse',)
         }),
     )
 
+
+class PurchaseItemForm(forms.ModelForm):
+    """Custom form for PurchaseItem with price auto-population"""
+    
+    class Meta:
+        model = PurchaseItem
+        fields = ['bill', 'inventory', 'quantity', 'price']
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make price field optional since it will be auto-populated
+        self.fields['price'].required = False
+        self.fields['price'].help_text = 'Auto-populated from inventory. Leave blank to auto-fill.'
+        self.fields['quantity'].help_text = 'Quantity of items'
+        
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        
+        # Auto-populate price from inventory if not provided
+        if 'inventory' in cleaned_data and cleaned_data.get('inventory'):
+            inventory = cleaned_data['inventory']
+            if not cleaned_data.get('price'):
+                # Use retail_pricing if available, otherwise use base price
+                cleaned_data['price'] = inventory.retail_pricing or inventory.price or 0
+        
+        return cleaned_data
+
+
+class PurchaseItemInline(admin.TabularInline):
+    """Inline admin for PurchaseItem with auto-price from inventory"""
+    model = PurchaseItem
+    form = PurchaseItemForm
+    extra = 1
+    fields = ['inventory', 'quantity', 'price']
+    readonly_fields = []
+
+
+@admin.register(Bill)
+class BillAdmin(admin.ModelAdmin):
+    """Admin interface for Bill model with purchase items inline"""
+    
+    list_display = [
+        'id', 'customer_name', 'customer_type', 'payment_method', 'status', 'created'
+    ]
+    list_filter = [
+        'status', 'payment_method', 'customer_type', 'created'
+    ]
+    search_fields = [
+        'customer_name', 'pan_vat_number', 'phone_numbers'
+    ]
+    readonly_fields = [
+        'created', 'modified'
+    ]
+    inlines = [PurchaseItemInline]
+    
+    fieldsets = (
+        ('Customer Information', {
+            'fields': ('customer_name', 'customer_type', 'address', 'phone_numbers', 'pan_vat_number')
+        }),
+        ('Billing Details', {
+            'fields': ('price', 'discount_method', 'discount_value', 'payment_method', 'status')
+        }),
+        ('Metadata', {
+            'fields': ('created', 'modified'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def save_formset(self, request, form, formset, change):
+        """Auto-populate prices for purchase items before saving"""
+        instances = formset.save(commit=False)
+        
+        for instance in instances:
+            # Auto-populate price from inventory if not provided
+            if not instance.price and instance.inventory:
+                # Use retail_pricing if available, otherwise use base price
+                instance.price = instance.inventory.retail_pricing or instance.inventory.price or 0
+            instance.save()
+        
+        formset.save_m2m()
+        super().save_formset(request, form, formset, change)
+
+
+@admin.register(PurchaseItem)
+class PurchaseItemAdmin(admin.ModelAdmin):
+    """Admin interface for PurchaseItem model with auto-price from inventory"""
+    
+    form = PurchaseItemForm
+    list_display = [
+        'id', 'bill', 'product_name', 'quantity', 'price', 'get_total_price'
+    ]
+    list_filter = [
+        'bill', 'inventory__item_name'
+    ]
+    search_fields = [
+        'inventory__item_name', 'bill__customer_name'
+    ]
+    readonly_fields = ['get_total_price']
+    
+    fieldsets = (
+        ('Purchase Information', {
+            'fields': ('bill', 'inventory', 'quantity', 'price', 'get_total_price')
+        }),
+    )
+    
+    def product_name(self, obj):
+        """Display the product name from related inventory"""
+        return obj.inventory.item_name if obj.inventory else '-'
+    product_name.short_description = 'Product Name'
+    
+    def get_total_price(self, obj):
+        """Display the calculated total price (quantity × price)"""
+        if obj.id:
+            return f"₹{obj.total_price()}"
+        return '-'
+    get_total_price.short_description = 'Total Price (Qty × Price)'
+    
+    def save_model(self, request, obj, form, change):
+        """Auto-populate price from inventory if not provided"""
+        if not obj.price and obj.inventory:
+            # Use retail_pricing if available, otherwise use base price
+            obj.price = obj.inventory.retail_pricing or obj.inventory.price or 0
+        super().save_model(request, obj, form, change)

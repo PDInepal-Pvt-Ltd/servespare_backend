@@ -294,7 +294,6 @@ class CartViewSet(viewsets.ViewSet):
                     'customer': request.user,
                     'created_by': request.user,
                     'tenant': request.user.tenant,
-                    'payment_method': checkout_data.get('payment_method', 'cash'),
                     'delivery_address': checkout_data.get('delivery_address', ''),
                     'delivery_city': checkout_data.get('delivery_city', ''),
                     'delivery_state': checkout_data.get('delivery_state', ''),
@@ -324,6 +323,13 @@ class CartViewSet(viewsets.ViewSet):
                 # Calculate order totals
                 order.calculate_totals()
                 
+                # Generate invoice from sales order
+                invoice = order.generate_invoice()
+                
+                # Update invoice payment method
+                invoice.payment_method = checkout_data.get('payment_method', 'cash')
+                invoice.save()
+                
                 # Remove only the selected items from the cart
                 cart_items.delete()
                 
@@ -335,6 +341,7 @@ class CartViewSet(viewsets.ViewSet):
                     'message': 'Order placed successfully!',
                     'order': order_serializer.data,
                     'order_number': order.order_number,
+                    'invoice_number': invoice.invoice_number,
                     'items_count': cart.items.count()
                 }, status=status.HTTP_201_CREATED)
                 
