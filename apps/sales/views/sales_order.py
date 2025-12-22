@@ -14,6 +14,7 @@ from apps.sales.serializers import (
     SalesOrderCreateSerializer,
     SalesOrderUpdateSerializer,
     SalesOrderStatusUpdateSerializer,
+    CustomerOrderStatusSerializer,
 )
 from apps.base.drf import TenantViewSetMixin
 from apps.base.permissions import CanViewOwnOrders
@@ -188,6 +189,138 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         month_orders = queryset.filter(order_date__gte=current_month)
         stats['this_month']['orders'] = month_orders.count()
         stats['this_month']['revenue'] = float(month_orders.aggregate(total=Sum('total_amount'))['total'] or 0)
+        
+        return Response(stats)
+    
+    @action(detail=False, methods=['get'])
+    def my_orders(self, request):
+        """
+        Get current user's orders with detailed status tracking.
+        This endpoint is specifically for customers to view their order status.
+        
+        GET /api/sales-orders/my-orders/
+        
+        Query Parameters:
+        - status: Filter by order status (confirmed, packed, in_transit, delivered, cancelled)
+        - start_date: Filter orders from this date
+        - end_date: Filter orders until this date
+        """
+        from apps.users.models import User
+        
+        # Get user's orders
+        queryset = self.get_queryset().filter(customer=request.user)
+        
+        # Filter by status if provided
+        order_status = request.query_params.get('status')
+        if order_status:
+            queryset = queryset.filter(order_status=order_status)
+        
+        # Apply pagination
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = CustomerOrderStatusSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = CustomerOrderStatusSerializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def track(self, request, pk=None):
+        """
+        Track specific order status with detailed timeline.
+        
+        GET /api/sales-orders/{id}/track/
+        """
+        order = self.get_object()
+        serializer = CustomerOrderStatusSerializer(order)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def my_orders_stats(self, request):
+        """
+        Get statistics for current user's orders.
+        This endpoint provides customers with insights about their ordering history.
+        
+        GET /api/sales-orders/my_orders_stats/
+        
+        Returns:
+        - Total orders count
+        - Total amount spent
+        - Orders by status
+        - Recent orders
+        - Active orders count
+        """
+        from apps.users.models import User
+        
+        # Get user's orders only
+        queryset = self.get_queryset().filter(customer=request.user)
+        
+        # Calculate statistics
+        total_orders = queryset.count()
+        total_spent = queryset.aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        # Average order value
+        avg_order_value = float(total_spent) / total_orders if total_orders > 0 else 0
+        
+        # Orders by status
+        orders_by_status = {}
+        for status_choice in SalesOrder.ORDER_STATUS_CHOICES:
+            status_code = status_choice[0]
+            status_orders = queryset.filter(order_status=status_code)
+            count = status_orders.count()
+            amount = status_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+            orders_by_status[status_code] = {
+                'count': count,
+                'label': status_choice[1],
+                'total_amount': float(amount)
+            }
+        
+        # Active orders (not delivered or cancelled)
+        active_orders = queryset.exclude(
+            order_status__in=['delivered', 'cancelled']
+        ).count()
+        
+        # Recent orders (last 5)
+        recent_orders = queryset.order_by('-order_date')[:5]
+        recent_orders_data = SalesOrderListSerializer(recent_orders, many=True).data
+        
+        # This month's orders
+        current_month = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_orders = queryset.filter(order_date__gte=current_month)
+        this_month_count = month_orders.count()
+        this_month_spent = month_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        # Last 6 months trend
+        monthly_trend = []
+        for i in range(6):
+            month_start = (timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0) 
+                          - timezone.timedelta(days=30 * i))
+            month_end = month_start.replace(day=1) + timezone.timedelta(days=32)
+            month_end = month_end.replace(day=1)
+            
+            month_data = queryset.filter(
+                order_date__gte=month_start,
+                order_date__lt=month_end
+            )
+            monthly_trend.insert(0, {
+                'month': month_start.strftime('%b %Y'),
+                'orders': month_data.count(),
+                'amount': float(month_data.aggregate(total=Sum('total_amount'))['total'] or 0)
+            })
+        
+        stats = {
+            'total_orders': total_orders,
+            'total_spent': float(total_spent),
+            'avg_order_value': avg_order_value,
+            'active_orders': active_orders,
+            'orders_by_status': orders_by_status,
+            'this_month': {
+                'orders': this_month_count,
+                'spent': float(this_month_spent)
+            },
+            'monthly_trend': monthly_trend,
+            'recent_orders': recent_orders_data,
+        }
         
         return Response(stats)
     
