@@ -300,8 +300,8 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 'total_amount': float(amount)
             }
         
-        # In progress orders (ready_to_pack, packed, ready_to_depart, in_transit)
-        in_progress_statuses = ['ready_to_pack', 'packed', 'ready_to_depart', 'in_transit']
+        # In progress orders (confirmed, ready_to_pack, packed, ready_to_depart, in_transit)
+        in_progress_statuses = ['confirmed', 'ready_to_pack', 'packed', 'ready_to_depart', 'in_transit']
         in_progress_orders = queryset.filter(order_status__in=in_progress_statuses)
         in_progress_count = in_progress_orders.count()
         in_progress_amount = in_progress_orders.aggregate(total=Sum('total_amount'))['total'] or 0
