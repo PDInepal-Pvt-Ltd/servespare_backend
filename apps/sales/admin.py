@@ -118,50 +118,6 @@ class SalesOrderItemAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(Bill)
-class BillAdmin(admin.ModelAdmin):
-    """Admin interface for Bill model"""
-    
-    list_display = [
-        'customer_name',
-        'customer_type',
-        'phone_numbers',
-        'pan_vat_number',
-        'is_active',
-        'created',
-        'modified'
-    ]
-    list_filter = [
-        'customer_type',
-        'is_active',
-        'created',
-        'modified'
-    ]
-    search_fields = [
-        'customer_name',
-        'phone_numbers',
-        'pan_vat_number',
-        'address'
-    ]
-    readonly_fields = ['created', 'modified']
-    
-    fieldsets = (
-        ('Customer Information', {
-            'fields': ('customer_name', 'customer_type', 'is_active')
-        }),
-        ('Contact Details', {
-            'fields': ('address', 'phone_numbers')
-        }),
-        ('Tax Information', {
-            'fields': ('pan_vat_number',)
-        }),
-        ('Timestamps', {
-            'fields': ('created', 'modified'),
-            'classes': ('collapse',)
-        }),
-    )
-
-
 class InvoiceItemInline(admin.TabularInline):
     """Inline admin for InvoiceItem"""
     model = InvoiceItem
