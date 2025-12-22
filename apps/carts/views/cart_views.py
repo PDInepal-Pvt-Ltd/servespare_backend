@@ -106,7 +106,7 @@ class CartViewSet(viewsets.ViewSet):
             inventory=inventory,
             defaults={
                 'quantity': quantity,
-                'price': inventory.retail_pricing,
+                'price': inventory.get_default_selling_price(),
                 'is_active': True
             }
         )

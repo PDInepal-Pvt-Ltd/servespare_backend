@@ -250,6 +250,20 @@ class Inventory(BaseModel):
     def __str__(self):
         return f"{self.item_name} ({self.get_category_display()}) - {self.get_vehicle_type_display()}"
 
+    def get_default_selling_price(self):
+        """Return preferred selling price with sensible fallbacks.
+
+        Priority: retail_pricing > mrp > price > 0.00
+        """
+        from decimal import Decimal
+        for value in (self.retail_pricing, self.mrp, self.price):
+            try:
+                if value is not None and value > 0:
+                    return value
+            except Exception:
+                continue
+        return Decimal('0.00')
+
 
 class InventoryImage(BaseModel):
     """

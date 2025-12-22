@@ -46,12 +46,19 @@ class CartItemSerializer(serializers.ModelSerializer):
     """Serializer for cart items"""
     inventory = InventoryBasicSerializer(read_only=True)
     total_price = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField()
     
     def get_total_price(self, obj):
-        """Get total price for this cart item (2 decimal places)"""
+        """Get total price for this cart item as string with 2 decimals"""
         from decimal import Decimal, ROUND_HALF_UP
-        total = obj.total_price or Decimal('0.00')
-        return total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        total = (obj.total_price or Decimal('0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        return f"{total:.2f}"
+
+    def get_price(self, obj):
+        """Return unit price as string with 2 decimals for consistency"""
+        from decimal import Decimal, ROUND_HALF_UP
+        value = (obj.price or Decimal('0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        return f"{value:.2f}"
     
     class Meta:
         model = CartItem
@@ -79,10 +86,10 @@ class CartSerializer(serializers.ModelSerializer):
         return obj.items.count()
     
     def get_subtotal(self, obj):
-        """Get cart subtotal (2 decimal places)"""
+        """Get cart subtotal as string with 2 decimals"""
         from decimal import Decimal, ROUND_HALF_UP
-        total = obj.subtotal or Decimal('0.00')
-        return total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        total = (obj.subtotal or Decimal('0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        return f"{total:.2f}"
     
     class Meta:
         model = Cart

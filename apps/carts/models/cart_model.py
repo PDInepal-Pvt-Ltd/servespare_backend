@@ -104,8 +104,9 @@ class CartItem(TimeStampedModel):
             })
     
     def save(self, *args, **kwargs):
-        # Always mirror the current inventory retail pricing
-        self.price = self.inventory.retail_pricing
+        # Always mirror the current inventory selling price with fallbacks
+        # retail_pricing > mrp > base price
+        self.price = self.inventory.get_default_selling_price()
         
         self.full_clean()
         super().save(*args, **kwargs)
