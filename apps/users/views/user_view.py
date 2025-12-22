@@ -39,6 +39,7 @@ from apps.users.serializers import (
     UserLoginSerializer,
     UserRegistrationSerializer,
     AdminAccountSerializer,
+    CustomerProfileSerializer,
 )
 from apps.users.utils import send_welcome_credentials_email
 
@@ -317,6 +318,22 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         GET /api/users/me/
         """
         serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def customer_profile(self, request):
+        """
+        Get customer profile with order statistics and favorites count.
+        
+        Returns:
+        - User profile information
+        - Total orders count
+        - Active orders count (excluding delivered and cancelled)
+        - Favorites count
+        
+        GET /api/users/customer_profile/
+        """
+        serializer = CustomerProfileSerializer(request.user)
         return Response(serializer.data)
     
     @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated])

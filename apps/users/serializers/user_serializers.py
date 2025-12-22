@@ -489,3 +489,58 @@ class AdminAccountSerializer(serializers.ModelSerializer):
         if obj.tenant:
             return obj.tenant.get_user_count()
         return 0
+
+
+class CustomerProfileSerializer(serializers.ModelSerializer):
+    """
+    Serializer for customer profile with order and favorites statistics.
+    Provides total orders, active orders (excluding delivered and cancelled), and favorites count.
+    """
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    total_orders = serializers.SerializerMethodField()
+    active_orders = serializers.SerializerMethodField()
+    favorites_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'username',
+            'email',
+            'full_name',
+            'first_name',
+            'last_name',
+            'phone',
+            'location',
+            'avatar',
+            'role',
+            'role_display',
+            'status',
+            'status_display',
+            'total_orders',
+            'active_orders',
+            'favorites_count',
+            'last_login_at',
+            'date_joined',
+            'created'
+        ]
+        read_only_fields = [
+            'id', 'username', 'role', 'status',
+            'last_login_at', 'date_joined', 'created',
+            'total_orders', 'active_orders', 'favorites_count'
+        ]
+    
+    def get_total_orders(self, obj):
+        """Get total number of orders placed by customer"""
+        return obj.sales_orders.count()
+    
+    def get_active_orders(self, obj):
+        """Get count of active orders (excluding delivered and cancelled)"""
+        return obj.sales_orders.exclude(
+            order_status__in=['delivered', 'cancelled']
+        ).count()
+    
+    def get_favorites_count(self, obj):
+        """Get count of customer's favorite items"""
+        return obj.favorites.filter(is_active=True).count()
