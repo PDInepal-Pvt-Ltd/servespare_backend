@@ -2,7 +2,7 @@ from rest_framework import serializers
 from decimal import Decimal
 from apps.carts.models import Cart, CartItem
 from apps.stock_management.models import Inventory
-from apps.sales.models import SalesOrder
+from apps.sales.models import SalesOrder, Bill
 
 
 class InventoryBasicSerializer(serializers.ModelSerializer):
@@ -163,7 +163,7 @@ class CheckoutSerializer(serializers.Serializer):
         """Ensure provided payment method is supported"""
         if not value:
             return 'cash'
-        valid_methods = {choice[0] for choice in SalesOrder.PAYMENT_METHOD_CHOICES}
+        valid_methods = {choice[0] for choice in Bill.PAYMENT_METHOD_CHOICES}
         if value not in valid_methods:
             raise serializers.ValidationError(
                 f"Invalid payment method. Choose from: {', '.join(sorted(valid_methods))}."

@@ -275,6 +275,39 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         
         instance.is_removed = True
         instance.save(update_fields=['is_removed', 'modified'])
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def restore(self, request, pk=None):
+        """
+        Restore a soft-deleted user.
+
+        POST /api/users/{id}/restore/
+        """
+        from rest_framework.exceptions import PermissionDenied, NotFound
+
+        # Fetch user including soft-deleted entries
+        try:
+            target_user = User.all_objects.get(pk=pk)
+        except User.DoesNotExist as exc:
+            raise NotFound("User not found.") from exc
+
+        # Ensure caller has rights to manage this user
+        if not can_manage_user(request.user, target_user):
+            raise PermissionDenied("You do not have permission to restore this user.")
+
+        if not target_user.is_removed:
+            return Response(
+                {'message': 'User is already active.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        target_user.is_removed = False
+        target_user.save(update_fields=['is_removed', 'modified'])
+
+        return Response(
+            {'message': f'User {target_user.username} restored successfully.'},
+            status=status.HTTP_200_OK
+        )
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
@@ -563,6 +596,35 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         
         return Response({'message': message}, status=status.HTTP_200_OK)
     
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, CanManageTenantUsers], url_path='deleted')
+    def list_deleted(self, request):
+        """
+        List soft-deleted users (admin/tenant admin only).
+
+        GET /api/users/deleted/
+        """
+        user = request.user
+        queryset = User.all_objects.filter(is_removed=True)
+
+        if is_super_admin(user):
+            pass  # super admin can view all
+        elif is_tenant_admin(user):
+            queryset = queryset.filter(tenant=user.tenant)
+        else:
+            queryset = queryset.none()
+
+        # Apply filter/search/order backends for consistency
+        queryset = self.filter_queryset(queryset)
+
+        page = self.paginate_queryset(queryset)
+        serializer_class = UserListSerializer if self.action == 'list_deleted' else self.get_serializer_class()
+        if page is not None:
+            serializer = serializer_class(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = serializer_class(queryset, many=True)
+        return Response(serializer.data)
+
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsAdminUser])
     def admin_accounts(self, request):
         """
