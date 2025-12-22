@@ -5,6 +5,7 @@ from django.contrib import admin, messages
 from django.utils.translation import ngettext
 
 from apps.subscription.models import SubscriptionPlan, Subscription
+from apps.subscription.models import SubscriberEmail
 
 
 @admin.register(SubscriptionPlan)
@@ -98,3 +99,10 @@ class SubscriptionAdmin(admin.ModelAdmin):
         return self._renew_months(request, queryset, 24)
 
     renew_24_months.short_description = 'Renew selected subscriptions by 24 months'
+
+
+@admin.register(SubscriberEmail)
+class SubscriberEmailAdmin(admin.ModelAdmin):
+    list_display = ['email', 'is_active', 'created', 'modified']
+    search_fields = ['email']
+    readonly_fields = ['created', 'modified']
