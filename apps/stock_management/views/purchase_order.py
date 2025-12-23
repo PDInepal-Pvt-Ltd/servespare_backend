@@ -2,7 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.db.models import Sum, F, DecimalField
+from django.db.models import Sum, F, DecimalField, Q
 from django.db.models.functions import Coalesce
 from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem
 from apps.stock_management.serializers import PurchaseOrderSerializer, PurchaseOrderItemSerializer
@@ -160,4 +160,35 @@ class PurchaseOrderItemViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             queryset = queryset.filter(is_active=is_active_bool)
         
         return queryset
+
+    @action(detail=False, methods=['get'])
+    def returned(self, request):
+        """
+        List purchase order items whose parent purchase order has status 'returned'.
+        Supports `search` query param (searches item_name, part_number, PO number, supplier name).
+        """
+        queryset = PurchaseOrderItem.objects.select_related('purchase_order', 'purchase_order__supplier').filter(
+            purchase_order__status='returned'
+        )
+
+        # Apply tenant/branch filters and any global filters
+        queryset = self.filter_queryset(queryset)
+
+        # Search across item_name, part_number, purchase_order.po_number, supplier name
+        search = request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(
+                Q(item_name__icontains=search) |
+                Q(part_number__icontains=search) |
+                Q(purchase_order__po_number__icontains=search) |
+                Q(purchase_order__supplier__party_name__icontains=search)
+            )
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 

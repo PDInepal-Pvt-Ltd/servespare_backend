@@ -181,6 +181,7 @@ class PurchaseOrderItemAdmin(admin.ModelAdmin):
         'part_number',
         'purchase_order__po_number'
     ]
+    actions = ['export_returned_items']
     readonly_fields = ['created', 'modified', 'subtotal', 'tax_amount', 'total_price']
     raw_id_fields = ['purchase_order']
     
@@ -221,6 +222,37 @@ class PurchaseOrderItemAdmin(admin.ModelAdmin):
             return f"${obj.total_price:.2f}"
         return "-"
     total_price.short_description = 'Total Price'
+
+    def export_returned_items(self, request, queryset):
+        """Export selected purchase order items that belong to returned POs as CSV."""
+        returned_qs = queryset.filter(purchase_order__status='returned')
+
+        # Prepare CSV
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="returned_purchase_order_items.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'PO Number', 'Supplier', 'Item Name', 'Part Number', 'Quantity', 'Unit Price', 'Tax', 'Total Price', 'Order Date'
+        ])
+
+        for item in returned_qs.select_related('purchase_order', 'purchase_order__supplier'):
+            supplier_name = item.purchase_order.supplier.party_name if item.purchase_order and item.purchase_order.supplier else ''
+            order_date = item.purchase_order.order_date if item.purchase_order else ''
+            writer.writerow([
+                item.purchase_order.po_number if item.purchase_order else '',
+                supplier_name,
+                item.item_name,
+                item.part_number or '',
+                str(item.quantity),
+                str(item.unit_price),
+                str(item.tax),
+                str(item.total_price),
+                order_date,
+            ])
+
+        return response
+    export_returned_items.short_description = 'Export returned purchase order items (CSV)'
 
 
 class InventoryImageInline(admin.TabularInline):
