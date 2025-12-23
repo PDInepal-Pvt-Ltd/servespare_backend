@@ -15,6 +15,8 @@ class PurchaseOrder(BaseModel):
         ('ordered', 'Ordered'),
         ('received', 'Received'),
         ('billed', 'Billed'),
+        ('returned', 'Returned'),
+
     ]
     
     # Tenant Context
