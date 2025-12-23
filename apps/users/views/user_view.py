@@ -144,6 +144,9 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         elif self.action == 'create':
             return UserCreateSerializer
         elif self.action in ['update', 'partial_update']:
+            # Customers updating their own profile get the safer profile serializer
+            if self._is_self_request():
+                return UserProfileUpdateSerializer
             return UserUpdateSerializer
         elif self.action == 'me':
             return UserProfileSerializer
@@ -178,9 +181,12 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         elif self.action == 'get_password_change_token':
             # Public endpoint
             permission_classes = [AllowAny]
+        elif self.action in ['update', 'partial_update'] and self._is_self_request():
+            # Allow any authenticated user (including customers) to update their own profile
+            permission_classes = [IsAuthenticated]
         elif self.action in ['create', 'update', 'partial_update', 'destroy',
                              'reset_password', 'update_status', 'update_role', 'bulk_action']:
-            # Only Super Admin or Tenant Admin can manage users
+            # Only Super Admin or Tenant Admin can manage other users
             permission_classes = [IsAuthenticated, CanManageTenantUsers]
         elif self.action in ['list', 'retrieve', 'admin_accounts']:
             # Authenticated users can view, but filtering applied by role
@@ -223,6 +229,19 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         
         # Default: only own user
         return queryset.filter(id=user.id)
+
+    def _is_self_request(self):
+        """Return True when the current action targets the authenticated user's own record."""
+        user = getattr(self, 'request', None)
+        user = getattr(user, 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+
+        pk = self.kwargs.get(self.lookup_field or 'pk')
+        try:
+            return pk is not None and int(pk) == user.id
+        except (TypeError, ValueError):
+            return False
     
     def perform_create(self, serializer):
         """
