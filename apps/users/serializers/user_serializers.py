@@ -509,7 +509,7 @@ class AdminAccountSerializer(serializers.ModelSerializer):
             'created',
             'last_login_at'
         ]
-        read_only_fields = ['id', 'created', 'last_login_at']
+        read_only_fields = ['id', 'branch', 'branch_name', 'created', 'last_login_at']
     
     def get_subscription_name(self, obj):
         """Get the subscription/package name for the admin's tenant"""
@@ -563,6 +563,7 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'username', 'role', 'status',
+            'branch', 'branch_name',
             'last_login_at', 'date_joined', 'created',
             'total_orders', 'active_orders', 'favorites_count'
         ]

@@ -200,7 +200,7 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - Tenant User: See only their own user
         """
         user = self.request.user
-        queryset = User.objects.filter(is_removed=False)
+        queryset = User.objects.filter(is_removed=False).select_related('tenant', 'branch')
         
         if not user or not user.is_authenticated:
             return queryset.none()
@@ -383,6 +383,8 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             'role_display': user.get_role_display(),
             'is_active': user.is_active,
             'must_change_password': user.must_change_password,
+            'branch': user.branch_id,
+            'branch_name': user.branch.branch_name if user.branch else None,
             'total_orders': user.sales_orders.count(),
             'active_orders': user.sales_orders.filter(order_status__in=ACTIVE_ORDER_STATUSES).count(),
             'favorites_count': user.favorites.filter(is_active=True).count(),
@@ -494,6 +496,8 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 'full_name': user.full_name,
                 'role': user.role,
                 'role_display': user.get_role_display(),
+                'branch': user.branch_id,
+                'branch_name': user.branch.branch_name if user.branch else None,
                 'must_change_password': True
             }
         }, status=status.HTTP_200_OK)
@@ -534,6 +538,8 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 'full_name': user.full_name,
                 'role': user.role,
                 'role_display': user.get_role_display(),
+                'branch': user.branch_id,
+                'branch_name': user.branch.branch_name if user.branch else None,
             },
             'tokens': {
                 'refresh': str(refresh),
@@ -674,7 +680,7 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         GET /api/users/deleted/
         """
         user = request.user
-        queryset = User.all_objects.filter(is_removed=True)
+        queryset = User.all_objects.filter(is_removed=True).select_related('tenant', 'branch')
 
         if is_super_admin(user):
             pass  # super admin can view all
@@ -889,6 +895,8 @@ class AuthViewSet(viewsets.GenericViewSet):
                     'role_display': user.get_role_display(),
                     'status': user.status,
                     'workspace_id': user.workspace_id,
+                    'branch': user.branch_id,
+                    'branch_name': user.branch.branch_name if user.branch else None,
                     'must_change_password': user.must_change_password,
                 }
             }, status=status.HTTP_200_OK)
