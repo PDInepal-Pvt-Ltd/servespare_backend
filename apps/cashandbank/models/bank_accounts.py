@@ -67,6 +67,14 @@ class BankAccount(BaseModel):
         help_text='Branch associated with this bank account'
     )
     
+    # Running balance for the account (tenant+branch scoped)
+    balance = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0.00,
+        help_text='Current balance for this bank account'
+    )
+    
     class Meta:
         db_table = 'bank_account'
         verbose_name = 'Bank Account'
