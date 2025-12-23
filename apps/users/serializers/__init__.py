@@ -15,6 +15,7 @@ from .user_serializers import (
     UserLoginSerializer,
     UserRegistrationSerializer,
     AdminAccountSerializer,
+    CustomerProfileSerializer,
 )
 
 __all__ = [
@@ -32,4 +33,6 @@ __all__ = [
     'BulkUserActionSerializer',
     'UserLoginSerializer',
     'UserRegistrationSerializer',
+    'AdminAccountSerializer',
+    'CustomerProfileSerializer',
 ]

@@ -5,7 +5,7 @@ from apps.carts.models import Cart, CartItem
 @admin.register(Cart)
 class CartAdmin(admin.ModelAdmin):
     """Admin interface for Cart model"""
-    list_display = ['id', 'user', 'total_items', 'subtotal', 'created', 'is_active']
+    list_display = ['id', 'user', 'items_count', 'subtotal_display', 'created', 'is_active']
     list_filter = ['is_active', 'created', 'modified']
     search_fields = ['user__username', 'user__email', 'user__full_name']
     readonly_fields = ['created', 'modified', 'total_items', 'subtotal']
@@ -24,6 +24,16 @@ class CartAdmin(admin.ModelAdmin):
         }),
     )
 
+    def items_count(self, obj):
+        return obj.items.count()
+    items_count.short_description = 'Items'
+
+    def subtotal_display(self, obj):
+        from decimal import Decimal, ROUND_HALF_UP
+        total = (obj.subtotal or Decimal('0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        return f"{total:.2f}"
+    subtotal_display.short_description = 'Subtotal'
+
 
 @admin.register(CartItem)
 class CartItemAdmin(admin.ModelAdmin):
@@ -33,8 +43,8 @@ class CartItemAdmin(admin.ModelAdmin):
         'cart',
         'inventory',
         'quantity',
-        'price',
-        'total_price',
+        'price_display',
+        'total_price_display',
         'created',
         'is_active'
     ]
@@ -59,4 +69,16 @@ class CartItemAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+    def price_display(self, obj):
+        from decimal import Decimal, ROUND_HALF_UP
+        value = (obj.price or Decimal('0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        return f"{value:.2f}"
+    price_display.short_description = 'Unit Price'
+
+    def total_price_display(self, obj):
+        from decimal import Decimal, ROUND_HALF_UP
+        value = (obj.total_price or Decimal('0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        return f"{value:.2f}"
+    total_price_display.short_description = 'Total'
 

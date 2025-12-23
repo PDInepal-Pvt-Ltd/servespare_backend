@@ -55,6 +55,8 @@ class BillSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     payment_method_display = serializers.CharField(source='get_payment_method_display', read_only=True)
     discount_method_display = serializers.CharField(source='get_discount_method_display', read_only=True)
+    tenant_name = serializers.CharField(source='tenant.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
     
     # Writable field for adding purchase items during creation
     purchase_items_data = serializers.ListField(
@@ -69,7 +71,9 @@ class BillSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'tenant',
+            'tenant_name',
             'branch',
+            'branch_name',
             'customer_name',
             'address',
             'phone_numbers',

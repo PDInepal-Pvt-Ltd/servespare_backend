@@ -22,7 +22,7 @@ class SalesOrderAdmin(admin.ModelAdmin):
     """Admin interface for SalesOrder model"""
     
     list_display = [
-        'order_number', 'customer', 'order_date', 'order_status', 
+        'order_number', 'tenant', 'branch', 'customer', 'order_date', 'order_status', 
         'total_amount', 'created_by'
     ]
     list_filter = [
@@ -86,7 +86,7 @@ class SalesOrderItemAdmin(admin.ModelAdmin):
     """Admin interface for SalesOrderItem model"""
     
     list_display = [
-        'order', 'item_name', 'quantity', 'unit_price', 
+        'order', 'tenant', 'branch', 'item_name', 'quantity', 'unit_price', 
         'discount_amount', 'tax_amount', 'line_total'
     ]
     list_filter = ['order__order_status', 'created']
@@ -138,7 +138,7 @@ class InvoiceAdmin(admin.ModelAdmin):
     """Admin interface for Invoice model"""
     
     list_display = [
-        'invoice_number', 'customer', 'invoice_date', 'payment_date',
+        'invoice_number', 'tenant', 'branch', 'customer', 'invoice_date', 'payment_date',
         'total_amount', 'payment_status', 'payment_method', 'created_by'
     ]
     list_filter = [
@@ -198,7 +198,7 @@ class InvoiceItemAdmin(admin.ModelAdmin):
     """Admin interface for InvoiceItem model"""
     
     list_display = [
-        'invoice', 'item_name', 'quantity', 'unit_price', 
+        'invoice', 'tenant', 'get_branch', 'item_name', 'quantity', 'unit_price', 
         'discount_amount', 'tax_amount', 'line_total'
     ]
     list_filter = ['created']
@@ -208,6 +208,12 @@ class InvoiceItemAdmin(admin.ModelAdmin):
         'discount_amount', 'tax_amount', 'line_total', 
         'created', 'modified'
     ]
+    
+    def get_branch(self, obj):
+        """Get branch from parent invoice"""
+        return obj.invoice.branch if obj.invoice and obj.invoice.branch else '-'
+    get_branch.short_description = 'Branch'
+    get_branch.admin_order_field = 'invoice__branch'
     
     fieldsets = (
         ('Invoice Information', {
@@ -276,7 +282,7 @@ class BillAdmin(admin.ModelAdmin):
     """Admin interface for Bill model with purchase items inline"""
     
     list_display = [
-        'id', 'customer_name', 'customer_type', 'payment_method', 'status', 'created'
+        'id', 'tenant', 'branch', 'customer_name', 'customer_type', 'payment_method', 'status', 'created'
     ]
     list_filter = [
         'status', 'payment_method', 'customer_type', 'created'
@@ -290,6 +296,9 @@ class BillAdmin(admin.ModelAdmin):
     inlines = [PurchaseItemInline]
     
     fieldsets = (
+        ('Tenant & Branch', {
+            'fields': ('tenant', 'branch')
+        }),
         ('Customer Information', {
             'fields': ('customer_name', 'customer_type', 'address', 'phone_numbers', 'pan_vat_number')
         }),
@@ -323,7 +332,7 @@ class PurchaseItemAdmin(admin.ModelAdmin):
     
     form = PurchaseItemForm
     list_display = [
-        'id', 'bill', 'product_name', 'quantity', 'price', 'get_total_price'
+        'id', 'bill', 'get_tenant', 'get_branch', 'product_name', 'quantity', 'price', 'get_total_price'
     ]
     list_filter = [
         'bill', 'inventory__item_name'
@@ -338,6 +347,18 @@ class PurchaseItemAdmin(admin.ModelAdmin):
             'fields': ('bill', 'inventory', 'quantity', 'price', 'get_total_price')
         }),
     )
+    
+    def get_tenant(self, obj):
+        """Get tenant from parent bill"""
+        return obj.bill.tenant if obj.bill and obj.bill.tenant else '-'
+    get_tenant.short_description = 'Tenant'
+    get_tenant.admin_order_field = 'bill__tenant'
+    
+    def get_branch(self, obj):
+        """Get branch from parent bill"""
+        return obj.bill.branch if obj.bill and obj.bill.branch else '-'
+    get_branch.short_description = 'Branch'
+    get_branch.admin_order_field = 'bill__branch'
     
     def product_name(self, obj):
         """Display the product name from related inventory"""
