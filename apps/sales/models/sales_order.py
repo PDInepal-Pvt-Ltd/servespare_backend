@@ -20,6 +20,7 @@ class SalesOrder(BaseModel):
         ('in_transit', 'In Transit'),
         ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
+        ('returned', 'Returned'),
     ]
     
     # Tenant Context

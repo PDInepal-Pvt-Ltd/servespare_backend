@@ -3,6 +3,7 @@ from django.utils import timezone
 from rest_framework import viewsets, status, filters, serializers
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -58,6 +59,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['role_display'] = user.get_role_display()
         token['full_name'] = user.full_name or user.username
         token['workspace_id'] = user.workspace_id
+        token['branch_id'] = user.branch_id
+        token['branch_name'] = user.branch.branch_name if user.branch else None
         
         return token
     
@@ -86,6 +89,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'role_display': self.user.get_role_display(),
             'status': self.user.status,
             'workspace_id': self.user.workspace_id,
+            'branch': self.user.branch_id,
+            'branch_name': self.user.branch.branch_name if self.user.branch else None,
             'must_change_password': self.user.must_change_password,
         }
         
@@ -121,9 +126,9 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     - bulk_action: Perform bulk actions
     """
     
-    queryset = User.objects.filter(is_removed=False)
-    filterset_fields = ['role', 'status', 'is_active', 'tenant', 'workspace_id', 'is_staff']
-    search_fields = ['username', 'email', 'full_name', 'phone']
+    queryset = User.objects.filter(is_removed=False).select_related('tenant', 'branch')
+    filterset_fields = ['role', 'status', 'is_active', 'tenant', 'branch', 'workspace_id', 'is_staff']
+    search_fields = ['username', 'email', 'full_name', 'phone', 'branch__branch_name', 'branch__branch_code']
     ordering_fields = ['created', 'username', 'email', 'last_login_at']
     ordering = ['-created']
     
@@ -139,6 +144,9 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         elif self.action == 'create':
             return UserCreateSerializer
         elif self.action in ['update', 'partial_update']:
+            # Customers updating their own profile get the safer profile serializer
+            if self._is_self_request():
+                return UserProfileUpdateSerializer
             return UserUpdateSerializer
         elif self.action == 'me':
             return UserProfileSerializer
@@ -173,9 +181,12 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         elif self.action == 'get_password_change_token':
             # Public endpoint
             permission_classes = [AllowAny]
+        elif self.action in ['update', 'partial_update'] and self._is_self_request():
+            # Allow any authenticated user (including customers) to update their own profile
+            permission_classes = [IsAuthenticated]
         elif self.action in ['create', 'update', 'partial_update', 'destroy',
                              'reset_password', 'update_status', 'update_role', 'bulk_action']:
-            # Only Super Admin or Tenant Admin can manage users
+            # Only Super Admin or Tenant Admin can manage other users
             permission_classes = [IsAuthenticated, CanManageTenantUsers]
         elif self.action in ['list', 'retrieve', 'admin_accounts']:
             # Authenticated users can view, but filtering applied by role
@@ -195,7 +206,7 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - Tenant User: See only their own user
         """
         user = self.request.user
-        queryset = User.objects.filter(is_removed=False)
+        queryset = User.objects.filter(is_removed=False).select_related('tenant', 'branch')
         
         if not user or not user.is_authenticated:
             return queryset.none()
@@ -218,6 +229,19 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         
         # Default: only own user
         return queryset.filter(id=user.id)
+
+    def _is_self_request(self):
+        """Return True when the current action targets the authenticated user's own record."""
+        user = getattr(self, 'request', None)
+        user = getattr(user, 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+
+        pk = self.kwargs.get(self.lookup_field or 'pk')
+        try:
+            return pk is not None and int(pk) == user.id
+        except (TypeError, ValueError):
+            return False
     
     def perform_create(self, serializer):
         """
@@ -227,13 +251,19 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - Tenant Admin: Can create users only in their own tenant
         """
         user = self.request.user
+        branch = serializer.validated_data.get('branch')
+        target_tenant = serializer.validated_data.get('tenant')
         
         # Validate tenant assignment
         if is_tenant_admin(user):
             # Tenant Admin can only create users in their own tenant
-            if serializer.validated_data.get('tenant') != user.tenant:
-                from rest_framework.exceptions import PermissionDenied
+            if target_tenant != user.tenant:
                 raise PermissionDenied("Tenant Admin can only create users in their own tenant.")
+            if branch and branch.tenant_id != user.tenant_id:
+                raise PermissionDenied("Tenant Admin can only assign branches from their own tenant.")
+
+        if branch and target_tenant and branch.tenant_id != target_tenant.id:
+            raise PermissionDenied("Selected branch does not belong to the chosen tenant.")
         
         serializer.save(created_by=user)
     
@@ -246,17 +276,22 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         user = self.request.user
         target_user = serializer.instance
+        branch = serializer.validated_data.get('branch')
+        target_tenant = serializer.validated_data.get('tenant', target_user.tenant)
         
         # Check if user can manage the target user
         if not can_manage_user(user, target_user):
-            from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("You do not have permission to update this user.")
         
         # Tenant Admin cannot change user's tenant
         if is_tenant_admin(user) and 'tenant' in serializer.validated_data:
             if serializer.validated_data['tenant'] != user.tenant:
-                from rest_framework.exceptions import PermissionDenied
                 raise PermissionDenied("Tenant Admin cannot change user's tenant.")
+        if is_tenant_admin(user) and branch and branch.tenant_id != user.tenant_id:
+            raise PermissionDenied("Tenant Admin can only assign branches from their own tenant.")
+
+        if branch and target_tenant and branch.tenant_id != target_tenant.id:
+            raise PermissionDenied("Selected branch does not belong to the chosen tenant.")
         
         serializer.save()
     
@@ -367,6 +402,8 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             'role_display': user.get_role_display(),
             'is_active': user.is_active,
             'must_change_password': user.must_change_password,
+            'branch': user.branch_id,
+            'branch_name': user.branch.branch_name if user.branch else None,
             'total_orders': user.sales_orders.count(),
             'active_orders': user.sales_orders.filter(order_status__in=ACTIVE_ORDER_STATUSES).count(),
             'favorites_count': user.favorites.filter(is_active=True).count(),
@@ -478,6 +515,8 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 'full_name': user.full_name,
                 'role': user.role,
                 'role_display': user.get_role_display(),
+                'branch': user.branch_id,
+                'branch_name': user.branch.branch_name if user.branch else None,
                 'must_change_password': True
             }
         }, status=status.HTTP_200_OK)
@@ -518,6 +557,8 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 'full_name': user.full_name,
                 'role': user.role,
                 'role_display': user.get_role_display(),
+                'branch': user.branch_id,
+                'branch_name': user.branch.branch_name if user.branch else None,
             },
             'tokens': {
                 'refresh': str(refresh),
@@ -658,7 +699,7 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         GET /api/users/deleted/
         """
         user = request.user
-        queryset = User.all_objects.filter(is_removed=True)
+        queryset = User.all_objects.filter(is_removed=True).select_related('tenant', 'branch')
 
         if is_super_admin(user):
             pass  # super admin can view all
@@ -873,6 +914,8 @@ class AuthViewSet(viewsets.GenericViewSet):
                     'role_display': user.get_role_display(),
                     'status': user.status,
                     'workspace_id': user.workspace_id,
+                    'branch': user.branch_id,
+                    'branch_name': user.branch.branch_name if user.branch else None,
                     'must_change_password': user.must_change_password,
                 }
             }, status=status.HTTP_200_OK)
@@ -899,6 +942,8 @@ class AuthViewSet(viewsets.GenericViewSet):
                 'role_display': user.get_role_display(),
                 'status': user.status,
                 'workspace_id': user.workspace_id,
+                'branch': user.branch_id,
+                'branch_name': user.branch.branch_name if user.branch else None,
                 'must_change_password': user.must_change_password,
             },
             'tokens': {

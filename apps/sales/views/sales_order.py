@@ -205,8 +205,6 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - start_date: Filter orders from this date
         - end_date: Filter orders until this date
         """
-        from apps.users.models import User
-        
         # Get user's orders
         queryset = self.get_queryset().filter(customer=request.user)
         
@@ -275,8 +273,6 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - Recent orders
         - Active orders count
         """
-        from apps.users.models import User
-        
         # Get user's orders only
         queryset = self.get_queryset().filter(customer=request.user)
         
@@ -379,6 +375,44 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         
         serializer = SalesOrderListSerializer(queryset, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def returned(self, request):
+        """
+        Get returned orders with support for search, filters, and ordering.
+        
+        GET /api/sales-orders/returned/
+        
+        Query params (examples):
+        - search: text to search in `order_number`, `customer__customer_name`, `customer__phone`, `tracking_number`
+        - ordering: fields like `-order_date`, `total_amount`
+        - customer, created_by, start_date, end_date
+
+
+
+        Search by order number:
+        /api/sales-orders/returned/?search=INV-123
+        Search by customer name:
+        /api/sales-orders/returned/?search=rahul
+        Search by phone:
+        /api/sales-orders/returned/?search=9876543210
+        Sort newest first:
+        /api/sales-orders/returned/?ordering=-order_date
+        Filter last month + search:
+        /api/sales-orders/returned/?start_date=2025-11-01&end_date=2025-11-30&search=rahul
+        """
+        base_qs = self.get_queryset().filter(order_status='returned')
+        queryset = self.filter_queryset(base_qs)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = SalesOrderListSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = SalesOrderListSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+
     
     @action(detail=True, methods=['get'])
     def invoice(self, request, pk=None):

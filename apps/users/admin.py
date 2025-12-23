@@ -12,14 +12,17 @@ class UserAdmin(TenantAdminMixin, BaseUserAdmin):
     
     # Display configuration
     list_display = [
-        'username', 'email', 'full_name', 'role', 'status', 'is_staff', 
+        'username', 'email', 'full_name', 'role', 'status', 'branch', 'is_staff', 
         'is_active', 'tenant', 'workspace_id', 'created', 'last_login_at'
     ]
     list_filter = [
-        'role', 'status', 'is_staff', 'is_superuser', 'is_active', 'tenant',
+        'role', 'status', 'branch', 'is_staff', 'is_superuser', 'is_active', 'tenant',
         'must_change_password', 'groups', 'created'
     ]
-    search_fields = ['username', 'email', 'full_name', 'phone', 'tenant__name', 'workspace_id']
+    search_fields = [
+        'username', 'email', 'full_name', 'phone', 'tenant__name', 'branch__branch_name',
+        'branch__branch_code', 'workspace_id'
+    ]
     ordering = ['-created']
     readonly_fields = ['created', 'modified', 'last_login_at', 'last_login', 'date_joined', 'is_removed']
     
@@ -32,7 +35,7 @@ class UserAdmin(TenantAdminMixin, BaseUserAdmin):
             'fields': ('full_name', 'first_name', 'last_name', 'phone', 'avatar')
         }),
         (_('Workspace & Tenant'), {
-            'fields': ('tenant', 'workspace_id',)
+            'fields': ('tenant', 'branch', 'workspace_id',)
         }),
         (_('Role & Status'), {
             'fields': ('role', 'status', 'is_active', 'must_change_password')
@@ -61,7 +64,7 @@ class UserAdmin(TenantAdminMixin, BaseUserAdmin):
             'fields': ('full_name', 'phone')
         }),
         (_('Workspace & Tenant'), {
-            'fields': ('tenant', 'workspace_id')
+            'fields': ('tenant', 'branch', 'workspace_id')
         }),
         (_('Role & Status'), {
             'fields': ('role', 'status', 'is_active', 'is_staff', 'is_superuser')
