@@ -3,6 +3,7 @@ from django.utils import timezone
 from rest_framework import viewsets, status, filters, serializers
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -58,6 +59,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['role_display'] = user.get_role_display()
         token['full_name'] = user.full_name or user.username
         token['workspace_id'] = user.workspace_id
+        token['branch_id'] = user.branch_id
+        token['branch_name'] = user.branch.branch_name if user.branch else None
         
         return token
     
@@ -86,6 +89,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'role_display': self.user.get_role_display(),
             'status': self.user.status,
             'workspace_id': self.user.workspace_id,
+            'branch': self.user.branch_id,
+            'branch_name': self.user.branch.branch_name if self.user.branch else None,
             'must_change_password': self.user.must_change_password,
         }
         
@@ -121,9 +126,9 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     - bulk_action: Perform bulk actions
     """
     
-    queryset = User.objects.filter(is_removed=False)
-    filterset_fields = ['role', 'status', 'is_active', 'tenant', 'workspace_id', 'is_staff']
-    search_fields = ['username', 'email', 'full_name', 'phone']
+    queryset = User.objects.filter(is_removed=False).select_related('tenant', 'branch')
+    filterset_fields = ['role', 'status', 'is_active', 'tenant', 'branch', 'workspace_id', 'is_staff']
+    search_fields = ['username', 'email', 'full_name', 'phone', 'branch__branch_name', 'branch__branch_code']
     ordering_fields = ['created', 'username', 'email', 'last_login_at']
     ordering = ['-created']
     
@@ -227,13 +232,19 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - Tenant Admin: Can create users only in their own tenant
         """
         user = self.request.user
+        branch = serializer.validated_data.get('branch')
+        target_tenant = serializer.validated_data.get('tenant')
         
         # Validate tenant assignment
         if is_tenant_admin(user):
             # Tenant Admin can only create users in their own tenant
-            if serializer.validated_data.get('tenant') != user.tenant:
-                from rest_framework.exceptions import PermissionDenied
+            if target_tenant != user.tenant:
                 raise PermissionDenied("Tenant Admin can only create users in their own tenant.")
+            if branch and branch.tenant_id != user.tenant_id:
+                raise PermissionDenied("Tenant Admin can only assign branches from their own tenant.")
+
+        if branch and target_tenant and branch.tenant_id != target_tenant.id:
+            raise PermissionDenied("Selected branch does not belong to the chosen tenant.")
         
         serializer.save(created_by=user)
     
@@ -246,17 +257,22 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         user = self.request.user
         target_user = serializer.instance
+        branch = serializer.validated_data.get('branch')
+        target_tenant = serializer.validated_data.get('tenant', target_user.tenant)
         
         # Check if user can manage the target user
         if not can_manage_user(user, target_user):
-            from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("You do not have permission to update this user.")
         
         # Tenant Admin cannot change user's tenant
         if is_tenant_admin(user) and 'tenant' in serializer.validated_data:
             if serializer.validated_data['tenant'] != user.tenant:
-                from rest_framework.exceptions import PermissionDenied
                 raise PermissionDenied("Tenant Admin cannot change user's tenant.")
+        if is_tenant_admin(user) and branch and branch.tenant_id != user.tenant_id:
+            raise PermissionDenied("Tenant Admin can only assign branches from their own tenant.")
+
+        if branch and target_tenant and branch.tenant_id != target_tenant.id:
+            raise PermissionDenied("Selected branch does not belong to the chosen tenant.")
         
         serializer.save()
     
@@ -899,6 +915,8 @@ class AuthViewSet(viewsets.GenericViewSet):
                 'role_display': user.get_role_display(),
                 'status': user.status,
                 'workspace_id': user.workspace_id,
+                'branch': user.branch_id,
+                'branch_name': user.branch.branch_name if user.branch else None,
                 'must_change_password': user.must_change_password,
             },
             'tokens': {

@@ -10,18 +10,41 @@ from apps.users.utils import (
 from apps.tenant.serializers import TenantSerializer
 
 
+def _validate_branch_with_tenant(attrs, instance=None):
+    """Ensure selected branch belongs to the provided tenant."""
+    branch = attrs.get('branch')
+    tenant = attrs.get('tenant')
+
+    if instance:
+        branch = branch or getattr(instance, 'branch', None)
+        tenant = tenant or getattr(instance, 'tenant', None)
+
+    # If a branch is provided without tenant, fall back to the branch's tenant
+    if branch and tenant is None:
+        attrs['tenant'] = branch.tenant
+        tenant = branch.tenant
+
+    if branch and tenant and branch.tenant_id != tenant.id:
+        raise serializers.ValidationError({
+            'branch': 'Branch must belong to the selected tenant.'
+        })
+
+    return attrs
+
+
 class UserListSerializer(serializers.ModelSerializer):
     """Serializer for listing users (minimal fields)."""
     
     role_display = serializers.CharField(source='get_role_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'full_name', 'role', 'role_display',
-            'status', 'status_display', 'is_active', 'tenant', 'workspace_id',
-            'created', 'last_login_at'
+            'status', 'status_display', 'is_active', 'tenant', 'branch', 'branch_name',
+            'workspace_id', 'created', 'last_login_at'
         ]
         read_only_fields = ['id', 'created', 'last_login_at']
 
@@ -33,12 +56,13 @@ class UserDetailSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
     groups_list = serializers.SerializerMethodField()
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'full_name', 'first_name', 'last_name',
-            'phone', 'location', 'avatar', 'tenant', 'workspace_id',
+            'phone', 'location', 'avatar', 'tenant', 'branch', 'branch_name', 'workspace_id',
             'role', 'role_display', 'status', 'status_display',
             'is_active', 'is_staff', 'is_superuser',
             'must_change_password',
@@ -84,12 +108,13 @@ class UserCreateSerializer(serializers.ModelSerializer):
         fields = [
             'username', 'email', 'password', 'password_confirm',
             'full_name', 'first_name', 'last_name', 'phone', 'location',
-            'avatar', 'tenant', 'workspace_id',
+            'avatar', 'tenant', 'branch', 'workspace_id',
             'role', 'status', 'is_active', 'created_by'
         ]
         extra_kwargs = {
             'email': {'required': False},
             'role': {'required': False},
+            'branch': {'required': False, 'allow_null': True},
         }
     
     def validate(self, attrs):
@@ -98,7 +123,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'password_confirm': 'Password fields do not match.'
             })
-        return attrs
+        return _validate_branch_with_tenant(attrs)
     
     def create(self, validated_data):
         """Create user with hashed password and send welcome email.
@@ -137,10 +162,14 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'email', 'full_name', 'first_name', 'last_name', 'phone', 'location',
-            'avatar', 'tenant', 'workspace_id',
+            'avatar', 'tenant', 'branch', 'workspace_id',
             'role', 'status', 'is_active', 'is_staff',
             'must_change_password'
         ]
+
+    def validate(self, attrs):
+        """Ensure branch belongs to the selected tenant when updating."""
+        return _validate_branch_with_tenant(attrs, instance=self.instance)
     
     def update(self, instance, validated_data):
         """Update user and sync role to groups if changed."""
@@ -281,18 +310,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
     
     role_display = serializers.CharField(source='get_role_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'full_name', 'first_name', 'last_name',
-            'phone', 'location', 'avatar', 'tenant', 'workspace_id',
+            'phone', 'location', 'avatar', 'tenant', 'branch', 'branch_name', 'workspace_id',
             'role', 'role_display', 'status', 'status_display',
             'must_change_password',
             'last_login_at', 'date_joined', 'created'
         ]
         read_only_fields = [
-            'id', 'username', 'role', 'status',
+            'id', 'username', 'role', 'status', 'branch',
             'must_change_password', 'last_login_at', 'date_joined', 'created'
         ]
 
@@ -455,6 +485,7 @@ class AdminAccountSerializer(serializers.ModelSerializer):
     tenant_user_count = serializers.SerializerMethodField()
     role_display = serializers.CharField(source='get_role_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     
     class Meta:
         model = User
@@ -470,6 +501,8 @@ class AdminAccountSerializer(serializers.ModelSerializer):
             'status_display',
             'tenant',
             'tenant_detail',
+            'branch',
+            'branch_name',
             'subscription_name',
             'tenant_user_count',
             'is_active',
@@ -501,6 +534,7 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
     total_orders = serializers.SerializerMethodField()
     active_orders = serializers.SerializerMethodField()
     favorites_count = serializers.SerializerMethodField()
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True)
     
     class Meta:
         model = User
@@ -514,6 +548,8 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
             'phone',
             'location',
             'avatar',
+            'branch',
+            'branch_name',
             'role',
             'role_display',
             'status',
