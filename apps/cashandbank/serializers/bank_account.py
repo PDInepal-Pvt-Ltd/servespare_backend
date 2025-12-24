@@ -16,13 +16,14 @@ class BankAccountSerializer(serializers.ModelSerializer):
             'account_type',
             'account_name',
             'bank_name',
+            'balance',
             'account_number',
             'account_holders_name',
             'is_active',
             'created',
             'modified'
         ]
-        read_only_fields = ['id', 'tenant', 'created', 'modified']
+        read_only_fields = ['id', 'tenant', 'created', 'modified', 'balance']
     
     def validate(self, data):
         """Validate that bank_name is provided for bank_account type"""
