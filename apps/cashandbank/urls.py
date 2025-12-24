@@ -1,8 +1,13 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from apps.cashandbank.views import BankAccountViewSet, CashTransactionViewSet
-from apps.cashandbank.views import CashBalanceViewSet, ManualEntryViewSet
-from apps.cashandbank.views import BankTransferViewSet
+from apps.cashandbank.views import (
+    BankAccountViewSet,
+    CashTransactionViewSet,
+    CashBalanceViewSet,
+    ManualEntryViewSet,
+    BankTransferViewSet,
+    CashierShiftViewSet,
+)
 
 # Create a router and register our viewsets
 router = DefaultRouter()
@@ -11,6 +16,7 @@ router.register(r'cash-transactions', CashTransactionViewSet, basename='cash-tra
 router.register(r'cash-balances', CashBalanceViewSet, basename='cash-balance')
 router.register(r'manual-entries', ManualEntryViewSet, basename='manual-entry')
 router.register(r'bank-transfers', BankTransferViewSet, basename='bank-transfer')
+router.register(r'shifts', CashierShiftViewSet, basename='cashier-shift')
 
 urlpatterns = [
     path('', include(router.urls)),
