@@ -1,5 +1,6 @@
 """
 Signals for CashBank App - Handles auto-posting of sales to active cashier shifts
+and syncing with Account Ledger
 """
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -100,3 +101,79 @@ def auto_post_sale_to_shift(sender, instance, created, **kwargs):
         )
     except Exception as e:
         logger.error(f"Error auto-posting sale for bill {instance.id}: {e}", exc_info=True)
+
+
+@receiver(post_save, sender='cashandbank.ShiftTransaction')
+def sync_shift_transaction_to_ledger(sender, instance, created, **kwargs):
+    """
+    Auto-create corresponding AccountLedger entries when ShiftTransaction is created.
+    This keeps the ledgers in sync with shift transactions.
+    
+    Maps transaction types to ledger types:
+    - opening/closing/cash_in/cash_out -> general ledger
+    - sale -> sales ledger + general ledger
+    """
+    if not created:
+        return
+
+    from apps.cashandbank.models import AccountLedger
+
+    try:
+        with transaction.atomic():
+            # Determine which ledgers to update
+            ledger_types = ['general']  # All transactions go to general ledger
+            
+            if instance.transaction_type == 'sale':
+                ledger_types.append('sales')
+            elif instance.transaction_type == 'cash_out':
+                ledger_types.append('purchase')
+            
+            # Calculate debit and credit based on transaction type
+            if instance.transaction_type in ('opening', 'cash_in', 'sale'):
+                debit = instance.amount
+                credit = Decimal('0.00')
+            else:  # cash_out, closing
+                debit = Decimal('0.00')
+                credit = instance.amount
+            
+            # Create ledger entries for each applicable ledger type
+            for ledger_type in ledger_types:
+                # Calculate running balance
+                previous_balance = AccountLedger.objects.filter(
+                    shift=instance.shift,
+                    ledger_type=ledger_type,
+                    transaction_date__lt=instance.transaction_date
+                ).order_by('-transaction_date', '-id').values_list('balance', flat=True).first() or Decimal('0.00')
+                
+                running_balance = previous_balance + debit - credit
+                
+                AccountLedger.objects.create(
+                    tenant=instance.tenant,
+                    branch=instance.shift.branch,
+                    shift=instance.shift,
+                    ledger_type=ledger_type,
+                    transaction_type=instance.transaction_type,
+                    debit=debit,
+                    credit=credit,
+                    balance=running_balance,
+                    description=instance.description or f'{instance.get_transaction_type_display()} transaction',
+                    reference=f'Shift #{instance.shift.id}',
+                    reference_type='shift',
+                    reference_id=str(instance.shift.id),
+                    transaction_date=instance.transaction_date,
+                    performed_by=instance.performed_by,
+                    is_manual_entry=False,
+                    notes=f'Auto-synced from ShiftTransaction {instance.id}'
+                )
+            
+            logger.info(
+                f"Synced ShiftTransaction {instance.id} to AccountLedger "
+                f"for ledger types: {ledger_types}"
+            )
+    
+    except Exception as e:
+        logger.error(
+            f"Error syncing ShiftTransaction {instance.id} to AccountLedger: {e}",
+            exc_info=True
+        )
+

@@ -7,6 +7,7 @@ from apps.cashandbank.views import (
     ManualEntryViewSet,
     BankTransferViewSet,
     CashierShiftViewSet,
+    AccountLedgerViewSet,
 )
 
 # Create a router and register our viewsets
@@ -17,6 +18,7 @@ router.register(r'cash-balances', CashBalanceViewSet, basename='cash-balance')
 router.register(r'manual-entries', ManualEntryViewSet, basename='manual-entry')
 router.register(r'bank-transfers', BankTransferViewSet, basename='bank-transfer')
 router.register(r'shifts', CashierShiftViewSet, basename='cashier-shift')
+router.register(r'account-ledger', AccountLedgerViewSet, basename='account-ledger')
 
 urlpatterns = [
     path('', include(router.urls)),

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from apps.cashandbank.models import BankAccount, CashBalance, ManualEntry, CashTransaction
-from apps.cashandbank.models import BankTransfer, CashierShift, ShiftTransaction
+from apps.cashandbank.models import BankTransfer, CashierShift, ShiftTransaction, AccountLedger
 
 
 @admin.register(BankAccount)
@@ -134,4 +134,47 @@ class ShiftTransactionAdmin(admin.ModelAdmin):
         ('Details', {'fields': ('amount', 'description', 'reference_type', 'reference_id')}),
         ('Performed By', {'fields': ('performed_by',)}),
         ('Timestamps', {'fields': ('transaction_date', 'created', 'modified'), 'classes': ('collapse',)}),
+    )
+
+
+@admin.register(AccountLedger)
+class AccountLedgerAdmin(admin.ModelAdmin):
+    list_display = [
+        'id', 'shift', 'ledger_type', 'transaction_type', 'debit', 'credit',
+        'balance', 'description', 'reference', 'transaction_date', 'performed_by',
+        'is_manual_entry', 'is_active'
+    ]
+    list_filter = [
+        'ledger_type', 'transaction_type', 'is_manual_entry', 'is_active',
+        'tenant', 'branch', 'transaction_date'
+    ]
+    search_fields = [
+        'description', 'reference', 'reference_id', 'shift__id',
+        'performed_by__username'
+    ]
+    readonly_fields = [
+        'created', 'modified', 'transaction_date', 'balance', 'net_amount'
+    ]
+    ordering = ['-transaction_date', '-id']
+
+    fieldsets = (
+        ('Context', {
+            'fields': ('tenant', 'branch', 'shift', 'ledger_type', 'transaction_type', 'is_active')
+        }),
+        ('Transaction Details', {
+            'fields': ('debit', 'credit', 'balance')
+        }),
+        ('Description & Reference', {
+            'fields': ('description', 'reference', 'reference_type', 'reference_id')
+        }),
+        ('Performed By', {
+            'fields': ('performed_by', 'is_manual_entry')
+        }),
+        ('Notes', {
+            'fields': ('notes',)
+        }),
+        ('Timestamps', {
+            'fields': ('transaction_date', 'created', 'modified'),
+            'classes': ('collapse',)
+        }),
     )

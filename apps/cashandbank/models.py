@@ -8,6 +8,7 @@ from apps.cashandbank.models import (
     CashBalance,
     ManualEntry,
     BankTransfer,
+    AccountLedger,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     'CashBalance',
     'ManualEntry',
     'BankTransfer',
+    'AccountLedger',
 ]
