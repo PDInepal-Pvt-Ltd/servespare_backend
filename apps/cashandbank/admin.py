@@ -1,6 +1,6 @@
 from django.contrib import admin
-from apps.cashandbank.models import BankAccount, CashBalance, ManualEntry
-from apps.cashandbank.models import BankTransfer
+from apps.cashandbank.models import BankAccount, CashBalance, ManualEntry, CashTransaction
+from apps.cashandbank.models import BankTransfer, CashierShift, ShiftTransaction
 
 
 @admin.register(BankAccount)
@@ -52,6 +52,22 @@ class CashBalanceAdmin(admin.ModelAdmin):
     readonly_fields = ['last_updated', 'created', 'modified']
 
 
+@admin.register(CashTransaction)
+class CashTransactionAdmin(admin.ModelAdmin):
+    list_display = ['id', 'transaction_type', 'amount', 'transaction_date', 'branch', 'tenant', 'is_active']
+    list_filter = ['transaction_type', 'branch', 'tenant', 'is_active']
+    search_fields = ['source_description']
+    readonly_fields = ['created', 'modified']
+    ordering = ['-transaction_date', '-created']
+    fieldsets = (
+        ('Context', {'fields': ('tenant', 'branch', 'transaction_type', 'is_active')}),
+        ('Amount & Timing', {'fields': ('amount', 'transaction_date')}),
+        ('Accounts', {'fields': ('from_account', 'to_account')}),
+        ('Description', {'fields': ('source_description',)}),
+        ('Timestamps', {'fields': ('created', 'modified'), 'classes': ('collapse',)}),
+    )
+
+
 @admin.register(ManualEntry)
 class ManualEntryAdmin(admin.ModelAdmin):
     list_display = ['transaction_type', 'amount', 'branch', 'tenant', 'entry_date', 'is_active']
@@ -73,4 +89,49 @@ class BankTransferAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {'fields': ('bank_account', 'amount', 'description', 'branch', 'tenant')}),
         ('Timestamps', {'fields': ('transfer_date', 'created', 'modified'), 'classes': ('collapse',)}),
+    )
+
+
+@admin.register(CashierShift)
+class CashierShiftAdmin(admin.ModelAdmin):
+    list_display = [
+        'id', 'cashier', 'branch', 'status', 'opening_float', 'expected_amount',
+        'actual_amount', 'variance_amount', 'is_flagged', 'transferred_to',
+        'opened_at', 'closed_at', 'transferred_at'
+    ]
+    list_filter = ['status', 'is_flagged', 'branch', 'cashier', 'tenant']
+    search_fields = ['cashier__username', 'branch__name', 'transferred_to', 'variance_reason', 'notes']
+    readonly_fields = ['created', 'modified', 'opened_at', 'closed_at', 'transferred_at']
+    ordering = ['-opened_at']
+
+    fieldsets = (
+        ('Context', {'fields': ('tenant', 'branch', 'cashier', 'status', 'is_flagged', 'is_active')}),
+        ('Opening/Expected', {'fields': ('opening_float', 'expected_amount')}),
+        ('Closing/Transfer', {
+            'fields': (
+                'actual_amount', 'variance_amount', 'variance_reason',
+                'transferred_to', 'transferred_by',
+            )
+        }),
+        ('Timestamps', {'fields': ('opened_at', 'closed_at', 'transferred_at', 'created', 'modified'), 'classes': ('collapse',)}),
+        ('Notes', {'fields': ('notes',)}),
+    )
+
+
+@admin.register(ShiftTransaction)
+class ShiftTransactionAdmin(admin.ModelAdmin):
+    list_display = [
+        'id', 'shift', 'transaction_type', 'amount', 'transaction_date',
+        'performed_by', 'reference_type', 'reference_id', 'is_active'
+    ]
+    list_filter = ['transaction_type', 'is_active', 'shift__tenant']
+    search_fields = ['description', 'reference_id', 'shift__id']
+    readonly_fields = ['created', 'modified', 'transaction_date']
+    ordering = ['-transaction_date']
+
+    fieldsets = (
+        ('Context', {'fields': ('shift', 'tenant', 'transaction_type', 'is_active')}),
+        ('Details', {'fields': ('amount', 'description', 'reference_type', 'reference_id')}),
+        ('Performed By', {'fields': ('performed_by',)}),
+        ('Timestamps', {'fields': ('transaction_date', 'created', 'modified'), 'classes': ('collapse',)}),
     )
