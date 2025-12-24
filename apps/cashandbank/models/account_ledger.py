@@ -33,6 +33,7 @@ class AccountLedger(BaseModel):
         ('cash_in', 'Cash In'),
         ('cash_out', 'Cash Out'),
         ('sale', 'Sale'),
+        ('purchase', 'Purchase'),
         ('closing', 'Shift Closing'),
         ('adjustment', 'Adjustment'),
         ('refund', 'Refund'),
@@ -191,3 +192,32 @@ class AccountLedger(BaseModel):
     def net_amount(self):
         """Net amount (debit - credit)"""
         return self.debit - self.credit
+    class Meta:
+        indexes = [
+            models.Index(fields=['shift', 'ledger_type']),
+            models.Index(fields=['tenant', 'branch']),
+            models.Index(fields=['transaction_date']),
+            models.Index(fields=['ledger_type']),
+        ]
+
+
+class SalesLedger(AccountLedger):
+    """
+    Proxy model for Sales Ledger entries.
+    Filters AccountLedger to show only sales-related transactions.
+    """
+    class Meta:
+        proxy = True
+        verbose_name = 'Sales Ledger'
+        verbose_name_plural = 'Sales Ledgers'
+
+
+class PurchaseLedger(AccountLedger):
+    """
+    Proxy model for Purchase Ledger entries.
+    Filters AccountLedger to show only purchase-related transactions.
+    """
+    class Meta:
+        proxy = True
+        verbose_name = 'Purchase Ledger'
+        verbose_name_plural = 'Purchase Ledgers'

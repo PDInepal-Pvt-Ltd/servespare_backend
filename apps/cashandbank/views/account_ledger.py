@@ -315,7 +315,8 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
         # Get ledger type from query params
         ledger_type = self.request.query_params.get('ledger_type', 'general')
 
-        return {
+        # Base summary
+        summary = {
             'total_debit': str(total_debit),
             'total_credit': str(total_credit),
             'net_balance': str(net_balance),
@@ -326,6 +327,96 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
             'filtered_by_shift': shift is not None,
             'currency': 'Rs',
         }
+
+        # Add Sales Ledger specific summary
+        if ledger_type == 'sales':
+            sales_qs = queryset.filter(ledger_type='sales')
+            if sales_qs.exists():
+                # Total unique customers (based on reference_id for bills)
+                from django.db.models import Count
+                total_customers = sales_qs.filter(
+                    reference_id__isnull=False,
+                    reference_type__in=['bill', 'invoice']
+                ).values('reference_id').distinct().count()
+                
+                if total_customers == 0:
+                    total_customers = sales_qs.filter(
+                        reference_id__isnull=False
+                    ).values('reference_id').distinct().count()
+                
+                # Gross amount (sales transactions - debit)
+                gross_sales = sales_qs.filter(
+                    transaction_type='sale'
+                ).aggregate(
+                    total=Sum('debit', output_field=DecimalField())
+                )['total'] or Decimal('0.00')
+                
+                # Return amount (refunds - credit)
+                return_amount = sales_qs.filter(
+                    transaction_type='refund'
+                ).aggregate(
+                    total=Sum('credit', output_field=DecimalField())
+                )['total'] or Decimal('0.00')
+                
+                # Net amount
+                net_sales = gross_sales - return_amount
+                
+                # Due remaining (calculated based on any pending amounts)
+                due_remaining = Decimal('0.00')
+                
+                summary['sales_summary'] = {
+                    'total_customers': total_customers,
+                    'gross_amount': f"Rs{gross_sales}",
+                    'return_amount': f"Rs{return_amount}",
+                    'net_amount': f"Rs{net_sales}",
+                    'due_remaining': f"Rs{due_remaining}",
+                }
+
+        # Add Purchase Ledger specific summary
+        if ledger_type == 'purchase':
+            purchase_qs = queryset.filter(ledger_type='purchase')
+            if purchase_qs.exists():
+                # Total unique suppliers (based on reference_id)
+                from django.db.models import Count
+                total_suppliers = purchase_qs.filter(
+                    reference_id__isnull=False,
+                    reference_type__in=['purchase_order', 'po', 'supplier']
+                ).values('reference_id').distinct().count()
+                
+                if total_suppliers == 0:
+                    total_suppliers = purchase_qs.filter(
+                        reference_id__isnull=False
+                    ).values('reference_id').distinct().count()
+                
+                # Gross amount (purchase transactions - credit)
+                gross_purchases = purchase_qs.filter(
+                    transaction_type='cash_out'
+                ).aggregate(
+                    total=Sum('credit', output_field=DecimalField())
+                )['total'] or Decimal('0.00')
+                
+                # Return amount (purchase returns - debit)
+                return_amount = purchase_qs.filter(
+                    transaction_type='sale'  # return transactions marked as sale type
+                ).aggregate(
+                    total=Sum('debit', output_field=DecimalField())
+                )['total'] or Decimal('0.00')
+                
+                # Net amount
+                net_purchases = gross_purchases - return_amount
+                
+                # Due remaining (for supplier payments)
+                due_remaining = Decimal('0.00')
+                
+                summary['purchase_summary'] = {
+                    'total_suppliers': total_suppliers,
+                    'gross_amount': f"Rs{gross_purchases}",
+                    'return_amount': f"Rs{return_amount}",
+                    'net_amount': f"Rs{net_purchases}",
+                    'due_remaining': f"Rs{due_remaining}",
+                }
+
+        return summary
 
     def get_paginated_response_with_summary(self, data, summary):
         """Return paginated response with summary included"""

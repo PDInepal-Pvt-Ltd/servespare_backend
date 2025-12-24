@@ -1,6 +1,6 @@
 from django.contrib import admin
 from apps.cashandbank.models import BankAccount, CashBalance, ManualEntry, CashTransaction
-from apps.cashandbank.models import BankTransfer, CashierShift, ShiftTransaction, AccountLedger
+from apps.cashandbank.models import BankTransfer, CashierShift, ShiftTransaction, AccountLedger, SalesLedger, PurchaseLedger
 
 
 @admin.register(BankAccount)
@@ -178,3 +178,128 @@ class AccountLedgerAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+class SalesLedgerAdmin(admin.ModelAdmin):
+    """Admin interface for Sales Ledger - Read-only view of sales transactions"""
+    
+    list_display = [
+        'id', 'shift', 'transaction_type', 'debit', 'credit',
+        'balance', 'description', 'reference', 'transaction_date', 'performed_by',
+        'is_active'
+    ]
+    list_filter = [
+        'transaction_type', 'is_active', 'tenant', 'branch',
+        'transaction_date'
+    ]
+    search_fields = [
+        'description', 'reference', 'reference_id', 'shift__id',
+        'performed_by__username'
+    ]
+    readonly_fields = [
+        'created', 'modified', 'transaction_date', 'balance', 'debit', 'credit',
+        'ledger_type', 'transaction_type', 'description', 'reference', 'reference_type',
+        'reference_id', 'performed_by', 'is_manual_entry', 'shift', 'tenant', 'branch', 'notes'
+    ]
+    ordering = ['-transaction_date', '-id']
+
+    fieldsets = (
+        ('Context', {
+            'fields': ('tenant', 'branch', 'shift', 'transaction_type', 'is_active')
+        }),
+        ('Transaction Details', {
+            'fields': ('debit', 'credit', 'balance')
+        }),
+        ('Description & Reference', {
+            'fields': ('description', 'reference', 'reference_type', 'reference_id')
+        }),
+        ('Performed By', {
+            'fields': ('performed_by', 'is_manual_entry')
+        }),
+        ('Notes', {
+            'fields': ('notes',)
+        }),
+        ('Timestamps', {
+            'fields': ('transaction_date', 'created', 'modified'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_queryset(self, request):
+        """Filter to show only sales ledger entries"""
+        qs = super().get_queryset(request)
+        return qs.filter(ledger_type='sales')
+
+    def has_add_permission(self, request):
+        """Disable adding new entries through admin"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Disable deletion through admin"""
+        return False
+
+
+class PurchaseLedgerAdmin(admin.ModelAdmin):
+    """Admin interface for Purchase Ledger - Read-only view of purchase transactions"""
+    
+    list_display = [
+        'id', 'shift', 'transaction_type', 'debit', 'credit',
+        'balance', 'description', 'reference', 'transaction_date', 'performed_by',
+        'is_active'
+    ]
+    list_filter = [
+        'transaction_type', 'is_active', 'tenant', 'branch',
+        'transaction_date'
+    ]
+    search_fields = [
+        'description', 'reference', 'reference_id', 'shift__id',
+        'performed_by__username'
+    ]
+    readonly_fields = [
+        'created', 'modified', 'transaction_date', 'balance', 'debit', 'credit',
+        'ledger_type', 'transaction_type', 'description', 'reference', 'reference_type',
+        'reference_id', 'performed_by', 'is_manual_entry', 'shift', 'tenant', 'branch', 'notes'
+    ]
+    ordering = ['-transaction_date', '-id']
+
+    fieldsets = (
+        ('Context', {
+            'fields': ('tenant', 'branch', 'shift', 'transaction_type', 'is_active')
+        }),
+        ('Transaction Details', {
+            'fields': ('debit', 'credit', 'balance')
+        }),
+        ('Description & Reference', {
+            'fields': ('description', 'reference', 'reference_type', 'reference_id')
+        }),
+        ('Performed By', {
+            'fields': ('performed_by', 'is_manual_entry')
+        }),
+        ('Notes', {
+            'fields': ('notes',)
+        }),
+        ('Timestamps', {
+            'fields': ('transaction_date', 'created', 'modified'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_queryset(self, request):
+        """Filter to show only purchase ledger entries"""
+        qs = super().get_queryset(request)
+        return qs.filter(ledger_type='purchase')
+
+    def has_add_permission(self, request):
+        """Disable adding new entries through admin"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Disable deletion through admin"""
+        return False
+
+
+# Register the specialized ledger admin interfaces
+# Using proxy models to allow multiple admin registrations for different ledger types
+
+admin.site.register(SalesLedger, SalesLedgerAdmin)
+admin.site.register(PurchaseLedger, PurchaseLedgerAdmin)
