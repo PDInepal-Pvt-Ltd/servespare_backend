@@ -62,14 +62,14 @@ class AccountLedgerSerializer(serializers.ModelSerializer):
             'performed_by_full_name',
             'is_manual_entry',
             'notes',
-            'created_at',
-            'updated_at',
+            'created',
+            'modified',
         ]
         read_only_fields = [
             'id',
             'balance',
-            'created_at',
-            'updated_at',
+            'created',
+            'modified',
             'performed_by_username',
             'performed_by_full_name',
             'shift_number',
