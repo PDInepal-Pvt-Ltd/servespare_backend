@@ -29,6 +29,7 @@ class CartViewSet(viewsets.ViewSet):
     - POST /cart/clear/ - Clear all items from cart
     """
     permission_classes = [IsAuthenticated]
+    serializer_class = CartSerializer
     
     def get_or_create_cart(self, user):
         """Get or create cart for the current user"""

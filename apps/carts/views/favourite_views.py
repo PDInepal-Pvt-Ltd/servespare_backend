@@ -26,6 +26,7 @@ class FavoriteViewSet(viewsets.ViewSet):
     - GET /favorites/check/{inventory_id}/ - Check if product is favorited
     """
     permission_classes = [IsAuthenticated]
+    serializer_class = FavoriteSerializer
     
     def list(self, request):
         """
