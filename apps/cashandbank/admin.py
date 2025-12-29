@@ -1,6 +1,7 @@
 from django.contrib import admin
 from apps.cashandbank.models import BankAccount, CashBalance, ManualEntry, CashTransaction
 from apps.cashandbank.models import BankTransfer, CashierShift, ShiftTransaction, AccountLedger, SalesLedger, PurchaseLedger
+from apps.cashandbank.models import Cheque
 
 
 @admin.register(BankAccount)
@@ -303,3 +304,15 @@ class PurchaseLedgerAdmin(admin.ModelAdmin):
 
 admin.site.register(SalesLedger, SalesLedgerAdmin)
 admin.site.register(PurchaseLedger, PurchaseLedgerAdmin)
+
+
+@admin.register(Cheque)
+class ChequeAdmin(admin.ModelAdmin):
+    list_display = ['cheque_number', 'cheque_type', 'bank_name', 'amount', 'due_date', 'party_name', 'is_active', 'created']
+    list_filter = ['cheque_type', 'is_active', 'due_date']
+    search_fields = ['cheque_number', 'party_name', 'bank_name', 'account_number']
+    readonly_fields = ['created', 'modified']
+    fieldsets = (
+        (None, {'fields': ('cheque_type', 'cheque_number', 'bank_name', 'amount', 'issue_date', 'due_date', 'party_name', 'account_number', 'ifsc_code', 'purpose', 'notes', 'reminder_setting', 'is_active')}),
+        ('Timestamps', {'fields': ('created', 'modified'), 'classes': ('collapse',)}),
+    )

@@ -16,6 +16,7 @@ from apps.cashandbank.serializers.account_ledger import (
     AccountLedgerListSerializer,
     LedgerSummarySerializer,
 )
+from apps.cashandbank.serializers.cheque import ChequeSerializer
 
 __all__ = [
     'BankAccountSerializer',
@@ -31,5 +32,6 @@ __all__ = [
     'AccountLedgerSerializer',
     'AccountLedgerListSerializer',
     'LedgerSummarySerializer',
+    'ChequeSerializer',
 ]
 
