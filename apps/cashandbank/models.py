@@ -11,6 +11,7 @@ from apps.cashandbank.models import (
     AccountLedger,
     SalesLedger,
     PurchaseLedger,
+    Cheque,
 )
 
 __all__ = [
@@ -24,3 +25,5 @@ __all__ = [
     'AccountLedger',
     'SalesLedger',
     'PurchaseLedger',
+    'Cheque',
+]

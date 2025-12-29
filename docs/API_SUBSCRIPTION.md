@@ -8,7 +8,7 @@
 ## Authentication
 All endpoints require JWT authentication. Include the token in the Authorization header:
 ```
-Authorization: Bearer <your_token>
+Authorization: Bearer <your_token>    
 ```
 
 ---
