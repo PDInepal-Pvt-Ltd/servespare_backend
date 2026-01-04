@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from apps.cashandbank.models import AccountLedger
-from apps.cashandbank.serializers import CashierShiftSerializer
 
 
 class AccountLedgerSerializer(serializers.ModelSerializer):
@@ -80,10 +79,14 @@ class AccountLedgerSerializer(serializers.ModelSerializer):
 
     def get_transaction_date_display(self, obj):
         """Format date as mm/dd/yyyy"""
+        if not obj.transaction_date:
+            return None
         return obj.transaction_date.strftime('%m/%d/%Y')
 
     def get_transaction_time_display(self, obj):
         """Format time as HH:MM AM/PM"""
+        if not obj.transaction_date:
+            return None
         return obj.transaction_date.strftime('%I:%M %p')
 
 
