@@ -23,6 +23,7 @@ class AccountLedger(BaseModel):
     LEDGER_TYPE_CHOICES = [
         ('general', 'General Ledger'),
         ('purchase', 'Purchase Ledger'),
+        ('sale', 'Sale Ledger'),
         ('account', 'Account Ledger'),
     ]
 

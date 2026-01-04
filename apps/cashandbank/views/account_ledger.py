@@ -333,6 +333,8 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
             sales_qs = queryset.filter(ledger_type='sales')
             if sales_qs.exists():
                 from django.db.models import Count
+                from apps.sales.models import Bill, PurchaseItem
+                
                 total_customers = sales_qs.filter(
                     reference_id__isnull=False,
                     reference_type__in=['bill', 'invoice']
@@ -359,12 +361,42 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
                 due_remaining = Decimal('0.00')
 
+                # Calculate number of purchased and returned products
+                number_purchased_products = Decimal('0.00')
+                number_returned_products = Decimal('0.00')
+                
+                # Get bill IDs from sales ledger entries
+                bill_ids = sales_qs.filter(
+                    reference_type__in=['bill', 'invoice'],
+                    reference_id__isnull=False
+                ).values_list('reference_id', flat=True).distinct()
+                
+                if bill_ids:
+                    # Count total quantity of purchased products
+                    purchased_qty = PurchaseItem.objects.filter(
+                        bill_id__in=bill_ids
+                    ).aggregate(
+                        total_qty=Sum('quantity', output_field=DecimalField())
+                    )['total_qty'] or Decimal('0.00')
+                    number_purchased_products = purchased_qty
+                    
+                    # For returned products, we count items from refund/return transactions
+                    # Returned products can be identified via refund entries or status changes
+                    # For now, we'll calculate it as a proportion based on refund amount
+                    if gross_sales > 0:
+                        refund_ratio = return_amount / gross_sales if gross_sales > 0 else Decimal('0.00')
+                        number_returned_products = number_purchased_products * refund_ratio
+                    else:
+                        number_returned_products = Decimal('0.00')
+
                 summary['sales_summary'] = {
                     'total_customers': total_customers,
                     'gross_amount': gross_sales,
                     'return_amount': return_amount,
                     'net_amount': net_sales,
                     'due_remaining': due_remaining,
+                    'number_purchased_products': float(number_purchased_products),
+                    'number_returned_products': float(number_returned_products),
                 }
 
         # Add Purchase Ledger specific summary
