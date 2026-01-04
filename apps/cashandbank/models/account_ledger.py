@@ -192,13 +192,7 @@ class AccountLedger(BaseModel):
     def net_amount(self):
         """Net amount (debit - credit)"""
         return self.debit - self.credit
-    class Meta:
-        indexes = [
-            models.Index(fields=['shift', 'ledger_type']),
-            models.Index(fields=['tenant', 'branch']),
-            models.Index(fields=['transaction_date']),
-            models.Index(fields=['ledger_type']),
-        ]
+    
 
 
 class SalesLedger(AccountLedger):
@@ -206,6 +200,92 @@ class SalesLedger(AccountLedger):
     Proxy model for Sales Ledger entries.
     Filters AccountLedger to show only sales-related transactions.
     """
+    @classmethod
+    def _resolve_order_ids(cls, ledger_qs):
+        """Resolve referenced sales order ids or order_numbers from ledger queryset.
+
+        Returns a tuple (order_ids, order_numbers) where order_ids is a set of
+        integer ids and order_numbers is a set of order_number strings.
+        """
+        refs = set()
+        refs_by_field = set()
+        for ref in ledger_qs.values_list('reference_id', flat=True):
+            if not ref:
+                continue
+            refs.add(str(ref))
+        # Also consider `reference` field if present
+        for ref in ledger_qs.values_list('reference', flat=True):
+            if not ref:
+                continue
+            refs.add(str(ref))
+
+        order_ids = set()
+        order_numbers = set()
+        for r in refs:
+            # try integer id
+            try:
+                order_ids.add(int(r))
+                continue
+            except Exception:
+                pass
+            order_numbers.add(r)
+
+        return order_ids, order_numbers
+
+    @classmethod
+    def _sum_item_quantities_for_orders(cls, order_qs):
+        """Sum `SalesOrderItem.quantity` for orders in `order_qs`.
+
+        Returns Decimal sum (or 0).
+        """
+        from apps.sales.models.sales_order import SalesOrderItem
+        from django.db.models import Sum
+        res = SalesOrderItem.objects.filter(order__in=order_qs).aggregate(total=Sum('quantity'))
+        return res.get('total') or 0
+
+    @classmethod
+    def total_items_for_transaction_type(cls, transaction_type, start_date=None, end_date=None, tenant=None, branch=None):
+        """Return total item quantity for given `transaction_type` across SalesLedger entries.
+
+        The method resolves referenced sales orders from `reference_id` or `reference` fields
+        (tries numeric ids first, otherwise treats as `order_number`). Duplicate orders are
+        counted once.
+        """
+        from django.db.models import Q
+        from apps.sales.models.sales_order import SalesOrder
+
+        q = cls.objects.filter(ledger_type='sales', transaction_type=transaction_type)
+        if tenant:
+            q = q.filter(tenant=tenant)
+        if branch:
+            q = q.filter(branch=branch)
+        if start_date:
+            q = q.filter(transaction_date__gte=start_date)
+        if end_date:
+            q = q.filter(transaction_date__lte=end_date)
+
+        order_ids, order_numbers = cls._resolve_order_ids(q)
+
+        order_q = SalesOrder.objects.none()
+        if order_ids:
+            order_q = order_q | SalesOrder.objects.filter(id__in=order_ids)
+        if order_numbers:
+            order_q = order_q | SalesOrder.objects.filter(order_number__in=order_numbers)
+
+        if not order_q.exists():
+            return 0
+
+        return cls._sum_item_quantities_for_orders(order_q.distinct())
+
+    @classmethod
+    def total_items_sold(cls, **filters):
+        """Shortcut to sum quantities for `sale` transaction_type."""
+        return cls.total_items_for_transaction_type('sale', **filters)
+
+    @classmethod
+    def total_items_returned(cls, **filters):
+        """Shortcut to sum quantities for `refund` transaction_type."""
+        return cls.total_items_for_transaction_type('refund', **filters)
     class Meta:
         proxy = True
         verbose_name = 'Sales Ledger'

@@ -181,6 +181,7 @@ class AccountLedgerAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(SalesLedger)
 class SalesLedgerAdmin(admin.ModelAdmin):
     """Admin interface for Sales Ledger - Read-only view of sales transactions"""
     
@@ -203,6 +204,8 @@ class SalesLedgerAdmin(admin.ModelAdmin):
         'reference_id', 'performed_by', 'is_manual_entry', 'shift', 'tenant', 'branch', 'notes'
     ]
     ordering = ['-transaction_date', '-id']
+
+    list_select_related = ('tenant', 'branch', 'shift', 'performed_by')
 
     fieldsets = (
         ('Context', {
@@ -240,6 +243,7 @@ class SalesLedgerAdmin(admin.ModelAdmin):
         return False
 
 
+@admin.register(PurchaseLedger)
 class PurchaseLedgerAdmin(admin.ModelAdmin):
     """Admin interface for Purchase Ledger - Read-only view of purchase transactions"""
     
@@ -262,6 +266,8 @@ class PurchaseLedgerAdmin(admin.ModelAdmin):
         'reference_id', 'performed_by', 'is_manual_entry', 'shift', 'tenant', 'branch', 'notes'
     ]
     ordering = ['-transaction_date', '-id']
+
+    list_select_related = ('tenant', 'branch', 'shift', 'performed_by')
 
     fieldsets = (
         ('Context', {
@@ -299,11 +305,7 @@ class PurchaseLedgerAdmin(admin.ModelAdmin):
         return False
 
 
-# Register the specialized ledger admin interfaces
-# Using proxy models to allow multiple admin registrations for different ledger types
-
-admin.site.register(SalesLedger, SalesLedgerAdmin)
-admin.site.register(PurchaseLedger, PurchaseLedgerAdmin)
+# Proxy admin classes are registered above with decorators
 
 
 @admin.register(Cheque)

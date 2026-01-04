@@ -317,9 +317,9 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         # Base summary
         summary = {
-            'total_debit': str(total_debit),
-            'total_credit': str(total_credit),
-            'net_balance': str(net_balance),
+            'total_debit': total_debit,
+            'total_credit': total_credit,
+            'net_balance': net_balance,
             'transaction_count': queryset.count(),
             'from_date': from_date,
             'to_date': to_date,
@@ -366,10 +366,10 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 
                 summary['sales_summary'] = {
                     'total_customers': total_customers,
-                    'gross_amount': f"Rs{gross_sales}",
-                    'return_amount': f"Rs{return_amount}",
-                    'net_amount': f"Rs{net_sales}",
-                    'due_remaining': f"Rs{due_remaining}",
+                    'gross_amount': gross_sales,
+                    'return_amount': return_amount,
+                    'net_amount': net_sales,
+                    'due_remaining': due_remaining,
                 }
 
         # Add Purchase Ledger specific summary
@@ -397,7 +397,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 
                 # Return amount (purchase returns - debit)
                 return_amount = purchase_qs.filter(
-                    transaction_type='sale'  # return transactions marked as sale type
+                    transaction_type='refund'
                 ).aggregate(
                     total=Sum('debit', output_field=DecimalField())
                 )['total'] or Decimal('0.00')
@@ -410,10 +410,10 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 
                 summary['purchase_summary'] = {
                     'total_suppliers': total_suppliers,
-                    'gross_amount': f"Rs{gross_purchases}",
-                    'return_amount': f"Rs{return_amount}",
-                    'net_amount': f"Rs{net_purchases}",
-                    'due_remaining': f"Rs{due_remaining}",
+                    'gross_amount': gross_purchases,
+                    'return_amount': return_amount,
+                    'net_amount': net_purchases,
+                    'due_remaining': due_remaining,
                 }
 
         return summary
