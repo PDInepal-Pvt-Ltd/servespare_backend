@@ -11,10 +11,85 @@ from django.core.exceptions import ValidationError
 def sync_bill_to_sales_ledger(sender, instance, created, **kwargs):
     """
     Sync bill to sales ledger when bill is created or status changes.
-    Creates ledger entries when bill is in 'paid' or 'credit_sale' status.
+    Creates ledger entries for every bill when it's created.
+    Updates ledger entries if bill status changes to refunded/cancelled.
     """
-    # Sales ledger support removed; no-op.
-    return
+    from apps.cashandbank.models import AccountLedger
+    from decimal import Decimal
+    from django.utils import timezone
+    
+    if not instance.tenant:
+        return
+    
+    # Get or create ledger entry reference
+    reference_id = str(instance.id)
+    
+    # For newly created bills, create a sales ledger entry
+    if created:
+        # Calculate bill total
+        bill_total = instance.subtotal - instance.discount_amount
+        if bill_total < 0:
+            bill_total = Decimal('0.00')
+        
+        customer_name = instance.customer_name or 'Walk-in Customer'
+        description = f"Bill {instance.id} - {customer_name}"
+        reference = f"Bill #{instance.id}"
+        
+        # Create ledger entry for the sale
+        AccountLedger.objects.create(
+            tenant=instance.tenant,
+            branch=instance.branch,
+            ledger_type='sale',
+            transaction_type='sale',
+            debit=bill_total,
+            credit=Decimal('0.00'),
+            description=description,
+            reference=reference,
+            reference_type='bill',
+            reference_id=reference_id,
+            transaction_date=instance.created or timezone.now(),
+            performed_by=instance.created_by,
+            is_manual_entry=False,
+            notes='Auto-generated from bill creation'
+        )
+    else:
+        # Handle status changes - if refunded, create a refund/return entry
+        if instance.status == 'refunded':
+            # Check if refund entry already exists
+            existing_refund = AccountLedger.objects.filter(
+                reference_type='bill',
+                reference_id=reference_id,
+                ledger_type='sale',
+                transaction_type='refund'
+            ).exists()
+            
+            if not existing_refund:
+                # Calculate bill total for refund
+                bill_total = instance.subtotal - instance.discount_amount
+                if bill_total < 0:
+                    bill_total = Decimal('0.00')
+                
+                customer_name = instance.customer_name or 'Walk-in Customer'
+                description = f"Refund for Bill {instance.id} - {customer_name}"
+                reference = f"Refund #{instance.id}"
+                
+                # Create refund entry (credit entry for return)
+                AccountLedger.objects.create(
+                    tenant=instance.tenant,
+                    branch=instance.branch,
+                    ledger_type='sale',
+                    transaction_type='refund',
+                    debit=Decimal('0.00'),
+                    credit=bill_total,
+                    description=description,
+                    reference=reference,
+                    reference_type='bill',
+                    reference_id=reference_id,
+                    transaction_date=timezone.now(),
+                    performed_by=instance.modified_by if hasattr(instance, 'modified_by') else None,
+                    is_manual_entry=False,
+                    notes='Auto-generated from bill refund'
+                )
 
 
 @receiver(post_save, sender='sales.Invoice')

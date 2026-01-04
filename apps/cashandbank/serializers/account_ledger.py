@@ -178,3 +178,92 @@ class LedgerSummarySerializer(serializers.Serializer):
     filtered_by_shift = serializers.BooleanField(
         help_text='Whether filtered by specific shift'
     )
+    
+    currency = serializers.CharField(
+        help_text='Currency code (e.g., Rs)',
+        required=False
+    )
+
+
+class SalesSummarySerializer(serializers.Serializer):
+    """
+    Serializer for sales ledger summary data.
+    """
+    
+    total_customers = serializers.IntegerField(
+        help_text='Total number of unique customers'
+    )
+    
+    gross_amount = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        help_text='Gross sales amount'
+    )
+    
+    return_amount = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        help_text='Total return/refund amount'
+    )
+    
+    net_amount = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        help_text='Net sales amount (gross - returns)'
+    )
+    
+    due_remaining = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        help_text='Outstanding due amount'
+    )
+    
+    number_purchased_products = serializers.FloatField(
+        help_text='Total quantity of products purchased/sold'
+    )
+    
+    number_returned_products = serializers.FloatField(
+        help_text='Total quantity of products returned'
+    )
+
+
+class PurchaseSummarySerializer(serializers.Serializer):
+    """
+    Serializer for purchase ledger summary data.
+    """
+    
+    total_suppliers = serializers.IntegerField(
+        help_text='Total number of unique suppliers'
+    )
+    
+    gross_amount = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        help_text='Gross purchase amount'
+    )
+    
+    return_amount = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        help_text='Total return/refund amount'
+    )
+    
+    net_amount = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        help_text='Net purchase amount (gross - returns)'
+    )
+    
+    due_remaining = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        help_text='Outstanding due amount to suppliers'
+    )
+    
+    number_purchased_items = serializers.FloatField(
+        help_text='Total quantity of items purchased'
+    )
+    
+    number_returned_items = serializers.FloatField(
+        help_text='Total quantity of items returned'
+    )

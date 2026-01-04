@@ -154,7 +154,7 @@ class AccountLedgerAdmin(admin.ModelAdmin):
         'performed_by__username'
     ]
     readonly_fields = [
-        'created', 'modified', 'transaction_date', 'balance', 'net_amount'
+        'created', 'modified', 'transaction_date', 'balance'
     ]
     ordering = ['-transaction_date', '-id']
 

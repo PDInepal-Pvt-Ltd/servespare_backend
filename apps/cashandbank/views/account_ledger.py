@@ -7,10 +7,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
-from datetime import datetime
 
-from apps.cashandbank.models import AccountLedger, CashierShift, ShiftTransaction
+from apps.cashandbank.models import AccountLedger, CashierShift
 from apps.cashandbank.serializers import (
     AccountLedgerSerializer,
     AccountLedgerListSerializer,
@@ -75,7 +73,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 from_date_obj = parse_date(from_date)
                 if from_date_obj:
                     queryset = queryset.filter(transaction_date__date__gte=from_date_obj)
-            except:
+            except Exception:
                 pass
 
         if to_date:
@@ -83,7 +81,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 to_date_obj = parse_date(to_date)
                 if to_date_obj:
                     queryset = queryset.filter(transaction_date__date__lte=to_date_obj)
-            except:
+            except Exception:
                 pass
 
         # Filter by reference type
@@ -332,8 +330,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
         if ledger_type == 'sales':
             sales_qs = queryset.filter(ledger_type='sales')
             if sales_qs.exists():
-                from django.db.models import Count
-                from apps.sales.models import Bill, PurchaseItem
+                from apps.sales.models import PurchaseItem
                 
                 total_customers = sales_qs.filter(
                     reference_id__isnull=False,
@@ -373,6 +370,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 
                 if bill_ids:
                     # Count total quantity of purchased products
+                    from apps.sales.models import PurchaseItem
                     purchased_qty = PurchaseItem.objects.filter(
                         bill_id__in=bill_ids
                     ).aggregate(
@@ -403,7 +401,8 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
         if ledger_type == 'purchase':
             purchase_qs = queryset.filter(ledger_type='purchase')
             if purchase_qs.exists():
-                from django.db.models import Count
+                from apps.stock_management.models import PurchaseOrderItem
+                
                 total_suppliers = purchase_qs.filter(
                     reference_id__isnull=False,
                     reference_type__in=['purchase_order', 'po', 'supplier']
@@ -415,7 +414,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
                     ).values('reference_id').distinct().count()
 
                 gross_purchases = purchase_qs.filter(
-                    transaction_type='cash_out'
+                    transaction_type='purchase'
                 ).aggregate(
                     total=Sum('credit', output_field=DecimalField())
                 )['total'] or Decimal('0.00')
@@ -430,12 +429,41 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
                 due_remaining = Decimal('0.00')
 
+                # Calculate number of purchased and returned items
+                number_purchased_items = Decimal('0.00')
+                number_returned_items = Decimal('0.00')
+                
+                # Get PO IDs from purchase ledger entries
+                po_ids = purchase_qs.filter(
+                    reference_type__in=['purchase_order', 'po'],
+                    reference_id__isnull=False
+                ).values_list('reference_id', flat=True).distinct()
+                
+                if po_ids:
+                    # Count total quantity of purchased items
+                    from apps.stock_management.models import PurchaseOrderItem
+                    purchased_qty = PurchaseOrderItem.objects.filter(
+                        purchase_order_id__in=po_ids
+                    ).aggregate(
+                        total_qty=Sum('quantity', output_field=DecimalField())
+                    )['total_qty'] or Decimal('0.00')
+                    number_purchased_items = purchased_qty
+                    
+                    # For returned items, calculate as proportion based on return amount
+                    if gross_purchases > 0:
+                        return_ratio = return_amount / gross_purchases if gross_purchases > 0 else Decimal('0.00')
+                        number_returned_items = number_purchased_items * return_ratio
+                    else:
+                        number_returned_items = Decimal('0.00')
+
                 summary['purchase_summary'] = {
                     'total_suppliers': total_suppliers,
                     'gross_amount': gross_purchases,
                     'return_amount': return_amount,
                     'net_amount': net_purchases,
                     'due_remaining': due_remaining,
+                    'number_purchased_items': float(number_purchased_items),
+                    'number_returned_items': float(number_returned_items),
                 }
 
         return summary
