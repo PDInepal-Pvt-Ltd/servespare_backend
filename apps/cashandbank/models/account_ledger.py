@@ -12,8 +12,7 @@ class AccountLedger(BaseModel):
     
     Ledger Types:
     - general: All transactions (cash in/out, sales, adjustments)
-    - sales: Only sales-related transactions
-    - purchase: Only purchase-related transactions (cash out for purchases)
+    - account: Combined account-level ledger
     
     This model stores ledger entries with:
     - Transaction details (date, time, description, reference)
@@ -23,7 +22,6 @@ class AccountLedger(BaseModel):
 
     LEDGER_TYPE_CHOICES = [
         ('general', 'General Ledger'),
-        ('sales', 'Sales Ledger'),
         ('purchase', 'Purchase Ledger'),
         ('account', 'Account Ledger'),
     ]
@@ -72,7 +70,7 @@ class AccountLedger(BaseModel):
         max_length=20,
         choices=LEDGER_TYPE_CHOICES,
         default='general',
-        help_text='Type of ledger (general, sales, purchase, account)'
+        help_text='Type of ledger (general, purchase, account)'
     )
 
     # Transaction type
@@ -166,13 +164,10 @@ class AccountLedger(BaseModel):
         verbose_name_plural = 'Account Ledgers'
         ordering = ['transaction_date', 'id']
         indexes = [
-            models.Index(fields=['shift']),
-            models.Index(fields=['tenant']),
-            models.Index(fields=['ledger_type']),
-            models.Index(fields=['transaction_type']),
             models.Index(fields=['transaction_date']),
-            models.Index(fields=['branch']),
-            models.Index(fields=['tenant', 'shift', 'transaction_date']),
+            models.Index(fields=['ledger_type']),
+            models.Index(fields=['shift', 'ledger_type']),
+            models.Index(fields=['tenant', 'branch']),
         ]
 
     def __str__(self):
@@ -192,32 +187,3 @@ class AccountLedger(BaseModel):
     def net_amount(self):
         """Net amount (debit - credit)"""
         return self.debit - self.credit
-    class Meta:
-        indexes = [
-            models.Index(fields=['shift', 'ledger_type']),
-            models.Index(fields=['tenant', 'branch']),
-            models.Index(fields=['transaction_date']),
-            models.Index(fields=['ledger_type']),
-        ]
-
-
-class SalesLedger(AccountLedger):
-    """
-    Proxy model for Sales Ledger entries.
-    Filters AccountLedger to show only sales-related transactions.
-    """
-    class Meta:
-        proxy = True
-        verbose_name = 'Sales Ledger'
-        verbose_name_plural = 'Sales Ledgers'
-
-
-class PurchaseLedger(AccountLedger):
-    """
-    Proxy model for Purchase Ledger entries.
-    Filters AccountLedger to show only purchase-related transactions.
-    """
-    class Meta:
-        proxy = True
-        verbose_name = 'Purchase Ledger'
-        verbose_name_plural = 'Purchase Ledgers'

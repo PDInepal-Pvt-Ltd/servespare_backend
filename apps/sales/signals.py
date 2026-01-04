@@ -13,10 +13,8 @@ def sync_bill_to_sales_ledger(sender, instance, created, **kwargs):
     Sync bill to sales ledger when bill is created or status changes.
     Creates ledger entries when bill is in 'paid' or 'credit_sale' status.
     """
-    from apps.cashandbank.ledger_service import LedgerService
-    
-    # Sync to sales ledger based on bill status
-    LedgerService.sync_bill_to_sales_ledger(instance)
+    # Sales ledger support removed; no-op.
+    return
 
 
 @receiver(post_save, sender='sales.Invoice')

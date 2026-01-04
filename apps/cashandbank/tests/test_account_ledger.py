@@ -150,9 +150,9 @@ class AccountLedgerTestCase(TestCase):
         self.assertEqual(balances, expected)
 
     def test_ledger_types(self):
-        """Test different ledger types are created correctly"""
+        """Ensure only general ledger entries are present now that sales ledger is removed"""
         # Create sale transaction
-        shift_txn = ShiftTransaction.objects.create(
+        ShiftTransaction.objects.create(
             shift=self.shift,
             tenant=self.tenant,
             transaction_type='sale',
@@ -161,7 +161,6 @@ class AccountLedgerTestCase(TestCase):
             performed_by=self.user
         )
 
-        # Should create entries in both general and sales ledgers
         general_entries = AccountLedger.objects.filter(
             shift=self.shift,
             ledger_type='general'
@@ -173,7 +172,7 @@ class AccountLedgerTestCase(TestCase):
         )
 
         self.assertTrue(general_entries.exists())
-        self.assertTrue(sales_entries.exists())
+        self.assertFalse(sales_entries.exists())
 
     def test_ledger_summary_calculation(self):
         """Test summary calculations"""
