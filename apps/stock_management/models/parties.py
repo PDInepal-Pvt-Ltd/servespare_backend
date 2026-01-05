@@ -2,6 +2,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from apps.base.models import BaseModel
 from apps.base.managers import TenantManager
+from django.conf import settings
 
 
 class Party(BaseModel):
@@ -54,6 +55,16 @@ class Party(BaseModel):
         blank=True,
         related_name='parties',
         help_text='Tenant that owns this party'
+    )
+
+    # Creator (who added this party)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_parties',
+        help_text='User who created this party'
     )
 
     # Basic Information
@@ -144,6 +155,7 @@ class Party(BaseModel):
             models.Index(fields=['party_name']),
             models.Index(fields=['tenant']),
             models.Index(fields=['branch']),
+            models.Index(fields=['created_by']),
         ]
 
     objects = TenantManager()

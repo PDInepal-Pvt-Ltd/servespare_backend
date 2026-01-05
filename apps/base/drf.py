@@ -55,6 +55,18 @@ class TenantViewSetMixin:
         if 'tenant' in field_names:
             return qs.filter(tenant=tenant)
 
+        # Some models (e.g. Parties) don't have a direct `tenant` field but
+        # are associated to a tenant via the `created_by` user. In that case
+        # allow scoping by `created_by__tenant` so records created by users
+        # in the same tenant are visible to other users of that tenant.
+        if 'created_by' in field_names:
+            try:
+                return qs.filter(created_by__tenant=tenant)
+            except Exception:
+                # If filtering by related field fails for some reason,
+                # fall back to returning the original queryset (safer).
+                return qs
+
         return qs
 
 
@@ -99,5 +111,13 @@ class TenantFilterBackend(BaseFilterBackend):
         field_names = [f.name for f in model._meta.fields]
         if 'tenant' in field_names:
             return queryset.filter(tenant=tenant)
+
+        # Support models without direct `tenant` field but with `created_by`
+        # referencing a User whose `tenant` should be used for scoping.
+        if 'created_by' in field_names:
+            try:
+                return queryset.filter(created_by__tenant=tenant)
+            except Exception:
+                return queryset
 
         return queryset
