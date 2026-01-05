@@ -110,8 +110,7 @@ def sync_shift_transaction_to_ledger(sender, instance, created, **kwargs):
     This keeps the ledgers in sync with shift transactions.
     
     Maps transaction types to ledger types:
-    - opening/closing/cash_in/cash_out -> general ledger
-    - sale -> sales ledger + general ledger
+    - all transactions -> general ledger
     """
     if not created:
         return
@@ -120,13 +119,8 @@ def sync_shift_transaction_to_ledger(sender, instance, created, **kwargs):
 
     try:
         with transaction.atomic():
-            # Determine which ledgers to update
+            # Determine which ledgers to update (sales/purchase ledgers removed)
             ledger_types = ['general']  # All transactions go to general ledger
-            
-            if instance.transaction_type == 'sale':
-                ledger_types.append('sales')
-            elif instance.transaction_type == 'cash_out':
-                ledger_types.append('purchase')
             
             # Calculate debit and credit based on transaction type
             if instance.transaction_type in ('opening', 'cash_in', 'sale'):

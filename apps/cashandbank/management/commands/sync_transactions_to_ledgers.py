@@ -5,9 +5,10 @@ Usage:
     python manage.py sync_transactions_to_ledgers [--bills-only] [--pos-only] [--tenant TENANT_ID]
 """
 from django.core.management.base import BaseCommand, CommandError
-from django.db.models import Q
-from decimal import Decimal
 import logging
+
+from apps.cashandbank.ledger_service import LedgerService
+from apps.stock_management.models import PurchaseOrder
 
 logger = logging.getLogger(__name__)
 
@@ -38,123 +39,58 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        from apps.cashandbank.ledger_service import LedgerService
-        from apps.sales.models import Bill
-        from apps.stock_management.models import PurchaseOrder
-        from apps.cashandbank.models import AccountLedger
+        bills_only = options['bills_only']
+        pos_only = options['pos_only']
+        tenant_id = options['tenant']
+        dry_run = options['dry_run']
 
-        bills_only = options.get('bills_only')
-        pos_only = options.get('pos_only')
-        tenant_id = options.get('tenant')
-        dry_run = options.get('dry_run')
+        if bills_only and pos_only:
+            raise CommandError('Use either --bills-only or --pos-only, not both.')
 
-        # Default to both if neither is specified
-        if not bills_only and not pos_only:
-            bills_only = True
-            pos_only = True
+        process_purchase_orders = not bills_only
 
-        bill_count = 0
-        po_count = 0
+        if process_purchase_orders:
+            synced = skipped = failed = 0
+            po_queryset = PurchaseOrder.objects.all().order_by('order_date', 'id')
 
-        # Sync Bills to Sales Ledger
-        if bills_only or (bills_only and pos_only):
-            self.stdout.write(self.style.SUCCESS('Syncing Bills to Sales Ledger...'))
-            
-            bills_query = Bill.objects.filter(status__in=['paid', 'credit_sale'])
             if tenant_id:
-                bills_query = bills_query.filter(tenant_id=tenant_id)
-            
-            # Exclude bills that already have ledger entries
-            bills_without_ledger = []
-            for bill in bills_query:
-                existing = AccountLedger.objects.filter(
-                    reference_type='bill',
-                    reference_id=str(bill.id),
-                    ledger_type='sales'
-                ).exists()
-                if not existing:
-                    bills_without_ledger.append(bill)
-            
-            for bill in bills_without_ledger:
-                try:
-                    if dry_run:
-                        total = bill.total_after_discount or Decimal('0.00')
-                        self.stdout.write(
-                            f"  [DRY RUN] Would sync Bill #{bill.id} "
-                            f"({bill.customer_name}) - Amount: {total}"
-                        )
-                    else:
-                        ledger = LedgerService.create_sales_ledger_entry(bill)
-                        if ledger:
-                            self.stdout.write(
-                                self.style.SUCCESS(
-                                    f"  ✓ Synced Bill #{bill.id} "
-                                    f"({bill.customer_name}) - Ledger ID: {ledger.id}"
-                                )
-                            )
-                            bill_count += 1
-                except Exception as e:
-                    self.stdout.write(
-                        self.style.ERROR(f"  ✗ Error syncing Bill #{bill.id}: {e}")
-                    )
+                po_queryset = po_queryset.filter(tenant_id=tenant_id)
 
-        # Sync Purchase Orders to Purchase Ledger
-        if pos_only or (bills_only and pos_only):
-            self.stdout.write(self.style.SUCCESS('\nSyncing Purchase Orders to Purchase Ledger...'))
-            
-            pos_query = PurchaseOrder.objects.filter(status__in=['received', 'billed'])
-            if tenant_id:
-                pos_query = pos_query.filter(tenant_id=tenant_id)
-            
-            # Exclude POs that already have ledger entries
-            pos_without_ledger = []
-            for po in pos_query:
-                existing = AccountLedger.objects.filter(
-                    reference_type='purchase_order',
-                    reference_id=str(po.id),
-                    ledger_type='purchase'
-                ).exists()
-                if not existing:
-                    pos_without_ledger.append(po)
-            
-            for po in pos_without_ledger:
-                try:
-                    if dry_run:
-                        total = po.total_amount or Decimal('0.00')
-                        self.stdout.write(
-                            f"  [DRY RUN] Would sync PO #{po.po_number} "
-                            f"({po.supplier.party_name}) - Amount: {total}"
-                        )
-                    else:
-                        ledger = LedgerService.create_purchase_ledger_entry(po)
-                        if ledger:
-                            self.stdout.write(
-                                self.style.SUCCESS(
-                                    f"  ✓ Synced PO #{po.po_number} "
-                                    f"({po.supplier.party_name}) - Ledger ID: {ledger.id}"
-                                )
-                            )
-                            po_count += 1
-                except Exception as e:
-                    self.stdout.write(
-                        self.style.ERROR(f"  ✗ Error syncing PO #{po.po_number}: {e}")
+            if not po_queryset.exists():
+                self.stdout.write(self.style.WARNING('No purchase orders found to synchronize.'))
+            else:
+                self.stdout.write(
+                    self.style.HTTP_INFO(
+                        f"Synchronizing {po_queryset.count()} purchase orders" + (' [dry run]' if dry_run else '')
                     )
-
-        # Summary
-        self.stdout.write(self.style.SUCCESS('\n' + '='*60))
-        if dry_run:
-            self.stdout.write(
-                self.style.WARNING(
-                    f'DRY RUN COMPLETED:\n'
-                    f'  Would sync {len(bills_without_ledger) if bills_only or (bills_only and pos_only) else 0} bills\n'
-                    f'  Would sync {len(pos_without_ledger) if pos_only or (bills_only and pos_only) else 0} purchase orders'
                 )
-            )
-        else:
+
+            for po in po_queryset:
+                if dry_run:
+                    self.stdout.write(
+                        f"[DRY RUN] PurchaseOrder {po.id} ({po.status}) would be synced to purchase ledger"
+                    )
+                    continue
+
+                try:
+                    LedgerService.sync_purchase_order_to_purchase_ledger(po)
+                    if po.status in {'received', 'billed'}:
+                        synced += 1
+                    else:
+                        skipped += 1
+                except Exception as exc:
+                    failed += 1
+                    logger.exception("Error syncing PurchaseOrder %s: %s", po.id, exc)
+
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'SYNC COMPLETED:\n'
-                    f'  Synced {bill_count} bills to sales ledger\n'
-                    f'  Synced {po_count} purchase orders to purchase ledger'
+                    f"Purchase orders synchronized: {synced} created/updated, {skipped} skipped, {failed} failed"
+                )
+            )
+
+        if not pos_only:
+            self.stdout.write(
+                self.style.WARNING(
+                    'Bill synchronization is not implemented in this command version; skipping bills.'
                 )
             )

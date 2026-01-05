@@ -60,11 +60,18 @@ class InvoiceViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         """Get queryset with proper prefetching"""
         Invoice = get_invoice_model()
+        # Avoid evaluating queryset during schema generation or when request has no authenticated user
+        if getattr(self, 'swagger_fake_view', False):
+            return get_invoice_model().objects.none()
+
         queryset = Invoice.objects.filter(is_removed=False).select_related(
             'customer', 'sales_order', 'bill', 'branch', 'created_by'
         ).prefetch_related('items')
         
         user = self.request.user
+        # If there's no authenticated user, return empty queryset to avoid filtering by AnonymousUser
+        if not hasattr(self.request, 'user') or self.request.user.is_anonymous:
+            return Invoice.objects.none()
         
         # Check if user is management (super admin, tenant admin, or branch manager)
         is_management = (

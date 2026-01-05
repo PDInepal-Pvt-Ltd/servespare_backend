@@ -105,6 +105,7 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
         'order_date',
         'expected_delivery_date',
         'total_amount',
+        'get_item_count',
         'is_active',
         'created',
         'modified'
@@ -139,15 +140,23 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
         ('Additional Information', {
             'fields': ('notes', 'terms_and_condition')
         }),
-        ('Summary', {
+        ('Ledger Integration', {
             'fields': ('total_amount',),
-            'classes': ('collapse',)
+            'description': 'Purchase Order automatically syncs to Purchase Ledger when created or status changes.'
         }),
         ('Timestamps', {
             'fields': ('created', 'modified'),
             'classes': ('collapse',)
         }),
     )
+    
+    def get_item_count(self, obj):
+        """Display the number of items in this purchase order"""
+        items = obj.items.all()
+        count = items.count()
+        total_qty = sum(float(item.quantity) for item in items) if items else 0
+        return f"{count} items ({total_qty:.1f} qty)"
+    get_item_count.short_description = 'Items'
     
     def total_amount(self, obj):
         """Display total amount"""

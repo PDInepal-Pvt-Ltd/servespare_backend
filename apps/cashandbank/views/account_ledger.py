@@ -7,10 +7,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
-from datetime import datetime
 
-from apps.cashandbank.models import AccountLedger, CashierShift, ShiftTransaction
+from apps.cashandbank.models import AccountLedger, CashierShift
 from apps.cashandbank.serializers import (
     AccountLedgerSerializer,
     AccountLedgerListSerializer,
@@ -75,7 +73,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 from_date_obj = parse_date(from_date)
                 if from_date_obj:
                     queryset = queryset.filter(transaction_date__date__gte=from_date_obj)
-            except:
+            except Exception:
                 pass
 
         if to_date:
@@ -83,7 +81,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 to_date_obj = parse_date(to_date)
                 if to_date_obj:
                     queryset = queryset.filter(transaction_date__date__lte=to_date_obj)
-            except:
+            except Exception:
                 pass
 
         # Filter by reference type
@@ -317,9 +315,9 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         # Base summary
         summary = {
-            'total_debit': str(total_debit),
-            'total_credit': str(total_credit),
-            'net_balance': str(net_balance),
+            'total_debit': total_debit,
+            'total_credit': total_credit,
+            'net_balance': net_balance,
             'transaction_count': queryset.count(),
             'from_date': from_date,
             'to_date': to_date,
@@ -332,88 +330,140 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
         if ledger_type == 'sales':
             sales_qs = queryset.filter(ledger_type='sales')
             if sales_qs.exists():
-                # Total unique customers (based on reference_id for bills)
-                from django.db.models import Count
+                from apps.sales.models import PurchaseItem
+                
                 total_customers = sales_qs.filter(
                     reference_id__isnull=False,
                     reference_type__in=['bill', 'invoice']
                 ).values('reference_id').distinct().count()
-                
+
                 if total_customers == 0:
                     total_customers = sales_qs.filter(
                         reference_id__isnull=False
                     ).values('reference_id').distinct().count()
-                
-                # Gross amount (sales transactions - debit)
+
                 gross_sales = sales_qs.filter(
                     transaction_type='sale'
                 ).aggregate(
                     total=Sum('debit', output_field=DecimalField())
                 )['total'] or Decimal('0.00')
-                
-                # Return amount (refunds - credit)
+
                 return_amount = sales_qs.filter(
                     transaction_type='refund'
                 ).aggregate(
                     total=Sum('credit', output_field=DecimalField())
                 )['total'] or Decimal('0.00')
-                
-                # Net amount
+
                 net_sales = gross_sales - return_amount
-                
-                # Due remaining (calculated based on any pending amounts)
+
                 due_remaining = Decimal('0.00')
+
+                # Calculate number of purchased and returned products
+                number_purchased_products = Decimal('0.00')
+                number_returned_products = Decimal('0.00')
                 
+                # Get bill IDs from sales ledger entries
+                bill_ids = sales_qs.filter(
+                    reference_type__in=['bill', 'invoice'],
+                    reference_id__isnull=False
+                ).values_list('reference_id', flat=True).distinct()
+                
+                if bill_ids:
+                    # Count total quantity of purchased products
+                    from apps.sales.models import PurchaseItem
+                    purchased_qty = PurchaseItem.objects.filter(
+                        bill_id__in=bill_ids
+                    ).aggregate(
+                        total_qty=Sum('quantity', output_field=DecimalField())
+                    )['total_qty'] or Decimal('0.00')
+                    number_purchased_products = purchased_qty
+                    
+                    # For returned products, we count items from refund/return transactions
+                    # Returned products can be identified via refund entries or status changes
+                    # For now, we'll calculate it as a proportion based on refund amount
+                    if gross_sales > 0:
+                        refund_ratio = return_amount / gross_sales if gross_sales > 0 else Decimal('0.00')
+                        number_returned_products = number_purchased_products * refund_ratio
+                    else:
+                        number_returned_products = Decimal('0.00')
+
                 summary['sales_summary'] = {
                     'total_customers': total_customers,
-                    'gross_amount': f"Rs{gross_sales}",
-                    'return_amount': f"Rs{return_amount}",
-                    'net_amount': f"Rs{net_sales}",
-                    'due_remaining': f"Rs{due_remaining}",
+                    'gross_amount': gross_sales,
+                    'return_amount': return_amount,
+                    'net_amount': net_sales,
+                    'due_remaining': due_remaining,
+                    'number_purchased_products': float(number_purchased_products),
+                    'number_returned_products': float(number_returned_products),
                 }
 
         # Add Purchase Ledger specific summary
         if ledger_type == 'purchase':
             purchase_qs = queryset.filter(ledger_type='purchase')
             if purchase_qs.exists():
-                # Total unique suppliers (based on reference_id)
-                from django.db.models import Count
+                from apps.stock_management.models import PurchaseOrderItem
+                
                 total_suppliers = purchase_qs.filter(
                     reference_id__isnull=False,
                     reference_type__in=['purchase_order', 'po', 'supplier']
                 ).values('reference_id').distinct().count()
-                
+
                 if total_suppliers == 0:
                     total_suppliers = purchase_qs.filter(
                         reference_id__isnull=False
                     ).values('reference_id').distinct().count()
-                
-                # Gross amount (purchase transactions - credit)
+
                 gross_purchases = purchase_qs.filter(
-                    transaction_type='cash_out'
+                    transaction_type='purchase'
                 ).aggregate(
                     total=Sum('credit', output_field=DecimalField())
                 )['total'] or Decimal('0.00')
-                
-                # Return amount (purchase returns - debit)
+
                 return_amount = purchase_qs.filter(
-                    transaction_type='sale'  # return transactions marked as sale type
+                    transaction_type='refund'
                 ).aggregate(
                     total=Sum('debit', output_field=DecimalField())
                 )['total'] or Decimal('0.00')
-                
-                # Net amount
+
                 net_purchases = gross_purchases - return_amount
-                
-                # Due remaining (for supplier payments)
+
                 due_remaining = Decimal('0.00')
+
+                # Calculate number of purchased and returned items
+                number_purchased_items = Decimal('0.00')
+                number_returned_items = Decimal('0.00')
                 
+                # Get PO IDs from purchase ledger entries
+                po_ids = purchase_qs.filter(
+                    reference_type__in=['purchase_order', 'po'],
+                    reference_id__isnull=False
+                ).values_list('reference_id', flat=True).distinct()
+                
+                if po_ids:
+                    # Count total quantity of purchased items
+                    from apps.stock_management.models import PurchaseOrderItem
+                    purchased_qty = PurchaseOrderItem.objects.filter(
+                        purchase_order_id__in=po_ids
+                    ).aggregate(
+                        total_qty=Sum('quantity', output_field=DecimalField())
+                    )['total_qty'] or Decimal('0.00')
+                    number_purchased_items = purchased_qty
+                    
+                    # For returned items, calculate as proportion based on return amount
+                    if gross_purchases > 0:
+                        return_ratio = return_amount / gross_purchases if gross_purchases > 0 else Decimal('0.00')
+                        number_returned_items = number_purchased_items * return_ratio
+                    else:
+                        number_returned_items = Decimal('0.00')
+
                 summary['purchase_summary'] = {
                     'total_suppliers': total_suppliers,
-                    'gross_amount': f"Rs{gross_purchases}",
-                    'return_amount': f"Rs{return_amount}",
-                    'net_amount': f"Rs{net_purchases}",
-                    'due_remaining': f"Rs{due_remaining}",
+                    'gross_amount': gross_purchases,
+                    'return_amount': return_amount,
+                    'net_amount': net_purchases,
+                    'due_remaining': due_remaining,
+                    'number_purchased_items': float(number_purchased_items),
+                    'number_returned_items': float(number_returned_items),
                 }
 
         return summary

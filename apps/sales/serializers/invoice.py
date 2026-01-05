@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from decimal import Decimal
+from typing import Optional, List
 
 
 class InvoiceItemSerializer(serializers.Serializer):
@@ -110,6 +111,14 @@ class InvoiceDetailSerializer(serializers.Serializer):
     def get_customer_phone(self, obj):
         """Get customer phone"""
         return obj.customer.phone_number if hasattr(obj.customer, 'phone_number') else None
+
+    def get_customer_name(self, obj) -> Optional[str]:
+        """Get customer full name"""
+        return getattr(obj.customer, 'full_name', None) or getattr(obj.customer, 'username', None)
+
+    def get_customer_email(self, obj) -> Optional[str]:
+        """Get customer email"""
+        return getattr(obj.customer, 'email', None)
     
     def get_sales_order_number(self, obj):
         """Get associated sales order number"""
