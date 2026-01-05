@@ -21,6 +21,9 @@ class Branch(BaseModel):
     Email = models.EmailField(unique=True)
     
     objects = TenantManager()
+    
+    class Meta:
+        ordering = ["branch_name"]
    
    
    

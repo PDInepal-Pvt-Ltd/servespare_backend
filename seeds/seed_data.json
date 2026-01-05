@@ -216,5 +216,43 @@
       "account_holders_name": "ServeIQ Demo Co",
       "branch": "Main Branch"
     }
-  ]
+  ],
+  "ledgers": {
+    "purchase_ledgers": [
+      {
+        "ledger_type": "purchase",
+        "transaction_type": "purchase",
+        "description": "Purchase Order from Global Auto Parts Supplier",
+        "reference_type": "purchase_order",
+        "notes": "Seed data for purchase ledger - Oil filters and parts",
+        "branch": "Warehouse A"
+      },
+      {
+        "ledger_type": "purchase",
+        "transaction_type": "purchase",
+        "description": "Purchase Order from Premium Parts International",
+        "reference_type": "purchase_order",
+        "notes": "Seed data for purchase ledger - Premium auto parts",
+        "branch": "Warehouse A"
+      }
+    ],
+    "sale_ledgers": [
+      {
+        "ledger_type": "sale",
+        "transaction_type": "sale",
+        "description": "Bill for walk-in customer - Engine parts",
+        "reference_type": "bill",
+        "notes": "Seed data for sale ledger - Retail sale",
+        "branch": "Main Branch"
+      },
+      {
+        "ledger_type": "sale",
+        "transaction_type": "sale",
+        "description": "Bill for registered customer - Tire and tubes",
+        "reference_type": "bill",
+        "notes": "Seed data for sale ledger - Customer sale",
+        "branch": "Main Branch"
+      }
+    ]
+  }
 }

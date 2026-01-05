@@ -20,6 +20,7 @@ class RequestOtpViewSet(viewsets.ViewSet):
 
     permission_classes = [AllowAny]
     throttle_classes = [OTPResendRateThrottle]
+    serializer_class = RecoveryRequestSerializer
 
     @action(detail=False, methods=["post"], url_path="request")
     def trigger_otp(self, request):
@@ -50,6 +51,7 @@ class VerifyOtpViewSet(viewsets.ViewSet):
     After successful OTP verification, a secure password reset token is generated.
     """
     permission_classes = [AllowAny]
+    serializer_class = OTPVerificationSerializer
 
     @action(detail=False, methods=["post"], url_path="verify")
     def verify_otp(self, request):
@@ -106,6 +108,7 @@ class OTPViewSet(viewsets.ViewSet):
     """
     permission_classes = [permissions.IsAdminUser]
     pagination_class = StandardResultsSetPagination
+    serializer_class = OTPSerializer
 
     def list(self, request):
         """

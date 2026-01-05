@@ -1,9 +1,6 @@
 from django.contrib import admin
 from django import forms
-from django.urls import path
-from django.http import JsonResponse
 from apps.sales.models import SalesOrder, SalesOrderItem, Bill, Invoice, InvoiceItem, PurchaseItem
-from apps.stock_management.models import Inventory
 
 
 class SalesOrderItemInline(admin.TabularInline):
@@ -279,10 +276,12 @@ class PurchaseItemInline(admin.TabularInline):
 
 @admin.register(Bill)
 class BillAdmin(admin.ModelAdmin):
-    """Admin interface for Bill model with purchase items inline"""
+    """Admin interface for Bill model with purchase items inline and ledger integration"""
     
     list_display = [
-        'id', 'tenant', 'branch', 'customer_name', 'customer_type', 'payment_method', 'status', 'created'
+        'id', 'tenant', 'branch', 'customer_name', 'customer_type', 'subtotal',
+        'discount_amount', 'total_after_discount', 'payment_method', 'status', 
+        'get_purchase_count', 'created'
     ]
     list_filter = [
         'status', 'payment_method', 'customer_type', 'created'
@@ -291,7 +290,7 @@ class BillAdmin(admin.ModelAdmin):
         'customer_name', 'pan_vat_number', 'phone_numbers'
     ]
     readonly_fields = [
-        'created', 'modified'
+        'created', 'modified', 'subtotal', 'discount_amount', 'total_after_discount'
     ]
     inlines = [PurchaseItemInline]
     
@@ -303,13 +302,24 @@ class BillAdmin(admin.ModelAdmin):
             'fields': ('customer_name', 'customer_type', 'address', 'phone_numbers', 'pan_vat_number')
         }),
         ('Billing Details', {
-            'fields': ('price', 'discount_method', 'discount_value', 'payment_method', 'status')
+            'fields': ('price', 'discount_method', 'discount_value', 'subtotal', 'discount_amount', 'total_after_discount', 'payment_method', 'status')
+        }),
+        ('Ledger Information', {
+            'fields': ('is_active',),
+            'description': 'Bill automatically syncs to Sales Ledger when created or status changes.'
         }),
         ('Metadata', {
             'fields': ('created', 'modified'),
             'classes': ('collapse',)
         }),
     )
+    
+    def get_purchase_count(self, obj):
+        """Display the number of items purchased in this bill"""
+        count = obj.purchase_items.count()
+        total_qty = sum(float(item.quantity) for item in obj.purchase_items.all())
+        return f"{count} items ({total_qty:.1f} qty)"
+    get_purchase_count.short_description = 'Items'
     
     def save_formset(self, request, form, formset, change):
         """Auto-populate prices for purchase items before saving"""

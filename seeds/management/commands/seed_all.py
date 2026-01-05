@@ -17,7 +17,7 @@ from apps.subscription.models import SubscriptionPlan, Subscription
 from apps.branch.models import Branch
 from apps.stock_management.models import Inventory, Party, PurchaseOrder, InventoryImage
 from apps.sales.models import SalesOrder, Bill
-from apps.cashandbank.models import BankAccount
+from apps.cashandbank.models import BankAccount, AccountLedger
 from apps.carts.models import Cart, CartItem
 from apps.otp.models import OTP
 
@@ -72,6 +72,10 @@ class Command(BaseCommand):
         
         # Seed OTP
         self.seed_otp()
+        
+        # Seed Purchase and Sale Ledgers
+        self.seed_purchase_ledgers()
+        self.seed_sale_ledgers()
         
         self.stdout.write(self.style.SUCCESS('✓ All seed data has been created successfully!'))
 
@@ -1476,3 +1480,129 @@ class Command(BaseCommand):
                 self.stdout.write(f"  ✓ Created OTP for user: {user.username} (Code: {otp_record.code})")
             else:
                 self.stdout.write(f"  - OTP already exists for user: {user.username}")
+
+    def seed_purchase_ledgers(self):
+        """Seed purchase ledger entries based on purchase orders"""
+        self.stdout.write('Seeding Purchase Ledgers...')
+        
+        purchase_orders = PurchaseOrder.objects.filter(
+            status__in=['received', 'billed']
+        ).select_related('tenant', 'branch', 'supplier')
+        
+        if not purchase_orders:
+            self.stdout.write("  - No purchase orders found in 'received' or 'billed' status, skipping purchase ledger seeding")
+            return
+        
+        created_count = 0
+        for po in purchase_orders:
+            # Check if ledger entry already exists
+            existing = AccountLedger.objects.filter(
+                reference_type='purchase_order',
+                reference_id=str(po.id),
+                ledger_type='purchase'
+            ).exists()
+            
+            if existing:
+                self.stdout.write(f"  - Ledger entry already exists for PO: {po.po_number}")
+                continue
+            
+            # Calculate running balance
+            previous_balance = AccountLedger.objects.filter(
+                tenant=po.tenant,
+                branch=po.branch,
+                ledger_type='purchase',
+                transaction_date__lt=po.order_date
+            ).order_by('-transaction_date', '-id').values_list('balance', flat=True).first() or Decimal('0.00')
+            
+            running_balance = previous_balance - po.total_amount
+            
+            # Create purchase ledger entry
+            ledger_entry = AccountLedger.objects.create(
+                tenant=po.tenant,
+                branch=po.branch,
+                ledger_type='purchase',
+                transaction_type='purchase',
+                debit=Decimal('0.00'),
+                credit=po.total_amount,
+                balance=running_balance,
+                description=f"Purchase Order {po.po_number} from {po.supplier.party_name if po.supplier else 'Unknown supplier'}",
+                reference=f"PO #{po.po_number or po.id}",
+                reference_type='purchase_order',
+                reference_id=str(po.id),
+                transaction_date=po.order_date,
+                performed_by=getattr(po, 'created_by', None),
+                is_manual_entry=False,
+                notes='Auto-generated seed data'
+            )
+            
+            created_count += 1
+            self.stdout.write(f"  ✓ Created purchase ledger entry for PO: {po.po_number} (Amount: {po.total_amount})")
+        
+        if created_count > 0:
+            self.stdout.write(f"  ✓ Created {created_count} purchase ledger entries")
+        else:
+            self.stdout.write("  - All purchase ledger entries already exist")
+
+    def seed_sale_ledgers(self):
+        """Seed sale ledger entries based on bills"""
+        self.stdout.write('Seeding Sale Ledgers...')
+        
+        bills = Bill.objects.filter(
+            is_active=True
+        ).select_related('tenant', 'branch', 'customer')
+        
+        if not bills:
+            self.stdout.write("  - No bills found, skipping sale ledger seeding")
+            return
+        
+        created_count = 0
+        for bill in bills:
+            # Check if ledger entry already exists
+            existing = AccountLedger.objects.filter(
+                reference_type='bill',
+                reference_id=str(bill.id),
+                ledger_type='sale'
+            ).exists()
+            
+            if existing:
+                self.stdout.write(f"  - Ledger entry already exists for Bill: {bill.bill_number}")
+                continue
+            
+            # Calculate running balance
+            bill_date = getattr(bill, 'bill_date', None) or getattr(bill, 'created', timezone.now())
+            previous_balance = AccountLedger.objects.filter(
+                tenant=bill.tenant,
+                branch=bill.branch,
+                ledger_type='sale',
+                transaction_date__lt=bill_date
+            ).order_by('-transaction_date', '-id').values_list('balance', flat=True).first() or Decimal('0.00')
+            
+            running_balance = previous_balance + bill.total_amount
+            
+            # Create sale ledger entry
+            customer_name = bill.customer.full_name if bill.customer else 'Walk-in Customer'
+            ledger_entry = AccountLedger.objects.create(
+                tenant=bill.tenant,
+                branch=bill.branch,
+                ledger_type='sale',
+                transaction_type='sale',
+                debit=bill.total_amount,
+                credit=Decimal('0.00'),
+                balance=running_balance,
+                description=f"Bill {bill.bill_number} for {customer_name}",
+                reference=f"Bill #{bill.bill_number or bill.id}",
+                reference_type='bill',
+                reference_id=str(bill.id),
+                transaction_date=bill_date,
+                performed_by=getattr(bill, 'created_by', None),
+                is_manual_entry=False,
+                notes='Auto-generated seed data'
+            )
+            
+            created_count += 1
+            self.stdout.write(f"  ✓ Created sale ledger entry for Bill: {bill.bill_number} (Amount: {bill.total_amount})")
+        
+        if created_count > 0:
+            self.stdout.write(f"  ✓ Created {created_count} sale ledger entries")
+        else:
+            self.stdout.write("  - All sale ledger entries already exist")
