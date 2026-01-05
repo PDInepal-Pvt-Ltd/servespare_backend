@@ -12,6 +12,7 @@ class PartySerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'tenant',
+            'created_by',
             'branch',
             'party_type',
             'customer_type',
@@ -30,7 +31,7 @@ class PartySerializer(serializers.ModelSerializer):
             'created',
             'modified'
         ]
-        read_only_fields = ['id', 'tenant', 'created', 'modified']
+        read_only_fields = ['id', 'tenant', 'created_by', 'created', 'modified']
     
     def validate(self, data):
         """Validate that customer_type is set when party_type is customer"""
@@ -63,6 +64,7 @@ class PartySerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.user and request.user.is_authenticated:
             validated_data.setdefault('tenant', request.user.tenant)
+            validated_data.setdefault('created_by', request.user)
             # If branch not provided and user has a branch, set it
             if 'branch' not in validated_data and getattr(request.user, 'branch', None):
                 validated_data['branch'] = request.user.branch
