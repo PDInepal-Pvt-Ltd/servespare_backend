@@ -16,12 +16,23 @@ class TenantQuerySet(models.QuerySet):
         if user and getattr(user, 'is_superuser', False):
             return self
 
-        # If model has a `tenant` field, filter by it
+        # Only apply filters when fields exist on the model. Some models use
+        # `deleted_at` or `is_removed` instead of a soft-delete field; only
+        # filter when present to avoid FieldError during imports (e.g. ModelForm
+        # field generation).
         field_names = [f.name for f in self.model._meta.fields]
-        if 'tenant' in field_names:
-            return self.filter(tenant=tenant)
 
-        return self
+        qs = self
+        if 'deleted_at' in field_names:
+            qs = qs.filter(deleted_at__isnull=True)
+        elif 'is_removed' in field_names:
+            qs = qs.filter(is_removed=False)
+
+        # If model has a `tenant` field, filter by it
+        if 'tenant' in field_names:
+            qs = qs.filter(tenant=tenant)
+
+        return qs
 
 
 class TenantManager(DjangoUserManager):
