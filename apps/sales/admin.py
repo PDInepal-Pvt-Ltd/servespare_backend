@@ -117,6 +117,24 @@ class SalesOrderItemAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 class InvoiceItemInline(admin.TabularInline):
@@ -235,6 +253,24 @@ class InvoiceItemAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 class PurchaseItemForm(forms.ModelForm):
@@ -334,6 +370,24 @@ class BillAdmin(admin.ModelAdmin):
         
         formset.save_m2m()
         super().save_formset(request, form, formset, change)
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 @admin.register(PurchaseItem)
@@ -388,3 +442,39 @@ class PurchaseItemAdmin(admin.ModelAdmin):
             # Use retail_pricing if available, otherwise use base price
             obj.price = obj.inventory.retail_pricing or obj.inventory.price or 0
         super().save_model(request, obj, form, change)
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles

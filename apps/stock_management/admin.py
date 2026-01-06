@@ -86,6 +86,24 @@ class PartyAdmin(admin.ModelAdmin):
     
     class Media:
         js = ('admin/js/party_admin.js',)
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 class PurchaseOrderItemInline(admin.TabularInline):
@@ -172,6 +190,24 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
             return f"${obj.total_amount:.2f}"
         return "-"
     total_amount.short_description = 'Total Amount'
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 @admin.register(PurchaseOrderItem)
@@ -247,7 +283,7 @@ class PurchaseOrderItemAdmin(admin.ModelAdmin):
         # Prepare CSV
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="returned_purchase_order_items.csv"'
-
+        
         writer = csv.writer(response)
         writer.writerow([
             'PO Number', 'Supplier', 'Item Name', 'Part Number', 'Quantity', 'Unit Price', 'Tax', 'Total Price', 'Order Date'
@@ -270,6 +306,24 @@ class PurchaseOrderItemAdmin(admin.ModelAdmin):
 
         return response
     export_returned_items.short_description = 'Export returned purchase order items (CSV)'
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 class InventoryImageInline(admin.TabularInline):
@@ -354,6 +408,24 @@ class InventoryAdmin(admin.ModelAdmin):
 
     # Mirror fieldsets on the add form so tenant/branch are available when creating
     add_fieldsets = fieldsets
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
     
     def get_urls(self):
         urls = super().get_urls()
@@ -656,3 +728,21 @@ class InventoryImageAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles

@@ -43,6 +43,24 @@ class BankAccountAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 @admin.register(CashBalance)
@@ -51,6 +69,24 @@ class CashBalanceAdmin(admin.ModelAdmin):
     list_filter = ['is_active', 'tenant', 'branch']
     search_fields = ['tenant__name', 'branch__name']
     readonly_fields = ['last_updated', 'created', 'modified']
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 @admin.register(CashTransaction)
@@ -67,6 +103,24 @@ class CashTransactionAdmin(admin.ModelAdmin):
         ('Description', {'fields': ('source_description',)}),
         ('Timestamps', {'fields': ('created', 'modified'), 'classes': ('collapse',)}),
     )
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 @admin.register(ManualEntry)
@@ -79,6 +133,24 @@ class ManualEntryAdmin(admin.ModelAdmin):
         (None, {'fields': ('transaction_type', 'amount', 'description', 'branch', 'tenant')}),
         ('Timestamps', {'fields': ('entry_date', 'created', 'modified'), 'classes': ('collapse',)}),
     )
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 @admin.register(BankTransfer)
@@ -91,6 +163,24 @@ class BankTransferAdmin(admin.ModelAdmin):
         (None, {'fields': ('bank_account', 'amount', 'description', 'branch', 'tenant')}),
         ('Timestamps', {'fields': ('transfer_date', 'created', 'modified'), 'classes': ('collapse',)}),
     )
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 @admin.register(CashierShift)
@@ -117,6 +207,24 @@ class CashierShiftAdmin(admin.ModelAdmin):
         ('Timestamps', {'fields': ('opened_at', 'closed_at', 'transferred_at', 'created', 'modified'), 'classes': ('collapse',)}),
         ('Notes', {'fields': ('notes',)}),
     )
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 @admin.register(ShiftTransaction)
@@ -136,6 +244,24 @@ class ShiftTransactionAdmin(admin.ModelAdmin):
         ('Performed By', {'fields': ('performed_by',)}),
         ('Timestamps', {'fields': ('transaction_date', 'created', 'modified'), 'classes': ('collapse',)}),
     )
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 @admin.register(AccountLedger)
@@ -179,6 +305,24 @@ class AccountLedgerAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 
@@ -193,3 +337,21 @@ class ChequeAdmin(admin.ModelAdmin):
         (None, {'fields': ('cheque_type', 'cheque_number', 'bank_name', 'amount', 'issue_date', 'due_date', 'party_name', 'account_number', 'ifsc_code', 'purpose', 'notes', 'reminder_setting', 'is_active')}),
         ('Timestamps', {'fields': ('created', 'modified'), 'classes': ('collapse',)}),
     )
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles

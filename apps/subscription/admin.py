@@ -26,6 +26,24 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 @admin.register(Subscription)
@@ -99,6 +117,24 @@ class SubscriptionAdmin(admin.ModelAdmin):
         return self._renew_months(request, queryset, 24)
 
     renew_24_months.short_description = 'Renew selected subscriptions by 24 months'
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
 
 
 @admin.register(SubscriberEmail)
@@ -106,3 +142,21 @@ class SubscriberEmailAdmin(admin.ModelAdmin):
     list_display = ['email', 'is_active', 'created', 'modified']
     search_fields = ['email']
     readonly_fields = ['created', 'modified']
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete.
+        Roles: SUPER_ADMIN, ADMIN, SUB_ADMIN, CASHIER, INVENTORY_MANAGER, CUSTOMER
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        from apps.users.models import User
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
