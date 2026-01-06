@@ -8,8 +8,11 @@ class TenantQuerySet(models.QuerySet):
         tenant = get_current_tenant()
         user = get_current_user()
 
-        # Always exclude soft-deleted records
-        qs = self.filter(deleted_at__isnull=True)
+        # Exclude soft-deleted records if the model has a deleted_at field
+        field_names = [f.name for f in self.model._meta.fields]
+        qs = self
+        if 'deleted_at' in field_names:
+            qs = qs.filter(deleted_at__isnull=True)
 
         # If no tenant is set for the request, do not alter queryset further
         if tenant is None:
@@ -20,7 +23,6 @@ class TenantQuerySet(models.QuerySet):
             return qs
 
         # If model has a `tenant` field, filter by it
-        field_names = [f.name for f in self.model._meta.fields]
         if 'tenant' in field_names:
             return qs.filter(tenant=tenant)
 
