@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Complete implementation of the **Cashier Cash Drawhttps://mail.google.com/mail/u/0?ui=2&ik=4c6624ac6d&attid=0.1&permmsgid=msg-a:r-4890265658194768662&th=19b64d7d8e010db9&view=att&disp=inline&realattid=f_mjpoko5n0&zwer Shift Management System** for the ServeIQ/Servespare backend. This system enables cashiers to open shifts, track cash adjustments, auto-post sales transactions, and close shifts with balanced or variance tracking.
+Complete implementation of the **Cashier Cash Drawhttps://mail.google.com/mail/u/0?ui=2&ik=4c6624ac6d&attid=0.1&permmsgid=msg-a:r-4890265658194768662&th=19b64d7d8e010db9&view=att&disp=inline&realattid=f_mjpoko5n0&zwer Shift Management System** for the   
 
 **Status:** ✅ **PRODUCTION READY**
 

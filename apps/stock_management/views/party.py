@@ -47,20 +47,32 @@ class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         
         return queryset
     
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def suppliers(self, request):
-        """
-        Get all suppliers
-        """
+        """Get all suppliers. Allow access for super admin, tenant admin, and inventory manager."""
+        from apps.users.models import User
+
+        if not (request.user and request.user.is_authenticated):
+            return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if request.user.role not in [User.Role.SUPER_ADMIN, User.Role.ADMIN, User.Role.INVENTORY_MANAGER]:
+            return Response({'detail': 'You do not have permission to perform this action.'}, status=status.HTTP_403_FORBIDDEN)
+
         suppliers = self.filter_queryset(Party.objects.filter(party_type='supplier', is_active=True))
         serializer = self.get_serializer(suppliers, many=True)
         return Response(serializer.data)
     
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def customers(self, request):
-        """
-        Get all customers
-        """
+        """Get all customers. Allow access for super admin, tenant admin, and inventory manager."""
+        from apps.users.models import User
+
+        if not (request.user and request.user.is_authenticated):
+            return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if request.user.role not in [User.Role.SUPER_ADMIN, User.Role.ADMIN, User.Role.INVENTORY_MANAGER]:
+            return Response({'detail': 'You do not have permission to perform this action.'}, status=status.HTTP_403_FORBIDDEN)
+
         customers = self.filter_queryset(Party.objects.filter(party_type='customer', is_active=True))
         serializer = self.get_serializer(customers, many=True)
         return Response(serializer.data)

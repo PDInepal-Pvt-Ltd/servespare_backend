@@ -14,6 +14,8 @@ from apps.stock_management.serializers import InventorySerializer
 class PartyAdmin(admin.ModelAdmin):
     list_display = [
         'party_name',
+        'tenant',
+        'branch',
         'party_type',
         'customer_type',
         'contact_person',
@@ -26,6 +28,8 @@ class PartyAdmin(admin.ModelAdmin):
         'modified'
     ]
     list_filter = [
+        'tenant',
+        'branch',
         'party_type',
         'customer_type',
         'payment_terms',
@@ -43,9 +47,13 @@ class PartyAdmin(admin.ModelAdmin):
         'pan_number',
         'city'
     ]
-    readonly_fields = ['created', 'modified']
+    readonly_fields = ['created', 'modified', 'created_by']
+    raw_id_fields = ['tenant', 'branch', 'created_by']
     
     fieldsets = (
+        ('Context', {
+            'fields': ('tenant', 'branch')
+        }),
         ('Party Type', {
             'fields': ('party_type', 'customer_type', 'is_active')
         }),
@@ -59,7 +67,7 @@ class PartyAdmin(admin.ModelAdmin):
             'fields': ('pan_number', 'payment_terms', 'credit_limit', 'opening_balance')
         }),
         ('Timestamps', {
-            'fields': ('created', 'modified'),
+            'fields': ('created', 'modified', 'created_by'),
             'classes': ('collapse',)
         }),
     )
