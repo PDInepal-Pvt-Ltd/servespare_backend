@@ -11,7 +11,7 @@ class SubscriberEmailCreateView(generics.CreateAPIView):
     No authentication is required; `AllowAny` is used. Duplicate emails are rejected
     by the model's unique constraint.
     """
-    queryset = SubscriberEmail.objects.filter(deleted_at__isnull=True)
+    queryset = SubscriberEmail.objects.all()
     serializer_class = SubscriberEmailSerializer
     permission_classes = [AllowAny]
     authentication_classes = []

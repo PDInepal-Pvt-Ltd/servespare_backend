@@ -12,7 +12,7 @@ class SubscriptionPlanViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing subscription plans (all authenticated users)
     """
-    queryset = SubscriptionPlan.objects.filter(deleted_at__isnull=True)
+    queryset = SubscriptionPlan.objects.filter(is_removed=False)
     serializer_class = SubscriptionPlanSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
@@ -21,7 +21,7 @@ class SubscriptionPlanViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         Optionally filter by is_active status
         """
-        queryset = SubscriptionPlan.objects.filter(deleted_at__isnull=True)
+        queryset = SubscriptionPlan.objects.all()
         is_active = self.request.query_params.get('is_active', None)
         
         if is_active is not None:

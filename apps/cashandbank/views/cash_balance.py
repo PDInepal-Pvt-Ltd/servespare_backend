@@ -9,12 +9,12 @@ from apps.base.permissions import CanManageBranchResources
 
 
 class CashBalanceViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
-    queryset = CashBalance.objects.filter(deleted_at__isnull=True).select_related('tenant', 'branch')
+    queryset = CashBalance.objects.select_related('tenant', 'branch').all()
     serializer_class = CashBalanceSerializer
     permission_classes = [IsAuthenticated, CanManageBranchResources]
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        qs = CashBalance.objects.filter(deleted_at__isnull=True).select_related('tenant', 'branch')
+        qs = CashBalance.objects.select_related('tenant', 'branch').all()
         # tenant/branch filtering applied by TenantViewSetMixin if available
         return self.filter_queryset(qs)

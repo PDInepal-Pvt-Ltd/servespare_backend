@@ -18,7 +18,7 @@ class MessageViewSet(viewsets.ModelViewSet):
     - GET /api/messages/{id}/ : Retrieve specific message (admin/support only)
     - PATCH /api/messages/{id}/ : Mark message as read (admin/support only)
     """
-    queryset = Message.objects.filter(deleted_at__isnull=True)
+    queryset = Message.objects.all()
     
     def get_serializer_class(self):
         """

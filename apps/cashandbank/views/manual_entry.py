@@ -9,13 +9,13 @@ from apps.base.permissions import CanManageBranchResources
 
 
 class ManualEntryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
-    queryset = ManualEntry.objects.filter(deleted_at__isnull=True).select_related('tenant', 'branch')
+    queryset = ManualEntry.objects.select_related('tenant', 'branch').all()
     serializer_class = ManualEntrySerializer
     permission_classes = [IsAuthenticated, CanManageBranchResources]
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        qs = ManualEntry.objects.filter(deleted_at__isnull=True).select_related('tenant', 'branch')
+        qs = ManualEntry.objects.select_related('tenant', 'branch').all()
         qs = self.filter_queryset(qs)
 
         # basic search by description

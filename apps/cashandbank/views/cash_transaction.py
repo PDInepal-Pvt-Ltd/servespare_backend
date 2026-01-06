@@ -22,7 +22,7 @@ class CashTransactionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     - Cashier: Can manage transactions only in their assigned branch
     - Others: No access
     """
-    queryset = CashTransaction.objects.filter(deleted_at__isnull=True)
+    queryset = CashTransaction.objects.all()
     serializer_class = CashTransactionSerializer
     permission_classes = [IsAuthenticated, CanManageBranchResources]
     pagination_class = StandardResultsSetPagination
@@ -35,7 +35,7 @@ class CashTransactionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - Tenant Admin: See transactions from all branches in their tenant
         - Cashier: See only transactions in their branch
         """
-        qs = CashTransaction.objects.filter(deleted_at__isnull=True)
+        qs = CashTransaction.objects.all()
         
         # Apply branch-level filtering based on user role
         qs = get_branch_queryset_for_user(self.request.user, qs)

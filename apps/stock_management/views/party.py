@@ -13,7 +13,7 @@ class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing parties (suppliers and customers) with RBAC (all authenticated users)
     """
-    queryset = Party.objects.filter(deleted_at__isnull=True)
+    queryset = Party.objects.filter(is_removed=False)
     serializer_class = PartySerializer
     permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
@@ -22,7 +22,7 @@ class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         Optionally filter by party_type, customer_type, or is_active
         """
-        queryset = Party.objects.filter(deleted_at__isnull=True)
+        queryset = Party.objects.filter(is_removed=False)
         
         # Filter by party_type
         party_type = self.request.query_params.get('party_type', None)

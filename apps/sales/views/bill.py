@@ -18,7 +18,7 @@ class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     - Super Admin, Tenant Admin, Branch Manager: Full CRUD access to all bills
     - Customer: Full CRUD access to their own bills (bills with their user info)
     """
-    queryset = Bill.objects.filter(deleted_at__isnull=True)
+    queryset = Bill.objects.filter(is_removed=False)
     serializer_class = BillSerializer
     permission_classes = [IsAuthenticated, CanViewOwnOrders]
     pagination_class = StandardResultsSetPagination
@@ -31,7 +31,7 @@ class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         from apps.users.models import User
         
-        queryset = Bill.objects.filter(deleted_at__isnull=True).prefetch_related('purchase_items', 'purchase_items__inventory')
+        queryset = Bill.objects.filter(is_removed=False).prefetch_related('purchase_items', 'purchase_items__inventory')
         
         # Customers can only see bills matching their information
         # Since bills don't have a direct FK to User, we filter by customer_name, phone, email

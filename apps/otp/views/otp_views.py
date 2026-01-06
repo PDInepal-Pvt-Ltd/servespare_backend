@@ -118,7 +118,7 @@ class OTPViewSet(viewsets.ViewSet):
         user_id = request.query_params.get("user_id", None)
         show_valid = request.query_params.get("valid", None)
 
-        otps = OTP.objects.filter(deleted_at__isnull=True).order_by("-created_at")
+        otps = OTP.objects.all().order_by("-created_at")
 
         if user_id:
             otps = otps.filter(user__id=user_id)

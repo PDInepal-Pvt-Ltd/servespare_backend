@@ -30,14 +30,14 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     - GET /api/shifts/active/ - Get active shift for user
     """
     
-    queryset = CashierShift.objects.filter(deleted_at__isnull=True)
+    queryset = CashierShift.objects.filter(is_removed=False)
     serializer_class = CashierShiftSerializer
     permission_classes = [IsAuthenticated, CanManageBranchResources]
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         """Filter shifts by status and tenant"""
-        queryset = CashierShift.objects.filter(deleted_at__isnull=True)
+        queryset = CashierShift.objects.all()
         
         # Filter by status
         status_param = self.request.query_params.get('status', None)
