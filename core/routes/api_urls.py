@@ -28,6 +28,9 @@ urlpatterns = [
     # OTP endpoints
     path('otp/', include('apps.otp.urls')),
     
+    # Message endpoints (contact form, support inquiries)
+    path('messages/', include('apps.message.urls')),
+    
     # Other apps
     path('subscription/', include('apps.subscription.urls')),
     path('stock-management/', include('apps.stock_management.urls')),
