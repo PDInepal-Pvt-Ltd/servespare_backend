@@ -6,16 +6,15 @@ from apps.subscription.models import SubscriptionPlan
 from apps.subscription.serializers import SubscriptionPlanSerializer
 from apps.base.drf import TenantViewSetMixin
 from apps.base.pagination import StandardResultsSetPagination
-from apps.base.permissions import IsSuperAdmin
 
 
 class SubscriptionPlanViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
-    ViewSet for managing subscription plans (Super Admin only)
+    ViewSet for managing subscription plans (all authenticated users)
     """
     queryset = SubscriptionPlan.objects.all()
     serializer_class = SubscriptionPlanSerializer
-    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):

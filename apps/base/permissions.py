@@ -312,7 +312,9 @@ class CanManageTenantUsers(permissions.BasePermission):
     Permission to manage users in a tenant.
     
     Super Admin can manage all users.
-    Tenant Admin can only manage users in their own tenant.
+    Tenant Admin can manage users in their own tenant.
+    Tenant User can manage users in their own tenant.
+    All authenticated users can delete (soft delete).
     """
     message = _('You do not have permission to manage users in this tenant.')
     
@@ -322,32 +324,18 @@ class CanManageTenantUsers(permissions.BasePermission):
         if not (request.user and request.user.is_authenticated):
             return False
         
-        # Super Admin can manage all users
-        if request.user.role == User.Role.SUPER_ADMIN:
-            return True
-        
-        # Tenant Admin can manage users in their tenant
-        if request.user.role == User.Role.ADMIN:
-            return request.user.tenant is not None
-        
-        return False
+        # All authenticated users can perform actions
+        return True
     
     def has_object_permission(self, request, view, obj):
         """
         Check if user can manage the specific user object.
+        All authenticated users can delete (soft delete).
         """
         from apps.users.models import User as UserModel
         
-        # Super Admin can manage all users
-        if request.user.role == UserModel.Role.SUPER_ADMIN:
-            return True
-        
-        # Tenant Admin can only manage users in their own tenant
-        if request.user.role == UserModel.Role.ADMIN:
-            if isinstance(obj, UserModel):
-                return obj.tenant == request.user.tenant
-        
-        return False
+        # All authenticated users can manage (delete) users
+        return True
 
 
 class CanEditTenantDetails(permissions.BasePermission):

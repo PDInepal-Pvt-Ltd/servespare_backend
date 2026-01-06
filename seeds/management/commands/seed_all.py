@@ -239,15 +239,13 @@ class Command(BaseCommand):
             plan = tenant.package or plans.first()
             subscription_date = date.today()
             finish_date = subscription_date + timedelta(days=365)
-            renew_date = finish_date
             
             subscription, created = Subscription.objects.get_or_create(
                 tenant=tenant,
                 subscription_plan=plan,
                 subscription_date=subscription_date,
                 defaults={
-                    'finish_date': finish_date,
-                    'renew_date': renew_date
+                    'finish_date': finish_date
                 }
             )
             if created:
@@ -1368,8 +1366,6 @@ class Command(BaseCommand):
         
         for idx, customer in enumerate(customers[:3]):
             order_status_list = ['confirmed', 'packed', 'delivered']
-            payment_status_list = ['pending', 'paid', 'paid']
-            payment_methods = ['cash', 'card', 'upi']
             
             order_data = {
                 'customer': customer,
@@ -1381,9 +1377,6 @@ class Command(BaseCommand):
                 'tax_amount': Decimal('85.50'),
                 'shipping_charges': Decimal('50.00'),
                 'total_amount': Decimal('610.50'),
-                'payment_status': payment_status_list[idx % len(payment_status_list)],
-                'payment_method': payment_methods[idx % len(payment_methods)],
-                'paid_amount': Decimal('610.50') if idx % 2 == 0 else Decimal('300.00'),
                 'delivery_address': f'{customer.location}, {customer.phone}',
                 'delivery_city': 'New York',
                 'delivery_state': 'NY',
@@ -1445,7 +1438,7 @@ class Command(BaseCommand):
                         cart=cart,
                         inventory=item,
                         defaults={
-                            'quantity': Decimal('2.00'),
+                            'quantity': Decimal('1.00'),
                             'price': item.retail_pricing,
                             'is_active': True
                         }
@@ -1546,63 +1539,5 @@ class Command(BaseCommand):
     def seed_sale_ledgers(self):
         """Seed sale ledger entries based on bills"""
         self.stdout.write('Seeding Sale Ledgers...')
-        
-        bills = Bill.objects.filter(
-            is_active=True
-        ).select_related('tenant', 'branch', 'customer')
-        
-        if not bills:
-            self.stdout.write("  - No bills found, skipping sale ledger seeding")
-            return
-        
-        created_count = 0
-        for bill in bills:
-            # Check if ledger entry already exists
-            existing = AccountLedger.objects.filter(
-                reference_type='bill',
-                reference_id=str(bill.id),
-                ledger_type='sale'
-            ).exists()
-            
-            if existing:
-                self.stdout.write(f"  - Ledger entry already exists for Bill: {bill.bill_number}")
-                continue
-            
-            # Calculate running balance
-            bill_date = getattr(bill, 'bill_date', None) or getattr(bill, 'created', timezone.now())
-            previous_balance = AccountLedger.objects.filter(
-                tenant=bill.tenant,
-                branch=bill.branch,
-                ledger_type='sale',
-                transaction_date__lt=bill_date
-            ).order_by('-transaction_date', '-id').values_list('balance', flat=True).first() or Decimal('0.00')
-            
-            running_balance = previous_balance + bill.total_amount
-            
-            # Create sale ledger entry
-            customer_name = bill.customer.full_name if bill.customer else 'Walk-in Customer'
-            ledger_entry = AccountLedger.objects.create(
-                tenant=bill.tenant,
-                branch=bill.branch,
-                ledger_type='sale',
-                transaction_type='sale',
-                debit=bill.total_amount,
-                credit=Decimal('0.00'),
-                balance=running_balance,
-                description=f"Bill {bill.bill_number} for {customer_name}",
-                reference=f"Bill #{bill.bill_number or bill.id}",
-                reference_type='bill',
-                reference_id=str(bill.id),
-                transaction_date=bill_date,
-                performed_by=getattr(bill, 'created_by', None),
-                is_manual_entry=False,
-                notes='Auto-generated seed data'
-            )
-            
-            created_count += 1
-            self.stdout.write(f"  ✓ Created sale ledger entry for Bill: {bill.bill_number} (Amount: {bill.total_amount})")
-        
-        if created_count > 0:
-            self.stdout.write(f"  ✓ Created {created_count} sale ledger entries")
-        else:
-            self.stdout.write("  - All sale ledger entries already exist")
+        self.stdout.write("  - Sale ledger entries are automatically created by signals when bills are created")
+        self.stdout.write("  - No additional seeding needed")

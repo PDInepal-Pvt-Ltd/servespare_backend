@@ -5,18 +5,17 @@ from rest_framework.response import Response
 from apps.stock_management.models import Party
 from apps.stock_management.serializers import PartySerializer
 from apps.base.drf import TenantViewSetMixin
-from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager
 from apps.base.permission_utils import get_tenant_queryset_for_user
 from apps.base.pagination import StandardResultsSetPagination
 
 
 class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
-    ViewSet for managing parties (suppliers and customers) with RBAC
+    ViewSet for managing parties (suppliers and customers) with RBAC (all authenticated users)
     """
     queryset = Party.objects.all()
     serializer_class = PartySerializer
-    permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdminOrBranchManager]
+    permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):

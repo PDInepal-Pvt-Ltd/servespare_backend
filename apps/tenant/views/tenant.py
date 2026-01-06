@@ -79,14 +79,11 @@ class TenantViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     
     def perform_destroy(self, instance):
         """
-        Delete tenant - only Super Admin can delete.
+        Delete tenant - all authenticated users can delete (soft delete).
         """
-        from apps.base.permissions import IsSuperAdmin
-        permission = IsSuperAdmin()
-        if not permission.has_permission(self.request, self):
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("Only Super Admin can delete tenants.")
-        super().perform_destroy(instance)
+        # Mark tenant as inactive (soft delete)
+        instance.is_active = False
+        instance.save(update_fields=['is_active', 'modified'])
     
     @action(detail=False, methods=['get'])
     def active(self, request):
