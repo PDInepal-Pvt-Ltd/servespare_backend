@@ -25,7 +25,7 @@ class TenantViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     - Customer: Can view all tenants
     - Others: Cannot access
     """
-    queryset = Tenant.objects.select_related('package').all()
+    queryset = Tenant.objects.filter(deleted_at__isnull=True).select_related('package')
     serializer_class = TenantSerializer
     permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdmin]
     pagination_class = StandardResultsSetPagination
@@ -38,7 +38,7 @@ class TenantViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - Tenant Admin: See only their own tenant
         - Customer: See all tenants
         """
-        queryset = Tenant.objects.select_related('package').all()
+        queryset = Tenant.objects.filter(deleted_at__isnull=True).select_related('package')
         
         # Apply role-based filtering
         queryset = get_tenant_queryset_for_user(self.request.user, queryset)
@@ -135,7 +135,7 @@ class TenantViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         Get counts of tenants grouped by status, or a single status via `?status=`.
         """
         status_filter = request.query_params.get('status', None)
-        qs = self.filter_queryset(Tenant.objects.all())
+        qs = self.filter_queryset(Tenant.objects.filter(deleted_at__isnull=True))
 
         if status_filter:
             count = qs.filter(status=status_filter).count()

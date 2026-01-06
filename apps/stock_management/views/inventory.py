@@ -24,7 +24,7 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     - Inventory Manager: Can manage inventory only in their assigned branch
     - Customer: Can view inventory (read-only)
     """
-    queryset = Inventory.objects.select_related('party').prefetch_related('images').all()
+    queryset = Inventory.objects.filter(deleted_at__isnull=True).select_related('party').prefetch_related('images')
     serializer_class = InventorySerializer
     permission_classes = [CanViewInventory]
     pagination_class = StandardResultsSetPagination
@@ -58,7 +58,7 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         from apps.users.models import User
         
-        queryset = Inventory.objects.select_related('party').prefetch_related('images').all()
+        queryset = Inventory.objects.filter(deleted_at__isnull=True).select_related('party').prefetch_related('images')
         
         # Customers should see everything (no active or branch filtering)
         # For authenticated users who are not customers, apply branch filtering
@@ -475,7 +475,7 @@ class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing inventory images
     """
-    queryset = InventoryImage.objects.select_related('inventory').all()
+    queryset = InventoryImage.objects.filter(deleted_at__isnull=True).select_related('inventory')
     serializer_class = InventoryImageSerializer
     pagination_class = StandardResultsSetPagination
     
@@ -483,7 +483,7 @@ class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         Optionally filter by inventory
         """
-        queryset = InventoryImage.objects.select_related('inventory').all()
+        queryset = InventoryImage.objects.filter(deleted_at__isnull=True).select_related('inventory')
         
         # Filter by inventory
         inventory_id = self.request.query_params.get('inventory', None)

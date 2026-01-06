@@ -15,7 +15,7 @@ class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing purchase orders with RBAC (all authenticated users)
     """
-    queryset = PurchaseOrder.objects.select_related('supplier').prefetch_related('items').all()
+    queryset = PurchaseOrder.objects.filter(deleted_at__isnull=True).select_related('supplier').prefetch_related('items')
     serializer_class = PurchaseOrderSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
@@ -24,7 +24,7 @@ class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         Optionally filter by supplier, status, or date ranges
         """
-        queryset = PurchaseOrder.objects.select_related('supplier').prefetch_related('items').all()
+        queryset = PurchaseOrder.objects.filter(deleted_at__isnull=True).select_related('supplier').prefetch_related('items')
         
         # Filter by supplier
         supplier_id = self.request.query_params.get('supplier', None)
@@ -62,6 +62,7 @@ class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             )
         
         purchase_orders = self.filter_queryset(PurchaseOrder.objects.filter(
+            deleted_at__isnull=True,
             status=status_filter
         ).select_related('supplier').prefetch_related('items'))
 
@@ -93,7 +94,7 @@ class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - Pending: count of draft and ordered POs
         - Received: count of received POs
         """
-        queryset = self.filter_queryset(PurchaseOrder.objects.all())
+        queryset = self.filter_queryset(PurchaseOrder.objects.filter(deleted_at__isnull=True))
         
         # Total POs count
         total_pos = queryset.count()
@@ -137,7 +138,7 @@ class PurchaseOrderItemViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing purchase order items
     """
-    queryset = PurchaseOrderItem.objects.select_related('purchase_order').all()
+    queryset = PurchaseOrderItem.objects.filter(deleted_at__isnull=True).select_related('purchase_order')
     serializer_class = PurchaseOrderItemSerializer
     pagination_class = StandardResultsSetPagination
     
@@ -145,7 +146,7 @@ class PurchaseOrderItemViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         Optionally filter by purchase_order
         """
-        queryset = PurchaseOrderItem.objects.select_related('purchase_order').all()
+        queryset = PurchaseOrderItem.objects.filter(deleted_at__isnull=True).select_related('purchase_order')
         
         # Filter by purchase_order
         po_id = self.request.query_params.get('purchase_order', None)
@@ -166,7 +167,7 @@ class PurchaseOrderItemViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         List purchase order items whose parent purchase order has status 'returned'.
         Supports `search` query param (searches item_name, part_number, PO number, supplier name).
         """
-        queryset = PurchaseOrderItem.objects.select_related('purchase_order', 'purchase_order__supplier').filter(
+        queryset = PurchaseOrderItem.objects.filter(deleted_at__isnull=True).select_related('purchase_order', 'purchase_order__supplier').filter(
             purchase_order__status='returned'
         )
 

@@ -15,7 +15,7 @@ from apps.base.pagination import StandardResultsSetPagination
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 	"""Audit log list/retrieve with filtering and export (all authenticated users)."""
 
-	queryset = AuditLog.objects.all().select_related('user', 'tenant')
+	queryset = AuditLog.objects.filter(deleted_at__isnull=True).select_related('user', 'tenant')
 	serializer_class = AuditLogSerializer
 	permission_classes = [IsAuthenticated]
 	filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]

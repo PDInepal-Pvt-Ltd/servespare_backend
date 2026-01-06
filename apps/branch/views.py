@@ -17,14 +17,14 @@ class BranchViewSet(viewsets.ModelViewSet):
 	- Tenant Admin: Can create/manage branches only in their tenant
 	- Others: Read-only access to their tenant's branches
 	"""
-	queryset = Branch.objects.all()
+	queryset = Branch.objects.filter(deleted_at__isnull=True)
 	serializer_class = BranchSerializer
 	permission_classes = [IsAuthenticated]
 	pagination_class = StandardResultsSetPagination
 
 	def get_queryset(self):
 		user = self.request.user
-		qs = Branch.objects.all()
+		qs = Branch.objects.filter(deleted_at__isnull=True)
 		
 		# Super Admin sees all branches
 		if is_super_admin(user):

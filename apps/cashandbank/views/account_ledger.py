@@ -32,7 +32,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
     - GET /api/account-ledger/purchase/ - Purchase Ledger
     """
     
-    queryset = AccountLedger.objects.all()
+    queryset = AccountLedger.objects.filter(deleted_at__isnull=True)
     serializer_class = AccountLedgerSerializer
     permission_classes = [IsAuthenticated, CanManageBranchResources]
     pagination_class = StandardResultsSetPagination
@@ -47,7 +47,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Filter ledger entries with extensive filtering options"""
-        queryset = AccountLedger.objects.all().order_by('transaction_date', 'id')
+        queryset = AccountLedger.objects.filter(deleted_at__isnull=True).order_by('transaction_date', 'id')
 
         # Filter by ledger type
         ledger_type = self.request.query_params.get('ledger_type', None)

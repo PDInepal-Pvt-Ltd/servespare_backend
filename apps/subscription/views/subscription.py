@@ -16,7 +16,7 @@ class SubscriptionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing subscriptions with RBAC (all authenticated users)
     """
-    queryset = Subscription.objects.select_related('tenant', 'subscription_plan').all()
+    queryset = Subscription.objects.filter(deleted_at__isnull=True).select_related('tenant', 'subscription_plan')
     serializer_class = SubscriptionSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
@@ -25,7 +25,7 @@ class SubscriptionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         Optionally filter by tenant, subscription_plan, or date ranges
         """
-        queryset = Subscription.objects.select_related('tenant', 'subscription_plan').all()
+        queryset = Subscription.objects.filter(deleted_at__isnull=True).select_related('tenant', 'subscription_plan')
         
         # Filter by tenant
         tenant_id = self.request.query_params.get('tenant', None)

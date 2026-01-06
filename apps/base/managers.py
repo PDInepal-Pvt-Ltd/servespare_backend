@@ -8,20 +8,23 @@ class TenantQuerySet(models.QuerySet):
         tenant = get_current_tenant()
         user = get_current_user()
 
-        # If no tenant is set for the request, do not alter queryset
-        if tenant is None:
-            return self
+        # Always exclude soft-deleted records
+        qs = self.filter(deleted_at__isnull=True)
 
-        # Superusers can see all data
+        # If no tenant is set for the request, do not alter queryset further
+        if tenant is None:
+            return qs
+
+        # Superusers can see all data (except soft-deleted)
         if user and getattr(user, 'is_superuser', False):
-            return self
+            return qs
 
         # If model has a `tenant` field, filter by it
         field_names = [f.name for f in self.model._meta.fields]
         if 'tenant' in field_names:
-            return self.filter(tenant=tenant)
+            return qs.filter(tenant=tenant)
 
-        return self
+        return qs
 
 
 class TenantManager(DjangoUserManager):

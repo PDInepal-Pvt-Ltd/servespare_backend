@@ -10,13 +10,13 @@ from apps.base.permissions import CanManageBranchResources
 
 
 class BankTransferViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
-    queryset = BankTransfer.objects.all()
+    queryset = BankTransfer.objects.filter(deleted_at__isnull=True)
     serializer_class = BankTransferSerializer
     permission_classes = [IsAuthenticated, CanManageBranchResources]
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        qs = BankTransfer.objects.all()
+        qs = BankTransfer.objects.filter(deleted_at__isnull=True)
         # Optionally filter by branch or bank_account
         branch = self.request.query_params.get('branch')
         if branch:

@@ -15,7 +15,7 @@ class BankAccountViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing bank accounts with RBAC
     """
-    queryset = BankAccount.objects.all()
+    queryset = BankAccount.objects.filter(deleted_at__isnull=True)
     serializer_class = BankAccountSerializer
     permission_classes = [IsAuthenticated, CanManageBranchResources]
     pagination_class = StandardResultsSetPagination
@@ -24,7 +24,7 @@ class BankAccountViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         Optionally filter by account_type or is_active
         """
-        queryset = BankAccount.objects.all()
+        queryset = BankAccount.objects.filter(deleted_at__isnull=True)
         
         # Filter by account_type
         account_type = self.request.query_params.get('account_type', None)
