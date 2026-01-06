@@ -92,6 +92,38 @@ class UserAdmin(TenantAdminMixin, BaseUserAdmin):
         self.message_user(request, f'{updated} user(s) suspended successfully.')
     suspend_users.short_description = _('Suspend selected users')
     
+    def has_delete_permission(self, request, obj=None):
+        """
+        Allow all authenticated users with specific roles to delete (soft delete) users.
+        
+        Roles with delete permission:
+        - SUPER_ADMIN: Can delete any user
+        - ADMIN: Can delete users in their tenant
+        - SUB_ADMIN: Can delete users in their tenant
+        - CASHIER: Can soft delete any user
+        - INVENTORY_MANAGER: Can soft delete any user
+        - CUSTOMER: Can soft delete any user
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        # If checking specific object permission
+        if obj:
+            from apps.base.permission_utils import can_manage_user
+            return can_manage_user(request.user, obj)
+        
+        # For general delete permission (list view)
+        # All users with these roles can access delete functionality
+        allowed_roles = [
+            User.Role.SUPER_ADMIN,
+            User.Role.ADMIN,
+            User.Role.SUB_ADMIN,
+            User.Role.CASHIER,
+            User.Role.INVENTORY_MANAGER,
+            User.Role.CUSTOMER
+        ]
+        return request.user.role in allowed_roles
+    
     def get_readonly_fields(self, request, obj=None):
         """Make tenant field readonly when editing existing users, except for superadmins."""
         readonly = list(super().get_readonly_fields(request, obj))

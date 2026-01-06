@@ -177,7 +177,9 @@ def can_manage_user(user, target_user):
     - Super Admin: Can manage all users
     - Tenant Admin: Can manage users in their own tenant
     - Tenant User: Can manage users in their own tenant
-    - All authenticated users: Can delete (soft delete) any user
+    - Cashier: Can delete (soft delete) any user
+    - Inventory Manager: Can delete (soft delete) any user
+    - Customer: Can delete (soft delete) any user
     
     Args:
         user: Django User object (the one performing the action)
@@ -203,8 +205,8 @@ def can_manage_user(user, target_user):
     if user.role == User.Role.SUB_ADMIN:
         return target_user.tenant == user.tenant
     
-    # Customer can delete any user (soft delete)
-    if user.role == User.Role.CUSTOMER:
+    # Cashier, Inventory Manager, and Customer can delete any user (soft delete)
+    if user.role in [User.Role.CASHIER, User.Role.INVENTORY_MANAGER, User.Role.CUSTOMER]:
         return True
     
     return False
