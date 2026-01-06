@@ -8,17 +8,16 @@ from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem
 from apps.stock_management.serializers import PurchaseOrderSerializer, PurchaseOrderItemSerializer
 from apps.base.drf import TenantViewSetMixin
 from apps.base.pagination import StandardResultsSetPagination
-from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager
 from apps.base.permission_utils import get_tenant_queryset_for_user, get_branch_queryset_for_user
 
 
 class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
-    ViewSet for managing purchase orders with RBAC
+    ViewSet for managing purchase orders with RBAC (all authenticated users)
     """
     queryset = PurchaseOrder.objects.select_related('supplier').prefetch_related('items').all()
     serializer_class = PurchaseOrderSerializer
-    permission_classes = [IsAuthenticated, IsSuperAdminOrTenantAdminOrBranchManager]
+    permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):

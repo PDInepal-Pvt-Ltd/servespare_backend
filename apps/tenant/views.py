@@ -1,4 +1,5 @@
-from django.shortcuts import render
+# Tenant views package
+from apps.tenant.views.tenant import TenantViewSet
 
-# Create your views here.
+__all__ = ['TenantViewSet']
 

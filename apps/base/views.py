@@ -5,19 +5,19 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.db.models import Count, Q
 from datetime import timedelta
+from rest_framework.permissions import IsAuthenticated
 
-from apps.base.permissions import IsSuperAdmin
 from .models import AuditLog
 from .serializers import AuditLogSerializer
 from apps.base.pagination import StandardResultsSetPagination
 
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
-	"""Superadmin-only audit log list/retrieve with filtering and export."""
+	"""Audit log list/retrieve with filtering and export (all authenticated users)."""
 
 	queryset = AuditLog.objects.all().select_related('user', 'tenant')
 	serializer_class = AuditLogSerializer
-	permission_classes = [IsSuperAdmin]
+	permission_classes = [IsAuthenticated]
 	filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
 	filterset_fields = ['action', 'entity', 'method', 'status_code', 'tenant', 'user']
 	search_fields = ['path', 'entity', 'user__username', 'tenant__business_name', 'ip_address', 'user_agent']

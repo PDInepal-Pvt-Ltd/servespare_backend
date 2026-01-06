@@ -14,7 +14,7 @@ from apps.carts.serializers import (
 from apps.stock_management.models import Inventory
 
 
-class FavoriteViewSet(viewsets.ViewSet):
+class FavoriteViewSet(viewsets.GenericViewSet):
     """
     ViewSet for managing customer favorite products
     
