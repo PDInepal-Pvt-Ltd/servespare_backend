@@ -470,6 +470,48 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         else:
             return Response(response_data, status=status.HTTP_201_CREATED)
 
+    def perform_destroy(self, instance):
+        """
+        Soft-delete inventory with role-based validation.
+
+        - Super Admin: Can delete any inventory
+        - Tenant Admin: Can delete inventory belonging to their tenant
+        - Inventory Manager: Can delete inventory in their branch
+        """
+        from rest_framework.exceptions import PermissionDenied
+        from apps.base.permission_utils import can_manage_tenant, can_manage_branch_resources
+
+        user = self.request.user
+
+        # Super admin can delete anything
+        try:
+            from apps.users.models import User
+        except Exception:
+            User = None
+
+        if getattr(user, 'is_superuser', False) or (User and getattr(user, 'role', None) == User.Role.SUPER_ADMIN):
+            instance.is_removed = True
+            instance.save(update_fields=['is_removed', 'modified'])
+            return
+
+        # Tenant admin can delete if they manage the tenant
+        if User and getattr(user, 'role', None) == User.Role.ADMIN:
+            if can_manage_tenant(user, getattr(instance, 'tenant', None)):
+                instance.is_removed = True
+                instance.save(update_fields=['is_removed', 'modified'])
+                return
+
+        # Inventory manager / branch-level check
+        if User and getattr(user, 'role', None) == User.Role.INVENTORY_MANAGER:
+            branch = getattr(instance, 'branch', None)
+            if branch and can_manage_branch_resources(user, branch):
+                instance.is_removed = True
+                instance.save(update_fields=['is_removed', 'modified'])
+                return
+
+        # Otherwise deny
+        raise PermissionDenied("You do not have permission to delete this inventory item.")
+
 
 class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
