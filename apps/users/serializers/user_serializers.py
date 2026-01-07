@@ -481,6 +481,7 @@ class AdminAccountSerializer(serializers.ModelSerializer):
     Shows admin details along with their tenant's subscription package and user count.
     """
     tenant_detail = TenantSerializer(source='tenant', read_only=True)
+    tenant_name = serializers.CharField(source='tenant.business_name', read_only=True)
     subscription_name = serializers.SerializerMethodField()
     tenant_user_count = serializers.SerializerMethodField()
     role_display = serializers.CharField(source='get_role_display', read_only=True)
@@ -501,6 +502,7 @@ class AdminAccountSerializer(serializers.ModelSerializer):
             'status_display',
             'tenant',
             'tenant_detail',
+            'tenant_name',
             'branch',
             'branch_name',
             'subscription_name',

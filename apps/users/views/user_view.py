@@ -3,7 +3,7 @@ from django.utils import timezone
 from rest_framework import viewsets, status, filters, serializers
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, NotFound
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -11,6 +11,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.base.pagination import StandardResultsSetPagination
+from apps.branch.models import Branch
 from apps.users.models import User
 from apps.base.drf import TenantViewSetMixin
 from apps.base.permissions import (
@@ -690,6 +691,36 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             message = f'{count} user(s) deleted successfully.'
         
         return Response({'message': message}, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=['get'],
+        permission_classes=[IsAuthenticated, CanManageTenantUsers],
+        url_path='by-branch/(?P<branch_id>[^/.]+)'
+    )
+    def by_branch(self, request, branch_id=None):
+        """
+        List users for a specific branch with standard filters, search, and ordering.
+
+        GET /api/users/by-branch/{branch_id}/
+        """
+        try:
+            branch = Branch.objects.select_related('tenant').get(pk=branch_id)
+        except Branch.DoesNotExist as exc:
+            raise NotFound('Branch not found.') from exc
+
+        if is_tenant_admin(request.user) and branch.tenant_id != request.user.tenant_id:
+            raise PermissionDenied('You cannot view users from another tenant.')
+
+        queryset = self.filter_queryset(self.get_queryset().filter(branch_id=branch.id))
+
+        page = self.paginate_queryset(queryset)
+        serializer = UserListSerializer(page, many=True) if page is not None else UserListSerializer(queryset, many=True)
+
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+
+        return Response(serializer.data)
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, CanManageTenantUsers], url_path='deleted')
     def list_deleted(self, request):

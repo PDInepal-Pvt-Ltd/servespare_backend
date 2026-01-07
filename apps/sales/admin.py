@@ -317,7 +317,7 @@ class BillAdmin(admin.ModelAdmin):
     list_display = [
         'id', 'tenant', 'branch', 'customer_name', 'customer_type', 'subtotal',
         'discount_amount', 'total_after_discount', 'payment_method', 'status', 
-        'get_purchase_count', 'created'
+        'get_purchase_count', 'created_by', 'created'
     ]
     list_filter = [
         'status', 'payment_method', 'customer_type', 'created'
@@ -326,13 +326,13 @@ class BillAdmin(admin.ModelAdmin):
         'customer_name', 'pan_vat_number', 'phone_numbers'
     ]
     readonly_fields = [
-        'created', 'modified', 'subtotal', 'discount_amount', 'total_after_discount'
+        'created', 'modified', 'subtotal', 'discount_amount', 'total_after_discount', 'created_by'
     ]
     inlines = [PurchaseItemInline]
     
     fieldsets = (
         ('Tenant & Branch', {
-            'fields': ('tenant', 'branch')
+            'fields': ('tenant', 'branch', 'created_by')
         }),
         ('Customer Information', {
             'fields': ('customer_name', 'customer_type', 'address', 'phone_numbers', 'pan_vat_number')

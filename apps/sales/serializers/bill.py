@@ -57,6 +57,7 @@ class BillSerializer(serializers.ModelSerializer):
     discount_method_display = serializers.CharField(source='get_discount_method_display', read_only=True)
     tenant_name = serializers.CharField(source='tenant.name', read_only=True)
     branch_name = serializers.CharField(source='branch.name', read_only=True)
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True, required=False, allow_null=True)
     
     # Writable field for adding purchase items during creation
     purchase_items_data = serializers.ListField(
@@ -74,6 +75,8 @@ class BillSerializer(serializers.ModelSerializer):
             'tenant_name',
             'branch',
             'branch_name',
+            'created_by',
+            'created_by_username',
             'customer_name',
             'address',
             'phone_numbers',
@@ -100,6 +103,7 @@ class BillSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id',
             'tenant',
+            'created_by',
             'created',
             'modified',
             'subtotal',
@@ -148,6 +152,7 @@ class BillSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.user and request.user.is_authenticated:
             validated_data.setdefault('tenant', request.user.tenant)
+            validated_data.setdefault('created_by', request.user)
             if 'branch' not in validated_data and getattr(request.user, 'branch', None):
                 validated_data['branch'] = request.user.branch
         

@@ -259,6 +259,7 @@ class CanViewOwnOrders(permissions.BasePermission):
     Permission for managing orders and bills.
     
     - Super Admin, Tenant Admin, Branch Manager: Full access to all orders
+    - Cashier: Can create and manage bills in their assigned branch
     - Customer: Full CRUD access to their own orders only
     """
     message = _('You do not have permission to access this order.')
@@ -272,6 +273,10 @@ class CanViewOwnOrders(permissions.BasePermission):
         # Management roles have full access
         if request.user.role in [User.Role.SUPER_ADMIN, User.Role.ADMIN, User.Role.SUB_ADMIN]:
             return True
+        
+        # Cashier can create and manage bills in their branch
+        if request.user.role == User.Role.CASHIER:
+            return request.user.branch is not None
         
         # Customers can create and manage their own orders
         if request.user.role == User.Role.CUSTOMER:
@@ -296,6 +301,11 @@ class CanViewOwnOrders(permissions.BasePermission):
         
         # Sub Admin can access their branch's orders
         if request.user.role == User.Role.SUB_ADMIN:
+            if hasattr(obj, 'branch'):
+                return obj.branch == request.user.branch
+        
+        # Cashier can access bills in their branch
+        if request.user.role == User.Role.CASHIER:
             if hasattr(obj, 'branch'):
                 return obj.branch == request.user.branch
         

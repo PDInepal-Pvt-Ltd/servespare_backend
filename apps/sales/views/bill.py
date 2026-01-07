@@ -16,6 +16,7 @@ class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     
     Permissions:
     - Super Admin, Tenant Admin, Branch Manager: Full CRUD access to all bills
+    - Cashier: Full CRUD access to bills in their assigned branch
     - Customer: Full CRUD access to their own bills (bills with their user info)
     """
     queryset = Bill.objects.filter(is_removed=False)
@@ -27,15 +28,24 @@ class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         Optionally filter by customer_type, is_active, status, payment_method and search
         
+        For cashiers: Only show bills in their assigned branch
         For customers: Only show bills with their name/phone/email (matching their user info)
         """
         from apps.users.models import User
         
         queryset = Bill.objects.filter(is_removed=False).prefetch_related('purchase_items', 'purchase_items__inventory')
         
+        # Cashiers can only see bills in their branch
+        if self.request.user.role == User.Role.CASHIER:
+            if self.request.user.branch:
+                queryset = queryset.filter(branch=self.request.user.branch)
+            else:
+                # If cashier has no branch, return empty queryset
+                queryset = queryset.none()
+        
         # Customers can only see bills matching their information
         # Since bills don't have a direct FK to User, we filter by customer_name, phone, email
-        if self.request.user.role == User.Role.CUSTOMER:
+        elif self.request.user.role == User.Role.CUSTOMER:
             user = self.request.user
             queryset = queryset.filter(
                 Q(customer_name__icontains=user.full_name or user.username) |

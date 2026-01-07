@@ -46,6 +46,15 @@ class Bill(BaseModel):
         help_text='Tenant that owns this bill'
     )
 
+    created_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bills_created',
+        help_text='User who created this bill'
+    )
+
     # Customer Information
     customer_name = models.CharField(
         max_length=255,
