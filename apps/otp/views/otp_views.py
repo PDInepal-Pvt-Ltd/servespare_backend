@@ -28,9 +28,8 @@ class RequestOtpViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         identifier = serializer.validated_data["identifier"]
 
-        try:
-            user = User.objects.get(Q(username=identifier) | Q(email=identifier))
-        except User.DoesNotExist:
+        user = User.objects.filter(Q(username=identifier) | Q(email=identifier)).first()
+        if not user:
             return Response({"message": "If an account exists, a recovery code has been sent."}, status=200)
 
         otp = generate_and_save_otp(user)
@@ -61,9 +60,8 @@ class VerifyOtpViewSet(viewsets.ViewSet):
         identifier = serializer.validated_data["identifier"]
         code = serializer.validated_data["otp"]
 
-        try:
-            user = User.objects.get(Q(username=identifier) | Q(email=identifier))
-        except User.DoesNotExist:
+        user = User.objects.filter(Q(username=identifier) | Q(email=identifier)).first()
+        if not user:
             return Response(
                 {"error": "Invalid or expired code."},
                 status=status.HTTP_400_BAD_REQUEST,
