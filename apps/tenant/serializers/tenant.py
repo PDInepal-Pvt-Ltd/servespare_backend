@@ -17,6 +17,8 @@ class TenantSerializer(serializers.ModelSerializer):
             'business_name',
             'email',
             'phone',
+            'pan_number',
+            'location',
             'package',
             'package_detail',
             'status',

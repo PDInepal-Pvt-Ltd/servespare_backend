@@ -59,13 +59,17 @@ class TenantViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             is_active_bool = is_active.lower() == 'true'
             queryset = queryset.filter(is_active=is_active_bool)
         
-        # Search by business name or email
+        # Search by business name, email, pan_number, or location
         search = self.request.query_params.get('search', None)
         if search is not None:
             queryset = queryset.filter(
                 business_name__icontains=search
             ) | queryset.filter(
                 email__icontains=search
+            ) | queryset.filter(
+                pan_number__icontains=search
+            ) | queryset.filter(
+                location__icontains=search
             )
         
         return queryset
