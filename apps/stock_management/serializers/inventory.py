@@ -22,7 +22,7 @@ class InventoryImageSerializer(serializers.ModelSerializer):
             'created',
             'modified'
         ]
-        read_only_fields = ['id', 'inventory', 'tenant', 'created', 'modified']
+        read_only_fields = ['id', 'tenant', 'created', 'modified']
 
     def create(self, validated_data):
         request = self.context.get('request')
