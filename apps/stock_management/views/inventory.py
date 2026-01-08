@@ -572,6 +572,7 @@ class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     queryset = InventoryImage.objects.filter(is_removed=False).select_related('inventory')
     serializer_class = InventoryImageSerializer
     pagination_class = StandardResultsSetPagination
+    parser_classes = (MultiPartParser, FormParser)
     
     def get_queryset(self):
         """
@@ -597,4 +598,141 @@ class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             queryset = queryset.filter(is_active=is_active_bool)
         
         return queryset
+    
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def bulk_upload(self, request):
+        """
+        Bulk upload images for an inventory item.
+        
+        POST /api/stock-management/inventory-images/bulk_upload/
+        
+        Form data:
+        - inventory_id: ID of the inventory item
+        - images: Multiple image files
+        - description: (optional) Description for all images
+        - is_primary: (optional) Set one as primary (default: first image)
+        
+        Returns: List of created image objects with full details
+        """
+        inventory_id = request.data.get('inventory_id')
+        if not inventory_id:
+            return Response(
+                {'error': 'inventory_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            inventory = Inventory.objects.get(id=inventory_id, is_removed=False)
+        except Inventory.DoesNotExist:
+            return Response(
+                {'error': f'Inventory item with id {inventory_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get multiple image files from request
+        images = request.FILES.getlist('images')
+        if not images:
+            return Response(
+                {'error': 'At least one image file is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        description = request.data.get('description', '')
+        is_primary_param = request.data.get('is_primary')
+        
+        created_images = []
+        errors = []
+        
+        for idx, image_file in enumerate(images):
+            try:
+                # Determine if this should be primary
+                is_primary = False
+                if is_primary_param:
+                    # If is_primary provided, make first image primary
+                    is_primary = (idx == 0)
+                elif idx == 0 and not InventoryImage.objects.filter(
+                    inventory=inventory, is_primary=True
+                ).exists():
+                    # If no primary image exists, make first image primary
+                    is_primary = True
+                
+                image_data = {
+                    'inventory': inventory.id,
+                    'image': image_file,
+                    'description': description if description else f'Image {idx + 1}',
+                    'is_primary': is_primary,
+                }
+                
+                serializer = InventoryImageSerializer(
+                    data=image_data,
+                    context={'request': request}
+                )
+                
+                if serializer.is_valid():
+                    serializer.save()
+                    created_images.append(serializer.data)
+                else:
+                    errors.append({
+                        'image': image_file.name,
+                        'errors': serializer.errors
+                    })
+            except Exception as e:
+                errors.append({
+                    'image': image_file.name,
+                    'error': str(e)
+                })
+        
+        response_data = {
+            'inventory_id': inventory_id,
+            'uploaded': len(created_images),
+            'failed': len(errors),
+            'images': created_images,
+        }
+        
+        if errors:
+            response_data['errors'] = errors
+        
+        status_code = status.HTTP_201_CREATED if created_images else status.HTTP_400_BAD_REQUEST
+        return Response(response_data, status=status_code)
+    
+    @action(detail=True, methods=['patch'], parser_classes=[MultiPartParser, FormParser])
+    def update_image(self, request, pk=None):
+        """
+        Update an inventory image with new file and metadata.
+        
+        PATCH /api/stock-management/inventory-images/{id}/update_image/
+        
+        Form data:
+        - image: New image file
+        - description: (optional) New description
+        - is_primary: (optional) Boolean to set as primary
+        
+        Returns: Updated image object
+        """
+        try:
+            image_obj = InventoryImage.objects.get(id=pk, is_removed=False)
+        except InventoryImage.DoesNotExist:
+            return Response(
+                {'error': f'Image with id {pk} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        image_file = request.FILES.get('image')
+        if image_file:
+            # Delete old image file if exists
+            if image_obj.image:
+                image_obj.image.delete(save=False)
+            image_obj.image = image_file
+        
+        if 'description' in request.data:
+            image_obj.description = request.data.get('description')
+        
+        if 'is_primary' in request.data:
+            is_primary = request.data.get('is_primary').lower() == 'true'
+            image_obj.is_primary = is_primary
+        
+        image_obj.save()
+        
+        serializer = InventoryImageSerializer(image_obj, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
