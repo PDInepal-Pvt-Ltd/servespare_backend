@@ -6,11 +6,12 @@ from django.dispatch import receiver
 import logging
 
 from apps.cashandbank.ledger_service import LedgerService
+from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem
 
 logger = logging.getLogger(__name__)
 
 
-@receiver(post_save, sender='stock_management.PurchaseOrder')
+@receiver(post_save, sender=PurchaseOrder)
 def sync_purchase_order_to_purchase_ledger(sender, instance, created, **kwargs):
     """
     Sync purchase order to purchase ledger using the LedgerService.
@@ -34,7 +35,7 @@ def sync_purchase_order_to_purchase_ledger(sender, instance, created, **kwargs):
         )
 
 
-@receiver(post_save, sender='stock_management.PurchaseOrderItem')
+@receiver(post_save, sender=PurchaseOrderItem)
 def update_ledger_on_item_change(sender, instance, created, **kwargs):
     """
     When PO items are added/updated, refresh the ledger entry if the
@@ -56,7 +57,7 @@ def update_ledger_on_item_change(sender, instance, created, **kwargs):
         )
 
 
-@receiver(post_delete, sender='stock_management.PurchaseOrderItem')
+@receiver(post_delete, sender=PurchaseOrderItem)
 def update_ledger_on_item_delete(sender, instance, **kwargs):
     """
     When PO items are deleted, refresh the ledger entry if the parent
