@@ -267,3 +267,75 @@ class PurchaseSummarySerializer(serializers.Serializer):
     number_returned_items = serializers.FloatField(
         help_text='Total quantity of items returned'
     )
+
+
+class PurchaseStatisticsSerializer(serializers.Serializer):
+    """
+    Serializer for purchase ledger statistics for dashboard.
+    """
+    
+    total_suppliers = serializers.IntegerField(
+        help_text='Total number of unique suppliers'
+    )
+    
+    gross_amount = serializers.CharField(
+        help_text='Gross purchase amount'
+    )
+    
+    return_amount = serializers.CharField(
+        help_text='Total return/refund amount'
+    )
+    
+    net_amount = serializers.CharField(
+        help_text='Net purchase amount (gross - returns)'
+    )
+    
+    due_remaining = serializers.CharField(
+        help_text='Outstanding due amount to suppliers'
+    )
+    
+    number_purchased_items = serializers.FloatField(
+        required=False,
+        help_text='Total quantity of items purchased'
+    )
+    
+    number_returned_items = serializers.FloatField(
+        required=False,
+        help_text='Total quantity of items returned'
+    )
+
+
+class SalesStatisticsSerializer(serializers.Serializer):
+    """
+    Serializer for sales ledger statistics for dashboard.
+    """
+    
+    total_customers = serializers.IntegerField(
+        help_text='Total number of unique customers'
+    )
+    
+    gross_amount = serializers.CharField(
+        help_text='Gross sales amount'
+    )
+    
+    return_amount = serializers.CharField(
+        help_text='Total return/refund amount'
+    )
+    
+    net_amount = serializers.CharField(
+        help_text='Net sales amount (gross - returns)'
+    )
+    
+    due_remaining = serializers.CharField(
+        help_text='Outstanding due amount from customers'
+    )
+    
+    number_purchased_products = serializers.FloatField(
+        required=False,
+        help_text='Total quantity of products purchased/sold'
+    )
+    
+    number_returned_products = serializers.FloatField(
+        required=False,
+        help_text='Total quantity of products returned'
+    )

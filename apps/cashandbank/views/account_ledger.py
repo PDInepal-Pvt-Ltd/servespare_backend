@@ -477,3 +477,199 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
             'previous': self.paginator.get_previous_link(),
             'results': data,
         })
+
+    @action(detail=False, methods=['get'], url_path='purchase-statistics')
+    def purchase_statistics(self, request):
+        """
+        Get purchase ledger statistics for dashboard.
+        
+        Returns:
+        - Total Suppliers
+        - Gross Amount
+        - Return Amount
+        - Net Amount
+        - Due Remaining
+        
+        Query Parameters:
+        - from_date: Filter from date (mm/dd/yyyy or yyyy-mm-dd)
+        - to_date: Filter to date (mm/dd/yyyy or yyyy-mm-dd)
+        - branch_id: Filter by branch
+        """
+        from apps.stock_management.models import PurchaseOrderItem
+        
+        # Filter purchase ledger entries
+        queryset = self.filter_queryset(self.get_queryset()).filter(ledger_type='purchase')
+        
+        if not queryset.exists():
+            return Response({
+                'total_suppliers': 0,
+                'gross_amount': '0.00',
+                'return_amount': '0.00',
+                'net_amount': '0.00',
+                'due_remaining': '0.00',
+                'number_purchased_items': 0.0,
+                'number_returned_items': 0.0,
+            })
+        
+        # Calculate total suppliers
+        total_suppliers = queryset.filter(
+            reference_id__isnull=False,
+            reference_type__in=['purchase_order', 'po', 'supplier']
+        ).values('reference_id').distinct().count()
+        
+        if total_suppliers == 0:
+            total_suppliers = queryset.filter(
+                reference_id__isnull=False
+            ).values('reference_id').distinct().count()
+        
+        # Calculate gross purchases
+        gross_purchases = queryset.filter(
+            transaction_type='purchase'
+        ).aggregate(
+            total=Sum('credit', output_field=DecimalField())
+        )['total'] or Decimal('0.00')
+        
+        # Calculate return amount
+        return_amount = queryset.filter(
+            transaction_type='refund'
+        ).aggregate(
+            total=Sum('debit', output_field=DecimalField())
+        )['total'] or Decimal('0.00')
+        
+        # Calculate net purchases
+        net_purchases = gross_purchases - return_amount
+        
+        # For now, due_remaining is 0 (can be enhanced later with payment tracking)
+        due_remaining = Decimal('0.00')
+        
+        # Calculate number of purchased and returned items
+        number_purchased_items = Decimal('0.00')
+        number_returned_items = Decimal('0.00')
+        
+        # Get PO IDs from purchase ledger entries
+        po_ids = queryset.filter(
+            reference_type__in=['purchase_order', 'po'],
+            reference_id__isnull=False
+        ).values_list('reference_id', flat=True).distinct()
+        
+        if po_ids:
+            # Count total quantity of purchased items
+            purchased_qty = PurchaseOrderItem.objects.filter(
+                purchase_order_id__in=po_ids
+            ).aggregate(
+                total_qty=Sum('quantity', output_field=DecimalField())
+            )['total_qty'] or Decimal('0.00')
+            number_purchased_items = purchased_qty
+            
+            # For returned items, calculate as proportion based on return amount
+            if gross_purchases > 0:
+                return_ratio = return_amount / gross_purchases
+                number_returned_items = number_purchased_items * return_ratio
+        
+        return Response({
+            'total_suppliers': total_suppliers,
+            'gross_amount': str(gross_purchases),
+            'return_amount': str(return_amount),
+            'net_amount': str(net_purchases),
+            'due_remaining': str(due_remaining),
+            'number_purchased_items': float(number_purchased_items),
+            'number_returned_items': float(number_returned_items),
+        })
+
+    @action(detail=False, methods=['get'], url_path='sales-statistics')
+    def sales_statistics(self, request):
+        """
+        Get sales ledger statistics for dashboard.
+        
+        Returns:
+        - Total Customers
+        - Gross Amount
+        - Return Amount
+        - Net Amount
+        - Due Remaining
+        
+        Query Parameters:
+        - from_date: Filter from date (mm/dd/yyyy or yyyy-mm-dd)
+        - to_date: Filter to date (mm/dd/yyyy or yyyy-mm-dd)
+        - branch_id: Filter by branch
+        """
+        from apps.sales.models import PurchaseItem
+        
+        # Filter sales ledger entries
+        queryset = self.filter_queryset(self.get_queryset()).filter(ledger_type='sales')
+        
+        if not queryset.exists():
+            return Response({
+                'total_customers': 0,
+                'gross_amount': '0.00',
+                'return_amount': '0.00',
+                'net_amount': '0.00',
+                'due_remaining': '0.00',
+                'number_purchased_products': 0.0,
+                'number_returned_products': 0.0,
+            })
+        
+        # Calculate total customers
+        total_customers = queryset.filter(
+            reference_id__isnull=False,
+            reference_type__in=['bill', 'invoice']
+        ).values('reference_id').distinct().count()
+        
+        if total_customers == 0:
+            total_customers = queryset.filter(
+                reference_id__isnull=False
+            ).values('reference_id').distinct().count()
+        
+        # Calculate gross sales
+        gross_sales = queryset.filter(
+            transaction_type='sale'
+        ).aggregate(
+            total=Sum('debit', output_field=DecimalField())
+        )['total'] or Decimal('0.00')
+        
+        # Calculate return amount
+        return_amount = queryset.filter(
+            transaction_type='refund'
+        ).aggregate(
+            total=Sum('credit', output_field=DecimalField())
+        )['total'] or Decimal('0.00')
+        
+        # Calculate net sales
+        net_sales = gross_sales - return_amount
+        
+        # For now, due_remaining is 0 (can be enhanced later with payment tracking)
+        due_remaining = Decimal('0.00')
+        
+        # Calculate number of purchased and returned products
+        number_purchased_products = Decimal('0.00')
+        number_returned_products = Decimal('0.00')
+        
+        # Get bill IDs from sales ledger entries
+        bill_ids = queryset.filter(
+            reference_type__in=['bill', 'invoice'],
+            reference_id__isnull=False
+        ).values_list('reference_id', flat=True).distinct()
+        
+        if bill_ids:
+            # Count total quantity of purchased products
+            purchased_qty = PurchaseItem.objects.filter(
+                bill_id__in=bill_ids
+            ).aggregate(
+                total_qty=Sum('quantity', output_field=DecimalField())
+            )['total_qty'] or Decimal('0.00')
+            number_purchased_products = purchased_qty
+            
+            # For returned products, calculate as proportion based on refund amount
+            if gross_sales > 0:
+                refund_ratio = return_amount / gross_sales
+                number_returned_products = number_purchased_products * refund_ratio
+        
+        return Response({
+            'total_customers': total_customers,
+            'gross_amount': str(gross_sales),
+            'return_amount': str(return_amount),
+            'net_amount': str(net_sales),
+            'due_remaining': str(due_remaining),
+            'number_purchased_products': float(number_purchased_products),
+            'number_returned_products': float(number_returned_products),
+        })
