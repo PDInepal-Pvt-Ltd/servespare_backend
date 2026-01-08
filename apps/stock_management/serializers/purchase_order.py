@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import serializers
 from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem
 from apps.stock_management.serializers.party import PartySerializer
@@ -135,4 +136,38 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         # Prevent tenant override via serializer
         validated_data.pop('tenant', None)
         return super().update(instance, validated_data)
+
+
+class PurchaseOrderCreateWithItemsSerializer(PurchaseOrderSerializer):
+    """
+    Create a purchase order and its items in one request.
+    """
+    items = PurchaseOrderItemSerializer(many=True, write_only=True)
+    items_detail = PurchaseOrderItemSerializer(source='items', many=True, read_only=True)
+
+    class Meta(PurchaseOrderSerializer.Meta):
+        fields = PurchaseOrderSerializer.Meta.fields + ['items', 'items_detail']
+        read_only_fields = PurchaseOrderSerializer.Meta.read_only_fields + ['items_detail']
+
+    def validate_items(self, value):
+        """Require at least one item when creating together."""
+        if not value:
+            raise serializers.ValidationError("At least one item is required.")
+        return value
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+
+        with transaction.atomic():
+            purchase_order = super().create(validated_data)
+
+            for item_data in items_data:
+                item_serializer = PurchaseOrderItemSerializer(
+                    data={**item_data, 'purchase_order': purchase_order.id},
+                    context=self.context
+                )
+                item_serializer.is_valid(raise_exception=True)
+                item_serializer.save()
+
+        return purchase_order
 
