@@ -31,20 +31,32 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     
     def get_authenticators(self):
         """
-        Bypass authentication for GET requests.
-        This allows GET requests without JWT token.
+        Allow unauthenticated GET requests only when no Authorization
+        header is present. If the client provides an Authorization header
+        authenticate the request so role-based filtering can apply.
         """
         if self.request and self.request.method == 'GET':
-            return []
+            # Django stores Authorization in HTTP_AUTHORIZATION
+            if not self.request.META.get('HTTP_AUTHORIZATION'):
+                return []
         return super().get_authenticators()
     
     def get_permissions(self):
         """
-        Allow unauthenticated access for list and retrieve actions.
-        Require authentication for create, update, delete, and other actions.
+        When an Authorization header is present, enforce `permission_classes`
+        for all actions (including `list` and `retrieve`) so authenticated
+        admin/inventory manager users are filtered to their tenant/branch.
+
+        If no Authorization header is present, allow read-only access.
         """
+        # If there's an auth header, enforce permissions for all actions
+        if self.request and self.request.META.get('HTTP_AUTHORIZATION'):
+            return [permission() for permission in self.permission_classes]
+
+        # No auth header: allow safe methods (public read-only)
         if self.action in ['list', 'retrieve']:
             return []
+
         return [permission() for permission in self.permission_classes]
     
     def get_queryset(self):

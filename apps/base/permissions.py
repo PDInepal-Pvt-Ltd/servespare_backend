@@ -240,17 +240,51 @@ class CanViewInventory(permissions.BasePermission):
     def has_permission(self, request, view):
         from apps.users.models import User
         
+        # If unauthenticated, deny here. Public read-only access is handled
+        # by view-level logic when no Authorization header is present.
         if not (request.user and request.user.is_authenticated):
             return False
-        
+
         # Super Admin, Tenant Admin, Inventory Manager can manage inventory
         if request.user.role in [User.Role.SUPER_ADMIN, User.Role.ADMIN, User.Role.INVENTORY_MANAGER]:
             return True
-        
-        # Customers can only view (read-only)
-        if request.user.role == User.Role.CUSTOMER:
+
+        # Cashier and Customer: read-only access
+        if request.user.role in [User.Role.CASHIER, User.Role.CUSTOMER]:
             return request.method in permissions.SAFE_METHODS
-        
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        """
+        Object-level permissions:
+        - Super Admin: full access
+        - Tenant Admin: can modify/delete objects in their tenant
+        - Inventory Manager: can modify/delete objects in their branch
+        - Cashier/Customer: read-only
+        """
+        from apps.users.models import User
+        from apps.base.permission_utils import can_manage_tenant, can_manage_branch_resources
+
+        if request.user.role == User.Role.SUPER_ADMIN:
+            return True
+
+        # Read-only for safe methods
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # Tenant Admin: modify if they manage tenant or branch belongs to their tenant
+        if request.user.role == User.Role.ADMIN:
+            if can_manage_tenant(request.user, getattr(obj, 'tenant', None)):
+                return True
+            if can_manage_branch_resources(request.user, getattr(obj, 'branch', None)):
+                return True
+
+        # Inventory Manager: modify if branch matches
+        if request.user.role == User.Role.INVENTORY_MANAGER:
+            if can_manage_branch_resources(request.user, getattr(obj, 'branch', None)):
+                return True
+
         return False
 
 
