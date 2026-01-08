@@ -1,6 +1,6 @@
 from django.db import transaction
 from rest_framework import serializers
-from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem
+from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem, Party
 from apps.stock_management.serializers.party import PartySerializer
 
 
@@ -134,6 +134,20 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             # Default branch to user's branch if not provided
             if 'branch' not in validated_data and getattr(request.user, 'branch', None):
                 validated_data['branch'] = request.user.branch
+
+        # Fallback: derive tenant/branch from supplier if still missing
+        try:
+            if not validated_data.get('tenant') and validated_data.get('supplier'):
+                supplier_id = validated_data.get('supplier')
+                supplier = Party.objects.filter(id=supplier_id).only('tenant_id', 'branch_id').first()
+                if supplier:
+                    if not validated_data.get('tenant'):
+                        validated_data['tenant'] = supplier.tenant
+                    if 'branch' not in validated_data and getattr(supplier, 'branch', None):
+                        validated_data['branch'] = supplier.branch
+        except Exception:
+            # If supplier lookup fails, proceed without overriding
+            pass
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
