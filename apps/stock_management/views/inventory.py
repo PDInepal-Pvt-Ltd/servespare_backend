@@ -102,6 +102,55 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             )
         
         return queryset
+
+    def get_object(self):
+        """
+        Override to support delete/update when the object's tenant/branch
+        filters exclude it from the default queryset (causing NotFound).
+
+        If the standard lookup fails, try to fetch the instance directly
+        and perform role-based checks to decide if the requesting user
+        should be allowed to operate on it.
+        """
+        from rest_framework.exceptions import NotFound, PermissionDenied
+        from django.http import Http404
+        from apps.stock_management.models import Inventory as InventoryModel
+        from apps.base.permission_utils import (
+            can_manage_tenant,
+            can_manage_branch_resources,
+        )
+        try:
+            return super().get_object()
+        except (NotFound, Http404):
+            pk = self.kwargs.get(self.lookup_field)
+            if not pk:
+                raise NotFound("No Inventory matches the given query.")
+
+            instance = InventoryModel.objects.filter(is_removed=False).select_related('tenant', 'branch').filter(pk=pk).first()
+            if not instance:
+                raise NotFound("No Inventory matches the given query.")
+
+            user = getattr(self.request, 'user', None)
+            try:
+                from apps.users.models import User
+            except Exception:
+                User = None
+
+            # Superuser / super admin
+            if getattr(user, 'is_superuser', False) or (User and getattr(user, 'role', None) == User.Role.SUPER_ADMIN):
+                return instance
+
+            # Tenant admin can access if they manage tenant or branch (branch may belong to their tenant)
+            if User and getattr(user, 'role', None) == User.Role.ADMIN:
+                if can_manage_tenant(user, getattr(instance, 'tenant', None)) or can_manage_branch_resources(user, getattr(instance, 'branch', None)):
+                    return instance
+
+            # Inventory manager can access if branch matches
+            if User and getattr(user, 'role', None) == User.Role.INVENTORY_MANAGER:
+                if can_manage_branch_resources(user, getattr(instance, 'branch', None)):
+                    return instance
+
+            raise PermissionDenied("You do not have permission to access this inventory item.")
     
     @action(detail=False, methods=['get'])
     def low_stock(self, request):
