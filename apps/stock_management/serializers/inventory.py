@@ -123,6 +123,26 @@ class InventorySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Minimum stock level cannot be negative.")
         return value
 
+    def validate_barcode(self, value):
+        """Prevent duplicate barcodes from causing 500s on save."""
+        if not value:
+            return value
+
+        # Exclude current instance during updates
+        qs = Inventory.objects.filter(barcode=value, is_removed=False)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        # Narrow by tenant when available to avoid cross-tenant conflicts
+        request = self.context.get('request')
+        tenant = getattr(getattr(request, 'user', None), 'tenant', None)
+        if tenant:
+            qs = qs.filter(tenant=tenant)
+
+        if qs.exists():
+            raise serializers.ValidationError('Inventory with this Barcode already exists.')
+        return value
+
     def _create_images(self, inventory, images_data):
         """Create inventory images from nested payload."""
         for image_data in images_data:
@@ -137,7 +157,15 @@ class InventorySerializer(serializers.ModelSerializer):
             validated_data.setdefault('tenant', request.user.tenant)
             if 'branch' not in validated_data and getattr(request.user, 'branch', None):
                 validated_data['branch'] = request.user.branch
-        inventory = super().create(validated_data)
+        try:
+            inventory = super().create(validated_data)
+        except Exception as exc:
+            # Surface model validation errors (e.g., unique constraints) as DRF validation errors
+            from django.core.exceptions import ValidationError as DjangoValidationError
+
+            if isinstance(exc, DjangoValidationError):
+                raise serializers.ValidationError(exc.message_dict)
+            raise
         if images_data:
             self._create_images(inventory, images_data)
         return inventory

@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Q, F, Sum, DecimalField
 from apps.stock_management.models import Inventory, InventoryImage, Party
 from apps.stock_management.serializers import InventorySerializer, InventoryImageSerializer
@@ -28,6 +28,7 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     serializer_class = InventorySerializer
     permission_classes = [CanViewInventory]
     pagination_class = StandardResultsSetPagination
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
     
     def get_authenticators(self):
         """
@@ -58,6 +59,50 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             return []
 
         return [permission() for permission in self.permission_classes]
+
+    def _create_images_from_request(self, inventory, request):
+        """Attach uploaded images from the same request to the inventory item."""
+        files = request.FILES.getlist('images') or []
+
+        single_image = request.FILES.get('image')
+        if single_image and single_image not in files:
+            files.insert(0, single_image)
+
+        if not files:
+            return
+
+        description = request.data.get('description', '')
+        is_primary_param = request.data.get('is_primary')
+
+        for idx, image_file in enumerate(files):
+            is_primary = False
+            if is_primary_param is not None:
+                is_primary = str(is_primary_param).lower() == 'true'
+            elif idx == 0 and not inventory.images.filter(is_primary=True, is_removed=False).exists():
+                is_primary = True
+
+            payload = {
+                'inventory': inventory.id,
+                'image': image_file,
+                'description': description or f'Image {idx + 1}',
+                'is_primary': is_primary,
+            }
+
+            serializer = InventoryImageSerializer(data=payload, context={'request': request})
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        inventory = serializer.save()
+
+        # Attach images if provided in the same request
+        self._create_images_from_request(inventory, request)
+
+        headers = self.get_success_headers(serializer.data)
+        response_data = self.get_serializer(inventory).data
+        return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
     
     def get_queryset(self):
         """
@@ -276,16 +321,16 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         }
         return Response(pricing_data)
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser])
     def add_image(self, request, pk=None):
         """
         Add an image to an inventory item
         """
         inventory = self.get_object()
-        serializer = InventoryImageSerializer(data={
-            **request.data,
-            'inventory': inventory.id
-        })
+        serializer = InventoryImageSerializer(
+            data={**request.data, 'inventory': inventory.id},
+            context={'request': request}
+        )
         
         if serializer.is_valid():
             serializer.save()
