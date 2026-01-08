@@ -494,9 +494,12 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             instance.save(update_fields=['is_removed', 'modified'])
             return
 
-        # Tenant admin can delete if they manage the tenant
+        # Tenant admin can delete if they manage the tenant or the branch
+        # belongs to their tenant (covers records with tenant unset but branch set)
         if User and getattr(user, 'role', None) == User.Role.ADMIN:
-            if can_manage_tenant(user, getattr(instance, 'tenant', None)):
+            tenant = getattr(instance, 'tenant', None)
+            branch = getattr(instance, 'branch', None)
+            if can_manage_tenant(user, tenant) or can_manage_branch_resources(user, branch):
                 instance.is_removed = True
                 instance.save(update_fields=['is_removed', 'modified'])
                 return
