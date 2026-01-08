@@ -318,9 +318,9 @@ class InventoryImage(BaseModel):
     
     def save(self, *args, **kwargs):
         # If this is set as primary, unset other primary images
-        if self.is_primary:
+        if self.is_primary and self.inventory_id:
             InventoryImage.objects.filter(
-                inventory=self.inventory,
+                inventory_id=self.inventory_id,
                 is_primary=True
             ).exclude(pk=self.pk).update(is_primary=False)
         super().save(*args, **kwargs)
