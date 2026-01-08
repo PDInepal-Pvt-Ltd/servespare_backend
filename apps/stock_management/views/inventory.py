@@ -490,7 +490,7 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                         'row': row_num,
                         'data': row,
                         'errors': errors
-                    })
+                     })
                     continue
                 
                 # Validate and create inventory item
