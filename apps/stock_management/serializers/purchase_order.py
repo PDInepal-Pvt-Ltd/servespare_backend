@@ -64,6 +64,10 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
         if 'branch' not in validated_data and validated_data.get('purchase_order'):
             po = validated_data['purchase_order']
             validated_data['branch'] = getattr(po, 'branch', None)
+        # Ensure tenant follows parent PO if missing
+        if not validated_data.get('tenant') and validated_data.get('purchase_order'):
+            po = validated_data['purchase_order']
+            validated_data['tenant'] = getattr(po, 'tenant', None)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -137,14 +141,20 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 
         # Fallback: derive tenant/branch from supplier if still missing
         try:
-            if not validated_data.get('tenant') and validated_data.get('supplier'):
-                supplier_id = validated_data.get('supplier')
-                supplier = Party.objects.filter(id=supplier_id).only('tenant_id', 'branch_id').first()
-                if supplier:
-                    if not validated_data.get('tenant'):
-                        validated_data['tenant'] = supplier.tenant
-                    if 'branch' not in validated_data and getattr(supplier, 'branch', None):
-                        validated_data['branch'] = supplier.branch
+            supplier_obj = validated_data.get('supplier')
+            supplier = None
+            if supplier_obj:
+                # supplier_obj may be a PK or a Party instance; resolve robustly
+                if isinstance(supplier_obj, Party):
+                    supplier = supplier_obj
+                else:
+                    supplier = Party.objects.filter(id=supplier_obj).only('tenant_id', 'branch_id').first()
+
+            if supplier:
+                if not validated_data.get('tenant'):
+                    validated_data['tenant'] = supplier.tenant
+                if 'branch' not in validated_data and getattr(supplier, 'branch', None):
+                    validated_data['branch'] = supplier.branch
         except Exception:
             # If supplier lookup fails, proceed without overriding
             pass
