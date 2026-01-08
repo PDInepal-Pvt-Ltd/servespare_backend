@@ -33,6 +33,10 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
             'modified'
         ]
         read_only_fields = ['id', 'tenant', 'created', 'modified', 'subtotal', 'tax_amount', 'total_price']
+        # Allow nested create (via PurchaseOrderCreateWithItemsSerializer) without requiring purchase_order in each item
+        extra_kwargs = {
+            'purchase_order': {'required': False}
+        }
     
     def validate_quantity(self, value):
         """Validate quantity"""
@@ -163,7 +167,7 @@ class PurchaseOrderCreateWithItemsSerializer(PurchaseOrderSerializer):
 
             for item_data in items_data:
                 item_serializer = PurchaseOrderItemSerializer(
-                    data={**item_data, 'purchase_order': purchase_order.id},
+                    data={**item_data, 'purchase_order': purchase_order},
                     context=self.context
                 )
                 item_serializer.is_valid(raise_exception=True)
