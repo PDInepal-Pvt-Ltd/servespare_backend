@@ -1,5 +1,6 @@
+from django.db import transaction
 from rest_framework import serializers
-from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem
+from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem, Party
 from apps.stock_management.serializers.party import PartySerializer
 
 
@@ -32,6 +33,10 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
             'modified'
         ]
         read_only_fields = ['id', 'tenant', 'created', 'modified', 'subtotal', 'tax_amount', 'total_price']
+        # Allow nested create (via PurchaseOrderCreateWithItemsSerializer) without requiring purchase_order in each item
+        extra_kwargs = {
+            'purchase_order': {'required': False}
+        }
     
     def validate_quantity(self, value):
         """Validate quantity"""
@@ -59,6 +64,10 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
         if 'branch' not in validated_data and validated_data.get('purchase_order'):
             po = validated_data['purchase_order']
             validated_data['branch'] = getattr(po, 'branch', None)
+        # Ensure tenant follows parent PO if missing
+        if not validated_data.get('tenant') and validated_data.get('purchase_order'):
+            po = validated_data['purchase_order']
+            validated_data['tenant'] = getattr(po, 'tenant', None)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -129,10 +138,64 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             # Default branch to user's branch if not provided
             if 'branch' not in validated_data and getattr(request.user, 'branch', None):
                 validated_data['branch'] = request.user.branch
+
+        # Fallback: derive tenant/branch from supplier if still missing
+        try:
+            supplier_obj = validated_data.get('supplier')
+            supplier = None
+            if supplier_obj:
+                # supplier_obj may be a PK or a Party instance; resolve robustly
+                if isinstance(supplier_obj, Party):
+                    supplier = supplier_obj
+                else:
+                    supplier = Party.objects.filter(id=supplier_obj).only('tenant_id', 'branch_id').first()
+
+            if supplier:
+                if not validated_data.get('tenant'):
+                    validated_data['tenant'] = supplier.tenant
+                if 'branch' not in validated_data and getattr(supplier, 'branch', None):
+                    validated_data['branch'] = supplier.branch
+        except Exception:
+            # If supplier lookup fails, proceed without overriding
+            pass
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
         # Prevent tenant override via serializer
         validated_data.pop('tenant', None)
         return super().update(instance, validated_data)
+
+
+class PurchaseOrderCreateWithItemsSerializer(PurchaseOrderSerializer):
+    """
+    Create a purchase order and its items in one request.
+    """
+    items = PurchaseOrderItemSerializer(many=True, write_only=True)
+    items_detail = PurchaseOrderItemSerializer(source='items', many=True, read_only=True)
+
+    class Meta(PurchaseOrderSerializer.Meta):
+        fields = PurchaseOrderSerializer.Meta.fields + ['items', 'items_detail']
+        read_only_fields = PurchaseOrderSerializer.Meta.read_only_fields + ['items_detail']
+
+    def validate_items(self, value):
+        """Require at least one item when creating together."""
+        if not value:
+            raise serializers.ValidationError("At least one item is required.")
+        return value
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+
+        with transaction.atomic():
+            purchase_order = super().create(validated_data)
+
+            for item_data in items_data:
+                item_serializer = PurchaseOrderItemSerializer(
+                    data={**item_data, 'purchase_order': purchase_order.id},
+                    context=self.context
+                )
+                item_serializer.is_valid(raise_exception=True)
+                item_serializer.save()
+
+        return purchase_order
 

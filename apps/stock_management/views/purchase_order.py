@@ -5,7 +5,11 @@ from rest_framework.response import Response
 from django.db.models import Sum, F, DecimalField, Q
 from django.db.models.functions import Coalesce
 from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem
-from apps.stock_management.serializers import PurchaseOrderSerializer, PurchaseOrderItemSerializer
+from apps.stock_management.serializers import (
+    PurchaseOrderSerializer,
+    PurchaseOrderItemSerializer,
+    PurchaseOrderCreateWithItemsSerializer,
+)
 from apps.base.drf import TenantViewSetMixin
 from apps.base.pagination import StandardResultsSetPagination
 from apps.base.permission_utils import get_tenant_queryset_for_user, get_branch_queryset_for_user
@@ -17,8 +21,15 @@ class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     """
     queryset = PurchaseOrder.objects.select_related('supplier').prefetch_related('items').all()
     serializer_class = PurchaseOrderSerializer
+    # lookup_value_regex = r"\d+"  # avoid pk/action collisions for custom routes
     permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
+
+    def get_serializer_class(self):
+        """Use combined serializer for bulk create with items."""
+        if self.action == 'create_with_items':
+            return PurchaseOrderCreateWithItemsSerializer
+        return super().get_serializer_class()
     
     def get_queryset(self):
         """
@@ -84,6 +95,21 @@ class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='create-with-items')
+    def create_with_items(self, request):
+        """
+        Create a purchase order and its items in a single request.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        purchase_order = serializer.save()
+
+        output_serializer = PurchaseOrderSerializer(
+            purchase_order,
+            context=self.get_serializer_context()
+        )
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['get'])
     def statistics(self, request):
