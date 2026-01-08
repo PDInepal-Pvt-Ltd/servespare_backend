@@ -167,7 +167,7 @@ class PurchaseOrderCreateWithItemsSerializer(PurchaseOrderSerializer):
 
             for item_data in items_data:
                 item_serializer = PurchaseOrderItemSerializer(
-                    data={**item_data, 'purchase_order': purchase_order},
+                    data={**item_data, 'purchase_order': purchase_order.id},
                     context=self.context
                 )
                 item_serializer.is_valid(raise_exception=True)
