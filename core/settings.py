@@ -36,6 +36,7 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     'unopinionated-kiddingly-verline.ngrok-free.dev',
+    'imspravidhi.vercel.app',
 ]
 
 # Allow localhost and ngrok host for CSRF and CORS (used by corsheaders middleware)
@@ -43,19 +44,16 @@ ALLOWED_HOSTS = [
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'https://unopinionated-kiddingly-verline.ngrok-free.dev',
+    'https://imspravidhi.vercel.app',
 ]
 
 # If you need cross-origin requests from frontend, explicitly allow it via django-cors-headers settings.
+# Consolidated to avoid duplicate assignments.
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
+    'http://localhost:3001',
     'https://unopinionated-kiddingly-verline.ngrok-free.dev',
-    
-]
-
-# CORS Settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:3001",
+    'https://imspravidhi.vercel.app',
 ]
 
 CORS_ALLOW_CREDENTIALS = True
