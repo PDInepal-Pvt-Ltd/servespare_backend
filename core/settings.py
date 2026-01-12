@@ -33,6 +33,8 @@ SECRET_KEY = config(
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = [
+    'backend.ervespare.xyz',
+    'ervespare.xyz',
     'localhost',
     '127.0.0.1',
     'unopinionated-kiddingly-verline.ngrok-free.dev',
