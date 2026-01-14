@@ -30,11 +30,13 @@ SECRET_KEY = config(
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # Controlled via environment. Example in env.example: DEBUG=True
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = [
-    'backend.ervespare.xyz',
-    'ervespare.xyz',
+    'backend.servespare.xyz',
+    'www.backend.servespare.xyz',
+    'www.imspravidhi.vercel.app',
+    'servespare.xyz',
     'localhost',
     '127.0.0.1',
     'unopinionated-kiddingly-verline.ngrok-free.dev',
@@ -47,6 +49,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'https://unopinionated-kiddingly-verline.ngrok-free.dev',
     'https://imspravidhi.vercel.app',
+    'https://backend.servespare.xyz',
+    'https://servespare.xyz',
 ]
 
 # If you need cross-origin requests from frontend, explicitly allow it via django-cors-headers settings.
@@ -56,6 +60,8 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:3001',
     'https://unopinionated-kiddingly-verline.ngrok-free.dev',
     'https://imspravidhi.vercel.app',
+    'https://backend.servespare.xyz',
+    'https://servespare.xyz',
 ]
 
 CORS_ALLOW_CREDENTIALS = True
