@@ -174,7 +174,10 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         Permissions:
         - me, update_profile, change_password: User must be authenticated
         - list, retrieve: Must be authenticated, filtering applied by role
-        - create, update, destroy, reset_password: Super Admin or Tenant Admin
+        - create: 
+            * Customer role: No JWT required (AllowAny)
+            * Other roles: Super Admin or Tenant Admin only (IsAuthenticated + CanManageTenantUsers)
+        - update, destroy, reset_password: Super Admin or Tenant Admin
         """
         if self.action in ['me', 'update_profile', 'change_password', 'first_time_password_change']:
             # Any authenticated user can access their own profile
@@ -182,10 +185,19 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         elif self.action == 'get_password_change_token':
             # Public endpoint
             permission_classes = [AllowAny]
+        elif self.action == 'create':
+            # Special handling for user creation
+            # Check if this is a customer creation (no JWT required)
+            role = self.request.data.get('role', '').lower() if hasattr(self, 'request') else None
+            if role == 'customer' or not role:  # Default to customer if no role specified
+                permission_classes = [AllowAny]
+            else:
+                # Other roles require authentication and proper permissions
+                permission_classes = [IsAuthenticated, CanManageTenantUsers]
         elif self.action in ['update', 'partial_update'] and self._is_self_request():
             # Allow any authenticated user (including customers) to update their own profile
             permission_classes = [IsAuthenticated]
-        elif self.action in ['create', 'update', 'partial_update', 'destroy',
+        elif self.action in ['update', 'partial_update', 'destroy',
                              'reset_password', 'update_status', 'update_role', 'bulk_action']:
             # Only Super Admin or Tenant Admin can manage other users
             permission_classes = [IsAuthenticated, CanManageTenantUsers]
@@ -877,11 +889,40 @@ class AuthViewSet(viewsets.GenericViewSet):
         POST /api/auth/register/
         Body: {username, email, password, password_confirm, full_name, phone, role (optional)}
         
-        Super Admin/Admin can optionally assign a role during registration by including 'role' field.
+        Special cases:
+        - Customer role: No JWT token required (public endpoint)
+        - Other roles (admin, sub_admin, etc.): JWT token required (must be authenticated)
+        - Super Admin role: Can only be created from terminal management command
+        
         If not provided, defaults to CUSTOMER role.
         """
         serializer = UserRegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        # Get the role from the request (defaults to customer if not specified)
+        requested_role = request.data.get('role', 'customer').lower()
+        
+        # Super Admin can only be created via management command, not through API
+        if requested_role == User.Role.SUPER_ADMIN:
+            return Response(
+                {'error': 'Super Admin users can only be created via terminal management command.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if user is trying to create a non-customer role without JWT
+        if requested_role != User.Role.CUSTOMER:
+            # Non-customer roles require authentication
+            if not request.user or not request.user.is_authenticated:
+                return Response(
+                    {'error': f'JWT token is required to create {requested_role.replace("_", " ")} users. Please authenticate first.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            # Check if the authenticated user has permission to create this role
+            if not (is_super_admin(request.user) or is_tenant_admin(request.user)):
+                return Response(
+                    {'error': f'You do not have permission to create {requested_role.replace("_", " ")} users.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
         
         # Get the raw password before it's hashed
         raw_password = serializer.validated_data.get('password')
