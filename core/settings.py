@@ -133,6 +133,18 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+# DATABASES = {
+# 'default': {
+# 'ENGINE': 'django.db.backends.mysql',
+# 'NAME': 'servesp1_servespare',
+# 'HOST': 'localhost',
+# 'PORT': '3306',
+# 'USER': 'servesp1_admin',
+# 'PASSWORD' :'github.com'
+
+# }
+    
+# }
 
 
 # Password validation
