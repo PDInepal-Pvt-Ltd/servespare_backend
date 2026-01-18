@@ -210,6 +210,19 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             raise PermissionDenied("You do not have permission to access this inventory item.")
     
     @action(detail=False, methods=['get'])
+    def recent(self, request):
+        """
+        Get the 3 most recently added products
+        GET /api/inventory/recent/
+        """
+        recent_items = self.filter_queryset(Inventory.objects.filter(
+            is_active=True
+        ).select_related('party').prefetch_related('images').order_by('-created')[:3])
+
+        serializer = self.get_serializer(recent_items, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
     def low_stock(self, request):
         """
         Get all items with low stock (quantity <= min_stock_level)
