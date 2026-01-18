@@ -12,17 +12,27 @@ from .models import OTP # Assuming this is your OTP model
 
 def generate_and_save_otp(user):
     """
-    Generates a 6-digit code securely, calculates expiry, and saves/updates the OTP record.
+    Generates a 6-digit code securely, calculates expiry, and saves the OTP record.
+    Deletes old OTPs for the user to prevent conflicts.
     Returns the OTP instance.
     """
-    code = ''.join(secrets.choice('0123456789') for _ in range(6))
-    expires_at = timezone.now() + timedelta(minutes=5)
-    
-    otp, _ = OTP.objects.update_or_create(
-        user=user, 
-        defaults={'code': code, 'expires_at': expires_at}
-    )
-    return otp
+    try:
+        # Delete any existing OTPs for this user
+        OTP.objects.filter(user=user).delete()
+        
+        code = ''.join(secrets.choice('0123456789') for _ in range(6))
+        expires_at = timezone.now() + timedelta(minutes=5)
+        
+        otp = OTP.objects.create(
+            user=user, 
+            code=code, 
+            expires_at=expires_at
+        )
+        print(f"OTP generated successfully for user {user.get_username()}: {code}")
+        return otp
+    except Exception as e:
+        print(f"Error generating OTP for user {user.get_username()}: {e}")
+        raise
 
 
 def send_otp_email(user, otp_code):
@@ -72,7 +82,14 @@ def send_otp_email(user, otp_code):
     )
     
     try:
-        # 4. Use EmailMultiAlternatives to send the email
+        # 4. Verify email credentials are configured
+        if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
+            print(f"Warning: EMAIL_HOST_USER or EMAIL_HOST_PASSWORD not configured.")
+            print(f"Current EMAIL_BACKEND: {settings.EMAIL_BACKEND}")
+            if settings.DEBUG:
+                print("DEBUG mode enabled - email will be sent to console.")
+        
+        # 5. Use EmailMultiAlternatives to send the email
         email = EmailMultiAlternatives(
             subject,
             plain_message,
@@ -80,11 +97,14 @@ def send_otp_email(user, otp_code):
             [user.email],
         )
         
-        # 5. Attach the HTML version
+        # 6. Attach the HTML version
         email.attach_alternative(html_message, "text/html")
         
-        email.send(fail_silently=False)
+        result = email.send(fail_silently=False)
+        print(f"OTP email sent successfully to {user.email}. Message count: {result}")
         return True
     except Exception as e:
-        print(f"Failed to send OTP email. Error: {e}")
+        print(f"Failed to send OTP email to {user.email}. Error: {e}")
+        import traceback
+        traceback.print_exc()
         return False

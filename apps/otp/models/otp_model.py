@@ -11,11 +11,11 @@ User = settings.AUTH_USER_MODEL
 
 class OTP(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    # OneToOneField ensures a user only has one active OTP entry at a time
-    user = models.OneToOneField(
+    # ForeignKey allows multiple OTPs per user (for resend scenarios)
+    user = models.ForeignKey(
         User, 
         on_delete=models.CASCADE, 
-        related_name='otp_record'
+        related_name='otp_records'
     )
     code = models.CharField(max_length=6, verbose_name=_("OTP Code"))
     created_at = models.DateTimeField(auto_now_add=True)
