@@ -33,11 +33,12 @@ class User(AbstractUser, BaseModel):
         INACTIVE = 'inactive', _('Inactive')
         SUSPENDED = 'suspended', _('Suspended')
     
-    # Email field (not unique, username is used for login)
+    # Email field (unique, username is used for login)
     email = models.EmailField(
         _('email address'),
         blank=True,
         null=True,
+        unique=True,
         db_index=True,
         help_text=_('Email address for the user.')
     )
@@ -58,6 +59,7 @@ class User(AbstractUser, BaseModel):
         max_length=20,
         null=True,
         blank=True,
+        unique=True,
         db_index=True,
         help_text=_('Contact phone number.')
     )
