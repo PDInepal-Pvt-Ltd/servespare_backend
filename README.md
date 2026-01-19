@@ -205,7 +205,6 @@ GET    /api/tenant/{id}/users/      # Get users of tenant
 |------|-------|-------------|
 | **SUPER_ADMIN** | Global | Full system access, manage all tenants, all users, all data |
 | **ADMIN** | Tenant | Manage own tenant, add/remove users, configure settings, view reports |
-| **TENANT_USER** | Tenant | View tenant data, readonly access, manage own profile |
 | **CUSTOMER** | Tenant | Browse products, manage cart, place orders, view order history |
 | **INVENTORY MANAGER** | Branch |  Manage own Branch, add/remove product, view reports |
 | **CASHIER** | Branch |  Manage own Branch's bill,manage the shifts |
