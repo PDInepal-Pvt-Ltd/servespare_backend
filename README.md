@@ -574,7 +574,7 @@ python manage.py seed_db
 - **INVOICE_IMPLEMENTATION.md** — Invoice system architecture
 
 ### Postman Collections
-- Located in [docs/postman_collections/](docs/postman_collections/)
+- Located in [https://backend.servespare.xyz/api/docs/]
 - Pre-configured requests for all major endpoints
 - Includes auth setup, test data, example payloads
 
@@ -786,25 +786,4 @@ python manage.py migrate apps.users 0001_initial  # Specific app/migration
 
 ---
 
-## 33. Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Tenant filter not working | Ensure TenantMiddleware is in MIDDLEWARE list; user.tenant must be set |
-| JWT token expired | Use `/api/token/refresh/` endpoint with refresh token |
-| CORS blocked | Check CORS_ALLOWED_ORIGINS in settings.py for frontend domain |
-| Email not sending | Verify EMAIL_HOST_USER & EMAIL_HOST_PASSWORD in .env; test with console backend first (DEBUG=True) |
-| Static files 404 | Run `python manage.py collectstatic` in production |
-
----
-
-## 34. Contact & Support
-
-**Project Owner:** ServeIQ Team  
-**Repository:** [link to repo]  
-**Issue Tracker:** [GitHub Issues]  
-**Postman Collections:** docs/postman_collections/  
-
----
-
-**End of Report** | Generated 2026-01-19
+**End of Report** 
