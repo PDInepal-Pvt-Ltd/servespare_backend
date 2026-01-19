@@ -207,6 +207,9 @@ GET    /api/tenant/{id}/users/      # Get users of tenant
 | **ADMIN** | Tenant | Manage own tenant, add/remove users, configure settings, view reports |
 | **TENANT_USER** | Tenant | View tenant data, readonly access, manage own profile |
 | **CUSTOMER** | Tenant | Browse products, manage cart, place orders, view order history |
+| **INVENTORY MANAGER** | Branch |  Manage own Branch, add/remove product, view reports |
+| **CASHIER** | Branch |  Manage own Branch's bill,manage the shifts |
+
 
 ### Permission Classes
 - `@permission_classes([IsAuthenticated])` — Default (all authenticated)
@@ -406,15 +409,13 @@ GET    /api/branch/{id}/staff/          # Get branch staff
 ### Middleware Order (from [core/settings.py](core/settings.py))
 1. **SecurityMiddleware** — HSTS, XSS protection
 2. **CorsMiddleware** — CORS headers (before session)
-3. **SessionMiddleware** — Session support
-4. **CommonMiddleware** — Common headers
-5. **CsrfViewMiddleware** — CSRF token validation
-6. **AuthenticationMiddleware** — User identification
-7. **TenantMiddleware** — Extract & set request.tenant
-8. **AuditMiddleware** — Log all requests
-9. **AccountMiddleware** — django-allauth
-10. **MessageMiddleware** — Message framework
-11. **XFrameOptionsMiddleware** — Clickjacking protection
+3. **CommonMiddleware** — Common headers
+4. **CsrfViewMiddleware** — CSRF token validation
+5. **AuthenticationMiddleware** — User identification
+6. **TenantMiddleware** — Extract & set request.tenant
+7. **AuditMiddleware** — Log all requests
+8. **AccountMiddleware** — django-allauth
+
 
 ### Security Settings
 - **CSRF_TRUSTED_ORIGINS:** backend.servespare.xyz, localhost:3000, imspravidhi.vercel.app
