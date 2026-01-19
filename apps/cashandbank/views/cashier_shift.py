@@ -519,9 +519,11 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         Request body:
         {
             "counted_cash": 2000.00,
-            "transferred_to": "John Doe",
+            "transferred_to_id": 5,
             "variance_reason": "Optional: reason if variance"
         }
+        
+        Note: transferred_to_id must be a valid cashier ID in the same branch/tenant
         """
         from apps.cashandbank.serializers import ShiftTransferInputSerializer
 
@@ -538,7 +540,7 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         counted_cash = serializer.validated_data['counted_cash']
-        transferred_to = serializer.validated_data['transferred_to']
+        transferred_to = serializer.validated_data['transferred_to_id']  # Now a User object
         variance_reason = serializer.validated_data.get('variance_reason', '')
 
         expected = shift.expected_amount or Decimal('0.00')
@@ -596,7 +598,7 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         Request body:
         {
             "counted_cash": 2000.00,
-            "transferred_to": "John Doe",
+            "transferred_to_id": 5,
             "variance_reason": "Miscounted during count"
         }
         """
@@ -615,7 +617,7 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         counted_cash = serializer.validated_data['counted_cash']
-        transferred_to = serializer.validated_data['transferred_to']
+        transferred_to = serializer.validated_data['transferred_to_id']  # Now a User object
         variance_reason = serializer.validated_data.get('variance_reason', '')
 
         expected = shift.expected_amount or Decimal('0.00')
