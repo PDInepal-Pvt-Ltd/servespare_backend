@@ -524,27 +524,9 @@ From:     noreply@serveiq.com (configurable)
 - OTP delivery
 - Admin notifications
 
----
 
-## 23. Testing & Quality Assurance
 
-### Test Structure
-- **test_urls.py** — URL routing tests (root level)
-- **apps/*/tests.py** — Per-app test suites
-  - Unit tests for models, serializers
-  - Integration tests for views/API
-  - Permission & authentication tests
-
-### Run Tests
-```bash
-python manage.py test
-python manage.py test apps.users
-python manage.py test --verbosity=2
-```
-
----
-
-## 24. Data Seeding & Fixtures
+## 23. Data Seeding & Fixtures
 
 ### Seeds App ([seeds/](seeds/))
 - **seed_data.json** — Initial sample data (users, tenants, products, orders)
@@ -558,20 +540,7 @@ python manage.py loaddata seeds/seed_data.json
 python manage.py seed_db
 ```
 
----
-
-## 25. Project Documentation
-
-
-
-### Postman Collections
-- Located in [https://backend.servespare.xyz/api/docs/]
-- Pre-configured requests for all major endpoints
-- Includes auth setup, test data, example payloads
-
----
-
-## 26. Deployment & Runtime
+## 24. Deployment & Runtime
 
 ### Requirements
 ```
@@ -609,7 +578,7 @@ python manage.py runserver
 
 ---
 
-## 27. Key Integrations & Features
+## 25. Key Integrations & Features
 
 ### Multi-Tenancy
 ✅ Tenant isolation at middleware level  
@@ -647,7 +616,7 @@ python manage.py runserver
 
 ---
 
-## 28. Notable Patterns & Best Practices
+## 26. Notable Patterns & Best Practices
 
 1. **BaseModel Abstract Class** — All domain models inherit from BaseModel for consistent timestamps & soft deletes
 2. **TenantFilterBackend** — Global DRF filter ensures tenant isolation at query level
@@ -659,7 +628,7 @@ python manage.py runserver
 
 ---
 
-## 29. API Response Format
+## 27. API Response Format
 
 ### Standard Success Response
 ```json
@@ -695,7 +664,7 @@ or
 
 ---
 
-## 30. Summary Table
+## 28. Summary Table
 
 | Component | Tech | Purpose |
 |-----------|------|---------|
@@ -712,7 +681,7 @@ or
 
 ---
 
-## 31. Getting Started for New Developers
+## 29. Getting Started for New Developers
 
 ### 1. Clone & Setup
 ```bash
@@ -745,13 +714,13 @@ python manage.py runserver
 ```
 
 ### 5. Explore API
-- ReDoc Docs: http://localhost:8000/api/docs/
+- ReDoc Docs: http://localhost:8000/api/docs/ or https://backend.servespare.xyz/api/docs/
 - OpenAPI Schema: http://localhost:8000/api/docs/schema/
 - Test endpoints via Postman collections in docs/postman_collections/
 
 ---
 
-## 32. Common Workflows
+## 30. Common Workflows
 
 ### Add a New API Endpoint
 1. Create model in `apps/myapp/models.py`
