@@ -123,7 +123,7 @@ User registration, authentication, profile management, role assignment.
 
 ### Features
 - **Custom User Model:** `User` (AUTH_USER_MODEL = 'users.User')
-- **Roles:** SUPER_ADMIN, ADMIN, TENANT_USER, CUSTOMER
+- **Roles:** SUPER_ADMIN, ADMIN, INVENTORY MANAGER, CASHIER CUSTOMER
 - **JWT Authentication:** 5-hour access token, 7-day refresh token
 - **AllAuth Integration:** Email verification, password reset, social auth support
 
