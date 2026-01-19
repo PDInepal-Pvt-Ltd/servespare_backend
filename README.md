@@ -562,16 +562,7 @@ python manage.py seed_db
 
 ## 25. Project Documentation
 
-### Doc Files
-- **RBAC_IMPLEMENTATION.md** — Role-based access control details
-- **RBAC_QUICK_REFERENCE.md** — RBAC quick lookup
-- **BILL_SYSTEM_GUIDE.md** — Invoice & billing system
-- **LEDGER_SYNCHRONIZATION.md** — Cash & bank ledger sync
-- **CASHIER_SHIFT_API.md** — POS shift management
-- **API_STOCK_MANAGEMENT.md** — Inventory API guide
-- **API_SUBSCRIPTION.md** — Subscription plan endpoints
-- **API_TENANT.md** — Multi-tenancy guide
-- **INVOICE_IMPLEMENTATION.md** — Invoice system architecture
+
 
 ### Postman Collections
 - Located in [https://backend.servespare.xyz/api/docs/]
