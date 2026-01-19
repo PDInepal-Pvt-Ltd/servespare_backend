@@ -103,12 +103,44 @@ class PurchaseOrder(BaseModel):
     objects = TenantManager()
     
     def clean(self):
-        """Validate dates"""
+        """Validate all fields"""
+        errors = {}
+        
+        # Validate po_number
+        if not self.po_number or not self.po_number.strip():
+            errors['po_number'] = 'PO number is required.'
+        elif len(self.po_number) < 2:
+            errors['po_number'] = 'PO number must be at least 2 characters.'
+        
+        # Validate supplier
+        if not self.supplier:
+            errors['supplier'] = 'Supplier is required.'
+        elif self.supplier.party_type != 'supplier':
+            errors['supplier'] = 'Selected party must be a supplier.'
+        
+        # Validate order_date
+        if not self.order_date:
+            errors['order_date'] = 'Order date is required.'
+        
+        # Validate expected_delivery_date
         if self.expected_delivery_date and self.order_date:
             if self.expected_delivery_date < self.order_date:
-                raise ValidationError({
-                    'expected_delivery_date': 'Expected delivery date cannot be before order date.'
-                })
+                errors['expected_delivery_date'] = 'Expected delivery date cannot be before order date.'
+        
+        # Validate status
+        if not self.status:
+            errors['status'] = 'Status is required.'
+        
+        # Validate notes
+        if self.notes and len(self.notes) > 5000:
+            errors['notes'] = 'Notes cannot exceed 5000 characters.'
+        
+        # Validate terms_and_condition
+        if self.terms_and_condition and len(self.terms_and_condition) > 5000:
+            errors['terms_and_condition'] = 'Terms and conditions cannot exceed 5000 characters.'
+        
+        if errors:
+            raise ValidationError(errors)
     
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -201,15 +233,45 @@ class PurchaseOrderItem(BaseModel):
     objects = TenantManager()
     
     def clean(self):
-        """Validate item data"""
-        if self.quantity <= 0:
-            raise ValidationError({
-                'quantity': 'Quantity must be greater than zero.'
-            })
+        """Validate all fields"""
+        errors = {}
+        
+        # Validate item_name
+        if not self.item_name or not self.item_name.strip():
+            errors['item_name'] = 'Item name is required.'
+        elif len(self.item_name) < 2:
+            errors['item_name'] = 'Item name must be at least 2 characters.'
+        
+        # Validate part_number
+        if self.part_number and len(self.part_number) < 2:
+            errors['part_number'] = 'Part number must be at least 2 characters.'
+        
+        # Validate quantity
+        if not self.quantity or self.quantity <= 0:
+            errors['quantity'] = 'Quantity must be greater than zero.'
+        if self.quantity and self.quantity > 999999.99:
+            errors['quantity'] = 'Quantity cannot exceed 999,999.99.'
+        
+        # Validate unit_price
         if self.unit_price < 0:
-            raise ValidationError({
-                'unit_price': 'Unit price cannot be negative.'
-            })
+            errors['unit_price'] = 'Unit price cannot be negative.'
+        if self.unit_price > 999999.99:
+            errors['unit_price'] = 'Unit price cannot exceed 999,999.99.'
+        
+        # Validate tax
+        if self.tax < 0:
+            errors['tax'] = 'Tax percentage cannot be negative.'
+        if self.tax > 100:
+            errors['tax'] = 'Tax percentage cannot exceed 100%.'
+        
+        # Validate discount_description
+        if self.discount_description and len(self.discount_description) < 2:
+            errors['discount_description'] = 'Discount description must be at least 2 characters.'
+        if self.discount_description and len(self.discount_description) > 255:
+            errors['discount_description'] = 'Discount description cannot exceed 255 characters.'
+        
+        if errors:
+            raise ValidationError(errors)
     
     def save(self, *args, **kwargs):
         self.full_clean()

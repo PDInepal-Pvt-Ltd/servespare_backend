@@ -1,7 +1,50 @@
+import re
 from django.db import models
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 from apps.base.models import BaseModel
 from apps.base.managers import TenantManager
 from apps.stock_management.models import Inventory
+
+
+def validate_phone_number(value):
+    """
+    Validate Nepali phone number format.
+    Accepts:
+    - Mobile: 10 digits starting with 97 or 98 (e.g., 9841234567)
+    - Landline: 6-8 digits with area code (e.g., 01-4445678)
+    - International format: +977 followed by mobile/landline
+    - Formats accepted: with/without spaces, hyphens, parentheses
+    """
+    if not value:
+        return
+
+    cleaned = re.sub(r'[\s\-\(\)]', '', value)
+
+    if cleaned.startswith('+977'):
+        cleaned = cleaned[4:]
+    elif cleaned.startswith('977'):
+        cleaned = cleaned[3:]
+
+    if not cleaned.isdigit():
+        raise ValidationError(
+            _('Phone number must contain only digits, spaces, hyphens, parentheses, or +977 for international format.'),
+            code='invalid_phone_format'
+        )
+
+    if len(cleaned) == 10:
+        if not (cleaned.startswith('97') or cleaned.startswith('98')):
+            raise ValidationError(
+                _('Nepali mobile number must start with 97 or 98.'),
+                code='invalid_mobile_prefix'
+            )
+    elif 6 <= len(cleaned) <= 8:
+        pass
+    else:
+        raise ValidationError(
+            _('Phone number must be either 10 digits (mobile) or 6-8 digits (landline).'),
+            code='invalid_phone_length'
+        )
 
 
 class Bill(BaseModel):
@@ -187,34 +230,92 @@ class Bill(BaseModel):
         return total if total >= 0 else 0
 
     def clean(self):
-        from django.core.exceptions import ValidationError
+        errors = {}
 
-        if self.price is not None and self.price < 0:
-            raise ValidationError({
-                'price': 'Price cannot be negative.'
-            })
+        # Customer info validation
+        if not self.customer_name or not self.customer_name.strip():
+            errors['customer_name'] = 'Customer name is required.'
+        elif len(self.customer_name.strip()) < 2:
+            errors['customer_name'] = 'Customer name must be at least 2 characters.'
+        elif len(self.customer_name.strip()) > 255:
+            errors['customer_name'] = 'Customer name cannot exceed 255 characters.'
+
+        if not self.customer_type:
+            errors['customer_type'] = 'Customer type is required.'
+
+        if self.address:
+            addr = self.address.strip()
+            if len(addr) < 5:
+                errors['address'] = 'Address must be at least 5 characters when provided.'
+            elif len(addr) > 2000:
+                errors['address'] = 'Address cannot exceed 2000 characters.'
+
+        if self.phone_numbers:
+            phones = [p.strip() for p in self.phone_numbers.split(',') if p.strip()]
+            if not phones:
+                errors['phone_numbers'] = 'Provide at least one phone number or leave blank.'
+            for phone in phones:
+                try:
+                    validate_phone_number(phone)
+                except ValidationError as exc:
+                    errors['phone_numbers'] = '; '.join(exc.messages)
+                    break
+                if len(phone) > 20:
+                    errors['phone_numbers'] = 'Each phone number cannot exceed 20 characters.'
+                    break
+
+        if self.pan_vat_number:
+            pan_val = self.pan_vat_number.strip()
+            if not pan_val.isdigit():
+                errors['pan_vat_number'] = 'PAN/VAT number must be numeric.'
+            elif len(pan_val) != 9:
+                errors['pan_vat_number'] = 'PAN/VAT number must be exactly 9 digits.'
+
+        # Billing fields
+        if self.price is not None:
+            if self.price < 0:
+                errors['price'] = 'Price cannot be negative.'
+            elif self.price > 999999.99:
+                errors['price'] = 'Price cannot exceed 999,999.99.'
 
         if self.discount_value is None:
             self.discount_value = 0
 
         if self.discount_value < 0:
-            raise ValidationError({
-                'discount_value': 'Discount value cannot be negative.'
-            })
+            errors['discount_value'] = 'Discount value cannot be negative.'
+        elif self.discount_value > 999999.99:
+            errors['discount_value'] = 'Discount value cannot exceed 999,999.99.'
+
+        if not self.discount_method:
+            self.discount_method = 'amount'
+
+        if self.discount_method not in dict(self.DISCOUNT_METHOD_CHOICES):
+            errors['discount_method'] = 'Invalid discount method.'
 
         if self.discount_method == 'percentage':
             if self.discount_value is not None and self.discount_value > 100:
-                raise ValidationError({
-                    'discount_value': 'Percentage discount cannot exceed 100%.'
-                })
+                errors['discount_value'] = 'Percentage discount cannot exceed 100%.'
         else:  # amount or None
+            # Compare against price if provided, otherwise allow non-negative checked above
             if (
                 self.discount_value is not None and self.price is not None and
                 self.discount_value > self.price
             ):
-                raise ValidationError({
-                    'discount_value': 'Discount amount cannot exceed the price.'
-                })
+                errors['discount_value'] = 'Discount amount cannot exceed the price.'
+
+        # Payment fields
+        if not self.payment_method:
+            errors['payment_method'] = 'Payment method is required.'
+        elif self.payment_method not in dict(self.PAYMENT_METHOD_CHOICES):
+            errors['payment_method'] = 'Invalid payment method.'
+
+        if not self.status:
+            errors['status'] = 'Status is required.'
+        elif self.status not in dict(self.STATUS_CHOICES):
+            errors['status'] = 'Invalid status.'
+
+        if errors:
+            raise ValidationError(errors)
 
     objects = TenantManager()
 
@@ -300,11 +401,40 @@ class PurchaseItem(models.Model):
     def __str__(self):
         return f"{self.inventory.item_name} x {self.quantity}"
     
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        from decimal import Decimal
+
+        errors = {}
+
+        if not self.bill_id and not self.bill:
+            errors['bill'] = 'Bill is required.'
+
+        if not self.inventory_id and not self.inventory:
+            errors['inventory'] = 'Inventory item is required.'
+
+        if self.quantity is None:
+            errors['quantity'] = 'Quantity is required.'
+        elif self.quantity <= 0:
+            errors['quantity'] = 'Quantity must be greater than zero.'
+        elif self.quantity > Decimal('999999.99'):
+            errors['quantity'] = 'Quantity cannot exceed 999,999.99.'
+
+        price_value = self.price if self.price is not None else Decimal('0.00')
+        if price_value < 0:
+            errors['price'] = 'Price cannot be negative.'
+        elif price_value > Decimal('999999.99'):
+            errors['price'] = 'Price cannot exceed 999,999.99.'
+
+        if errors:
+            raise ValidationError(errors)
+    
     def save(self, *args, **kwargs):
         """Auto-populate price from inventory if not provided"""
-        if not self.price and self.inventory:
+        if (self.price is None or self.price == 0) and self.inventory:
             # Use retail_pricing if available, otherwise use base price
             self.price = self.inventory.retail_pricing or self.inventory.price or 0
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def total_price(self):

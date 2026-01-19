@@ -12,6 +12,7 @@ from apps.cashandbank.serializers import CashierShiftSerializer, ShiftTransactio
 from apps.base.drf import TenantViewSetMixin
 from apps.base.pagination import StandardResultsSetPagination
 from apps.base.permissions import CanManageBranchResources
+from apps.users.models import User
 
 
 class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
@@ -77,6 +78,48 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 {'detail': 'No active shift found'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+    @action(detail=False, methods=['get'])
+    def available_cashiers(self, request):
+        """
+        Get all available cashiers in the current user's branch and tenant.
+        
+        Returns active cashiers that can receive shift transfers.
+        Endpoint: GET /api/cash-and-bank/shifts/available_cashiers/
+        
+        Filters:
+        - Same branch as requesting user
+        - Same tenant as requesting user
+        - Role: Cashier
+        - Status: Active
+        - Not removed
+        """
+        user_branch = getattr(request.user, 'branch', None)
+        user_tenant = getattr(request.user, 'tenant', None)
+        
+        if not user_branch or not user_tenant:
+            return Response(
+                {'detail': 'User must have branch and tenant assigned'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get all active cashiers in same branch and tenant
+        available_cashiers = User.objects.filter(
+            tenant=user_tenant,
+            branch=user_branch,
+            role=User.Role.CASHIER,
+            status=User.Status.ACTIVE,
+            is_removed=False
+        ).values('id', 'username', 'full_name', 'email', 'phone').order_by('full_name')
+        
+        return Response({
+            'branch_id': user_branch.id,
+            'branch_name': user_branch.name,
+            'tenant_id': user_tenant.id,
+            'available_cashiers': list(available_cashiers),
+            'count': available_cashiers.count()
+        }, status=status.HTTP_200_OK)
+
 
     @action(detail=False, methods=['post'])
     def open(self, request):
@@ -430,6 +473,37 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         serializer = ShiftTransactionSerializer(transactions, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['get'])
+    def available_cashiers(self, request, pk=None):
+        """
+        Get list of available cashiers in the same branch/tenant for shift transfer.
+        
+        Returns list of active cashiers (excluding current cashier) in the same branch and tenant.
+        Endpoint: GET /api/cash-and-bank/shifts/{id}/available_cashiers/
+        """
+        shift = self.get_object()
+        
+        # Get all active cashiers in same branch and tenant, excluding current cashier
+        available_cashiers = User.objects.filter(
+            tenant=shift.tenant,
+            branch=shift.branch,
+            role=User.Role.CASHIER,
+            status=User.Status.ACTIVE,
+            is_removed=False
+        ).exclude(id=shift.cashier.id).values('id', 'username', 'full_name', 'email', 'phone')
+        
+        return Response({
+            'shift_id': shift.id,
+            'current_cashier': {
+                'id': shift.cashier.id,
+                'username': shift.cashier.username,
+                'full_name': shift.cashier.full_name,
+                'email': shift.cashier.email
+            },
+            'available_cashiers': list(available_cashiers),
+            'count': available_cashiers.count()
+        }, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=['post'])
     def transfer_shift(self, request, pk=None):
         """
@@ -473,13 +547,24 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         will_be_flagged = abs(variance) > Decimal('100.00')
 
         if has_variance and not variance_reason:
+            # Get available cashiers for the variance response
+            available_cashiers = User.objects.filter(
+                tenant=shift.tenant,
+                branch=shift.branch,
+                role=User.Role.CASHIER,
+                status=User.Status.ACTIVE,
+                is_removed=False
+            ).exclude(id=shift.cashier.id).values('id', 'username', 'full_name', 'email')
+            
             variance_data = {
                 'expected_amount': str(expected),
                 'counted_cash': str(counted_cash),
                 'variance_amount': str(variance),
                 'has_variance': True,
                 'will_be_flagged': will_be_flagged,
-                'detail': 'Variance detected; provide variance_reason to complete transfer.'
+                'detail': 'Variance detected; provide variance_reason to complete transfer.',
+                'available_cashiers': list(available_cashiers),
+                'cashiers_count': available_cashiers.count()
             }
             return Response(variance_data, status=status.HTTP_202_ACCEPTED)
 

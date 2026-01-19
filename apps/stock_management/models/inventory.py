@@ -205,7 +205,58 @@ class Inventory(BaseModel):
     objects = TenantManager()
     
     def clean(self):
-        """Validate pricing hierarchy: Distributor < Wholesale < Retail < MRP"""
+        """Validate all fields"""
+        errors = {}
+        
+        # Validate item_name
+        if not self.item_name or not self.item_name.strip():
+            errors['item_name'] = 'Item name is required.'
+        elif len(self.item_name) < 2:
+            errors['item_name'] = 'Item name must be at least 2 characters.'
+        
+        # Validate category
+        if not self.category:
+            errors['category'] = 'Category is required.'
+        
+        # Validate vehicle_type
+        if not self.vehicle_type:
+            errors['vehicle_type'] = 'Vehicle type is required.'
+        
+        # Validate part_number
+        if self.part_number and len(self.part_number) < 2:
+            errors['part_number'] = 'Part number must be at least 2 characters.'
+        
+        # Validate HSN code
+        if self.hsn_code:
+            if not self.hsn_code.isdigit():
+                errors['hsn_code'] = 'HSN code must contain only digits.'
+            elif len(self.hsn_code) != 8:
+                errors['hsn_code'] = 'HSN code must be exactly 8 digits.'
+        
+        # Validate quantity
+        if self.quantity < 0:
+            errors['quantity'] = 'Quantity cannot be negative.'
+        if self.quantity > 999999.99:
+            errors['quantity'] = 'Quantity cannot exceed 999,999.99.'
+        
+        # Validate min_stock_level
+        if self.min_stock_level < 0:
+            errors['min_stock_level'] = 'Minimum stock level cannot be negative.'
+        if self.min_stock_level > 999999.99:
+            errors['min_stock_level'] = 'Minimum stock level cannot exceed 999,999.99.'
+        
+        # Validate storage_location
+        if self.storage_location and len(self.storage_location) < 2:
+            errors['storage_location'] = 'Storage location must be at least 2 characters.'
+        
+        # Validate prices
+        for price_field in ['price', 'mrp', 'retail_pricing', 'wholesale_price', 'distributor_price']:
+            value = getattr(self, price_field, Decimal('0.00'))
+            if value < 0:
+                errors[price_field] = f'{price_field.replace("_", " ").title()} cannot be negative.'
+            if value > 999999.99:
+                errors[price_field] = f'{price_field.replace("_", " ").title()} cannot exceed 999,999.99.'
+        
         prices = {
             'distributor': self.distributor_price,
             'wholesale': self.wholesale_price,
@@ -213,30 +264,39 @@ class Inventory(BaseModel):
             'mrp': self.mrp,
         }
         
-        # Check pricing hierarchy
+        # Check pricing hierarchy: Distributor < Wholesale < Retail < MRP
         if prices['distributor'] > 0 and prices['wholesale'] > 0:
             if prices['distributor'] >= prices['wholesale']:
-                raise ValidationError({
-                    'distributor_price': 'Distributor price must be less than Wholesale price.'
-                })
+                errors['distributor_price'] = 'Distributor price must be less than Wholesale price.'
         
         if prices['wholesale'] > 0 and prices['retail'] > 0:
             if prices['wholesale'] >= prices['retail']:
-                raise ValidationError({
-                    'wholesale_price': 'Wholesale price must be less than Retail price.'
-                })
+                errors['wholesale_price'] = 'Wholesale price must be less than Retail price.'
         
         if prices['retail'] > 0 and prices['mrp'] > 0:
             if prices['retail'] >= prices['mrp']:
-                raise ValidationError({
-                    'retail_pricing': 'Retail price must be less than MRP.'
-                })
+                errors['retail_pricing'] = 'Retail price must be less than MRP.'
         
-        # Validate stock levels
-        if self.min_stock_level < 0:
-            raise ValidationError({
-                'min_stock_level': 'Minimum stock level cannot be negative.'
-            })
+        # Validate barcode
+        if self.barcode and len(self.barcode) < 2:
+            errors['barcode'] = 'Barcode must be at least 2 characters.'
+        if self.barcode and len(self.barcode) > 100:
+            errors['barcode'] = 'Barcode cannot exceed 100 characters.'
+        
+        # Validate vehicle_bike_details
+        if self.vehicle_bike_details and len(self.vehicle_bike_details) < 5:
+            errors['vehicle_bike_details'] = 'Vehicle/Bike details must be at least 5 characters.'
+        
+        # Validate model
+        if self.model and len(self.model) < 2:
+            errors['model'] = 'Model must be at least 2 characters.'
+        
+        # Validate type
+        if self.type and len(self.type) < 2:
+            errors['type'] = 'Type must be at least 2 characters.'
+        
+        if errors:
+            raise ValidationError(errors)
     
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -316,7 +376,33 @@ class InventoryImage(BaseModel):
 
     objects = TenantManager()
     
+    def clean(self):
+        """Validate all fields"""
+        errors = {}
+        
+        # Validate inventory
+        if not self.inventory:
+            errors['inventory'] = 'Inventory item is required.'
+        
+        # Validate image
+        if not self.image:
+            errors['image'] = 'Image is required.'
+        else:
+            # Check image file size (max 5MB)
+            if self.image.size > 5242880:  # 5MB in bytes
+                errors['image'] = 'Image size cannot exceed 5MB.'
+        
+        # Validate description
+        if self.description and len(self.description) < 2:
+            errors['description'] = 'Description must be at least 2 characters.'
+        if self.description and len(self.description) > 255:
+            errors['description'] = 'Description cannot exceed 255 characters.'
+        
+        if errors:
+            raise ValidationError(errors)
+    
     def save(self, *args, **kwargs):
+        self.full_clean()
         # If this is set as primary, unset other primary images
         if self.is_primary and self.inventory_id:
             InventoryImage.objects.filter(

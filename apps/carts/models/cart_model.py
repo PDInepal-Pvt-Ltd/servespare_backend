@@ -28,6 +28,20 @@ class Cart(TimeStampedModel):
     
     def __str__(self):
         return f"Cart for {self.user.username}"
+
+    def clean(self):
+        """Validate cart"""
+        errors = {}
+
+        if not self.user_id and not self.user:
+            errors['user'] = 'User is required.'
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
     
     @property
     def total_items(self):
@@ -92,21 +106,40 @@ class CartItem(TimeStampedModel):
     
     def clean(self):
         """Validate cart item"""
-        if self.quantity <= 0:
-            raise ValidationError({
-                'quantity': 'Quantity must be greater than zero.'
-            })
-        
+        errors = {}
+
+        if not self.cart_id and not self.cart:
+            errors['cart'] = 'Cart is required.'
+
+        if not self.inventory_id and not self.inventory:
+            errors['inventory'] = 'Inventory item is required.'
+
+        if self.quantity is None:
+            errors['quantity'] = 'Quantity is required.'
+        elif self.quantity <= 0:
+            errors['quantity'] = 'Quantity must be greater than zero.'
+        elif self.quantity > Decimal('999999.99'):
+            errors['quantity'] = 'Quantity cannot exceed 999,999.99.'
+
+        if self.price is None:
+            errors['price'] = 'Price is required.'
+        elif self.price < 0:
+            errors['price'] = 'Price cannot be negative.'
+        elif self.price > Decimal('999999.99'):
+            errors['price'] = 'Price cannot exceed 999,999.99.'
+
         # Check if inventory has sufficient stock
-        if self.inventory.quantity < self.quantity:
-            raise ValidationError({
-                'quantity': f'Insufficient stock. Only {self.inventory.quantity} available.'
-            })
+        if self.inventory_id and self.quantity and self.inventory.quantity < self.quantity:
+            errors['quantity'] = f'Insufficient stock. Only {self.inventory.quantity} available.'
+
+        if errors:
+            raise ValidationError(errors)
     
     def save(self, *args, **kwargs):
         # Always mirror the current inventory selling price with fallbacks
         # retail_pricing > mrp > base price
-        self.price = self.inventory.get_default_selling_price()
+        if not self.price or self.price == Decimal('0.00'):
+            self.price = self.inventory.get_default_selling_price()
         
         self.full_clean()
         super().save(*args, **kwargs)

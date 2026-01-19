@@ -1,4 +1,6 @@
 from django.db import models
+from django.core.exceptions import ValidationError
+from decimal import Decimal
 
 
 class Cheque(models.Model):
@@ -46,3 +48,52 @@ class Cheque(models.Model):
     def __str__(self):
         label = self.cheque_number or "(no number)"
         return f"{self.get_cheque_type_display()} - {label} - {self.amount}"
+
+    def clean(self):
+        errors = {}
+
+        if not self.cheque_type:
+            errors['cheque_type'] = 'Cheque type is required.'
+        elif self.cheque_type not in dict(self.CHEQUE_TYPE_CHOICES):
+            errors['cheque_type'] = 'Invalid cheque type.'
+
+        if not self.reminder_setting:
+            errors['reminder_setting'] = 'Reminder setting is required.'
+        elif self.reminder_setting not in dict(self.REMINDER_CHOICES):
+            errors['reminder_setting'] = 'Invalid reminder setting.'
+
+        if self.amount is None:
+            errors['amount'] = 'Amount is required.'
+        elif self.amount < Decimal('0.00'):
+            errors['amount'] = 'Amount cannot be negative.'
+
+        if not self.due_date:
+            errors['due_date'] = 'Due date is required.'
+
+        if self.issue_date and self.due_date and self.due_date < self.issue_date:
+            errors['due_date'] = 'Due date cannot be earlier than issue date.'
+
+        if self.cheque_number and len(self.cheque_number.strip()) > 128:
+            errors['cheque_number'] = 'Cheque number cannot exceed 128 characters.'
+
+        if self.bank_name and len(self.bank_name.strip()) > 255:
+            errors['bank_name'] = 'Bank name cannot exceed 255 characters.'
+
+        if self.party_name and len(self.party_name.strip()) > 255:
+            errors['party_name'] = 'Party name cannot exceed 255 characters.'
+
+        if self.account_number and len(self.account_number.strip()) > 64:
+            errors['account_number'] = 'Account number cannot exceed 64 characters.'
+
+        if self.ifsc_code and len(self.ifsc_code.strip()) > 32:
+            errors['ifsc_code'] = 'IFSC code cannot exceed 32 characters.'
+
+        if self.purpose and len(self.purpose.strip()) > 255:
+            errors['purpose'] = 'Purpose cannot exceed 255 characters.'
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)

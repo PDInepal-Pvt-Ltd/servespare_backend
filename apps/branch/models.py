@@ -1,6 +1,49 @@
+import re
 from django.db import models
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 from apps.base.models import BaseModel
 from apps.base.managers import TenantManager
+
+
+def validate_phone_number(value):
+    """
+    Validate Nepali phone number format.
+    Accepts:
+    - Mobile: 10 digits starting with 97 or 98 (e.g., 9841234567)
+    - Landline: 6-8 digits with area code (e.g., 01-4445678)
+    - International format: +977 followed by mobile/landline
+    - Formats accepted: with/without spaces, hyphens, parentheses
+    """
+    if not value:
+        return
+
+    cleaned = re.sub(r'[\s\-\(\)]', '', value)
+
+    if cleaned.startswith('+977'):
+        cleaned = cleaned[4:]
+    elif cleaned.startswith('977'):
+        cleaned = cleaned[3:]
+
+    if not cleaned.isdigit():
+        raise ValidationError(
+            _('Phone number must contain only digits, spaces, hyphens, parentheses, or +977 for international format.'),
+            code='invalid_phone_format'
+        )
+
+    if len(cleaned) == 10:
+        if not (cleaned.startswith('97') or cleaned.startswith('98')):
+            raise ValidationError(
+                _('Nepali mobile number must start with 97 or 98.'),
+                code='invalid_mobile_prefix'
+            )
+    elif 6 <= len(cleaned) <= 8:
+        pass
+    else:
+        raise ValidationError(
+            _('Phone number must be either 10 digits (mobile) or 6-8 digits (landline).'),
+            code='invalid_phone_length'
+        )
 
 class Branch(BaseModel):
     """
@@ -24,6 +67,59 @@ class Branch(BaseModel):
     
     class Meta:
         ordering = ["branch_name"]
+
+    def __str__(self):
+        return self.branch_name
+
+    def clean(self):
+        errors = {}
+
+        if not self.tenant_id and not self.tenant:
+            errors['tenant'] = 'Tenant is required.'
+
+        if not self.branch_name or not self.branch_name.strip():
+            errors['branch_name'] = 'Branch name is required.'
+        elif len(self.branch_name.strip()) < 2:
+            errors['branch_name'] = 'Branch name must be at least 2 characters.'
+        elif len(self.branch_name.strip()) > 255:
+            errors['branch_name'] = 'Branch name cannot exceed 255 characters.'
+
+        if not self.branch_code or not self.branch_code.strip():
+            errors['branch_code'] = 'Branch code is required.'
+        elif len(self.branch_code.strip()) < 2:
+            errors['branch_code'] = 'Branch code must be at least 2 characters.'
+        elif len(self.branch_code.strip()) > 50:
+            errors['branch_code'] = 'Branch code cannot exceed 50 characters.'
+
+        if self.Address:
+            addr = self.Address.strip()
+            if len(addr) < 5:
+                errors['Address'] = 'Address must be at least 5 characters when provided.'
+            elif len(addr) > 1000:
+                errors['Address'] = 'Address cannot exceed 1000 characters.'
+
+        if self.city and len(self.city.strip()) > 100:
+            errors['city'] = 'City cannot exceed 100 characters.'
+
+        if self.state and len(self.state.strip()) > 100:
+            errors['state'] = 'State cannot exceed 100 characters.'
+
+        if self.phone:
+            try:
+                validate_phone_number(self.phone.strip())
+            except ValidationError as exc:
+                errors['phone'] = '; '.join(exc.messages)
+
+        if not self.Email or not self.Email.strip():
+            errors['Email'] = 'Email is required.'
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
    
    
    
