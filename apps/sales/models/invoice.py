@@ -201,6 +201,7 @@ class Invoice(BaseModel):
         """Generate invoice number if not exists"""
         if not self.invoice_number:
             self.invoice_number = self.generate_invoice_number()
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def generate_invoice_number(self):
@@ -234,6 +235,52 @@ class Invoice(BaseModel):
         self.save(update_fields=[
             'subtotal', 'discount_amount', 'tax_amount', 'total_amount', 'modified'
         ])
+
+    def clean(self):
+        errors = {}
+
+        if not self.customer_id and not self.customer:
+            errors['customer'] = 'Customer is required.'
+
+        # Financial validations
+        money_fields = {
+            'subtotal': self.subtotal,
+            'discount_amount': self.discount_amount,
+            'tax_amount': self.tax_amount,
+            'shipping_charges': self.shipping_charges,
+            'total_amount': self.total_amount,
+        }
+        for field, value in money_fields.items():
+            if value is not None and value < 0:
+                errors[field] = f"{field.replace('_', ' ').title()} cannot be negative."
+
+        if self.discount_percentage is not None and self.discount_percentage > Decimal('100.00'):
+            errors['discount_percentage'] = 'Discount percentage cannot exceed 100%.'
+
+        if self.tax_percentage is not None and self.tax_percentage > Decimal('100.00'):
+            errors['tax_percentage'] = 'Tax percentage cannot exceed 100%.'
+
+        # Ensure discount_amount does not exceed subtotal
+        if self.subtotal is not None and self.discount_amount is not None:
+            if self.discount_amount > self.subtotal:
+                errors['discount_amount'] = 'Discount amount cannot exceed subtotal.'
+
+        # Ensure total is logical
+        if self.total_amount is not None and self.total_amount < Decimal('0.00'):
+            errors['total_amount'] = 'Total amount cannot be negative.'
+
+        if self.payment_method:
+            valid_methods = [choice[0] for choice in self._meta.get_field('payment_method').choices]
+            if self.payment_method not in valid_methods:
+                errors['payment_method'] = 'Invalid payment method.'
+
+        if self.payment_status:
+            valid_statuses = [choice[0] for choice in self._meta.get_field('payment_status').choices]
+            if self.payment_status not in valid_statuses:
+                errors['payment_status'] = 'Invalid payment status.'
+
+        if errors:
+            raise ValidationError(errors)
 
     @property
     def balance_amount(self):
@@ -386,11 +433,58 @@ class InvoiceItem(BaseModel):
 
         # Calculate line total
         self.line_total = amount_after_discount + self.tax_amount
+        self.full_clean()
 
         super().save(*args, **kwargs)
 
         # Recalculate invoice totals
         self.invoice.calculate_totals()
+
+    def clean(self):
+        errors = {}
+
+        if not self.invoice_id and not self.invoice:
+            errors['invoice'] = 'Invoice is required.'
+
+        if not self.inventory_id and not self.inventory:
+            errors['inventory'] = 'Inventory item is required.'
+
+        if not self.item_name or not self.item_name.strip():
+            errors['item_name'] = 'Item name is required.'
+        elif len(self.item_name.strip()) > 255:
+            errors['item_name'] = 'Item name cannot exceed 255 characters.'
+
+        if self.part_number and len(self.part_number.strip()) > 100:
+            errors['part_number'] = 'Part number cannot exceed 100 characters.'
+
+        # Numeric validations
+        if self.quantity is None or self.quantity <= 0:
+            errors['quantity'] = 'Quantity must be greater than zero.'
+
+        if self.unit_price is None or self.unit_price < 0:
+            errors['unit_price'] = 'Unit price cannot be negative.'
+
+        if self.discount_percentage is not None and self.discount_percentage > Decimal('100.00'):
+            errors['discount_percentage'] = 'Discount percentage cannot exceed 100%.'
+
+        gross_amount = self.quantity * self.unit_price if self.quantity and self.unit_price is not None else Decimal('0.00')
+
+        if self.discount_amount is not None and self.discount_amount < 0:
+            errors['discount_amount'] = 'Discount amount cannot be negative.'
+        elif self.discount_amount is not None and gross_amount and self.discount_amount > gross_amount:
+            errors['discount_amount'] = 'Discount amount cannot exceed gross amount.'
+
+        if self.tax_percentage is not None and self.tax_percentage > Decimal('100.00'):
+            errors['tax_percentage'] = 'Tax percentage cannot exceed 100%.'
+
+        if self.tax_amount is not None and self.tax_amount < 0:
+            errors['tax_amount'] = 'Tax amount cannot be negative.'
+
+        if self.line_total is not None and self.line_total < 0:
+            errors['line_total'] = 'Line total cannot be negative.'
+
+        if errors:
+            raise ValidationError(errors)
 
     def __str__(self):
         return f"{self.invoice.invoice_number} - {self.item_name} x {self.quantity}"

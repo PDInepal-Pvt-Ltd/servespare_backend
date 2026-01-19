@@ -2,7 +2,55 @@ from django.db import models
 from django.core.validators import RegexValidator, EmailValidator, MinLengthValidator, MaxLengthValidator
 from django.core.exceptions import ValidationError
 import re
+from django.utils.translation import gettext_lazy as _
 from apps.base.models import BaseModel
+
+
+def validate_phone_number(value):
+    """
+    Validate Nepali phone number format.
+    Accepts:
+    - Mobile: 10 digits starting with 97 or 98 (e.g., 9841234567)
+    - Landline: 6-8 digits with area code (e.g., 01-4445678)
+    - International format: +977 followed by mobile/landline
+    - Formats accepted: with/without spaces, hyphens, parentheses
+    """
+    if not value:
+        return
+    
+    # Remove common separators for validation
+    cleaned = re.sub(r'[\s\-\(\)]', '', value)
+    
+    # Check for international format (+977)
+    if cleaned.startswith('+977'):
+        cleaned = cleaned[4:]  # Remove +977
+    elif cleaned.startswith('977'):
+        cleaned = cleaned[3:]  # Remove 977
+    
+    # Must contain only digits after cleaning
+    if not cleaned.isdigit():
+        raise ValidationError(
+            _('Phone number must contain only digits, spaces, hyphens, parentheses, or +977 for international format.'),
+            code='invalid_phone_format'
+        )
+    
+    # Validate based on number type
+    if len(cleaned) == 10:
+        # Mobile number validation (must start with 97 or 98)
+        if not (cleaned.startswith('97') or cleaned.startswith('98')):
+            raise ValidationError(
+                _('Nepali mobile number must start with 97 or 98.'),
+                code='invalid_mobile_prefix'
+            )
+    elif len(cleaned) >= 6 and len(cleaned) <= 8:
+        # Landline number (6-8 digits)
+        # Valid - no additional prefix validation needed for landlines
+        pass
+    else:
+        raise ValidationError(
+            _('Phone number must be either 10 digits (mobile) or 6-8 digits (landline).'),
+            code='invalid_phone_length'
+        )
 
 
 class Tenant(BaseModel):
@@ -15,11 +63,7 @@ class Tenant(BaseModel):
         ('rejected', 'Rejected'),
     ]
     
-    # Phone number validator - allows formats like +977-9841234567, 9841234567, +977 9841234567
-    phone_validator = RegexValidator(
-        regex=r'^\+?[0-9]{1,4}?[-.\s]?\(?[0-9]{1,3}?\)?[-.\s]?[0-9]{1,4}[-.\s]?[0-9]{1,4}[-.\s]?[0-9]{1,9}$',
-        message="Phone number must be entered in a valid format. E.g., '+977-9841234567' or '9841234567'"
-    )
+    # Phone number validator - uses comprehensive Nepali phone validation function
     
     # PAN number validator - exactly 9 digits, numeric only
     pan_validator = RegexValidator(
@@ -53,8 +97,8 @@ class Tenant(BaseModel):
         max_length=20,
         blank=True,
         null=True,
-        validators=[phone_validator],
-        help_text="Contact phone number"
+        validators=[validate_phone_number],
+        help_text="Contact phone number (mobile: 10 digits starting with 97/98, landline: 6-8 digits, supports +977 format)"
     )
     pan_number = models.CharField(
         max_length=20,
@@ -143,9 +187,10 @@ class Tenant(BaseModel):
         if self.phone:
             self.phone = self.phone.strip()
             if self.phone:
-                phone_pattern = r'^\+?[0-9]{1,4}?[-.\s]?\(?[0-9]{1,3}?\)?[-.\s]?[0-9]{1,4}[-.\s]?[0-9]{1,4}[-.\s]?[0-9]{1,9}$'
-                if not re.match(phone_pattern, self.phone):
-                    errors['phone'] = "Phone number must be in a valid format. E.g., '+977-9841234567' or '9841234567'"
+                try:
+                    validate_phone_number(self.phone)
+                except ValidationError as e:
+                    errors['phone'] = e.message
         
         # Validate PAN number if provided
         if self.pan_number:

@@ -1,5 +1,6 @@
 from django.db import models, transaction
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from decimal import Decimal
 
 from apps.base.models import BaseModel
@@ -68,6 +69,7 @@ class BankTransfer(BaseModel):
         from apps.cashandbank.models.cash_balance import CashBalance
         from apps.cashandbank.models.bank_accounts import BankAccount
 
+        self.full_clean()
         is_create = self._state.adding
 
         if not is_create:
@@ -95,3 +97,23 @@ class BankTransfer(BaseModel):
 
             # Finally save the transfer record
             super().save(*args, **kwargs)
+
+    def clean(self):
+        errors = {}
+
+        if not self.bank_account_id and not self.bank_account:
+            errors['bank_account'] = 'Bank account is required.'
+
+        if self.amount is None:
+            errors['amount'] = 'Amount is required.'
+        elif self.amount <= 0:
+            errors['amount'] = 'Amount must be greater than zero.'
+
+        if self.description and len(self.description.strip()) > 500:
+            errors['description'] = 'Description cannot exceed 500 characters.'
+
+        if not self.transfer_date:
+            errors['transfer_date'] = 'Transfer date is required.'
+
+        if errors:
+            raise ValidationError(errors)
