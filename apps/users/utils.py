@@ -98,6 +98,115 @@ def send_welcome_credentials_email(user, raw_password):
         return False
 
 
+def send_subscription_limit_exceeded_email(tenant, resource_type, current_count, limit):
+    """
+    Sends a notification email when a tenant exceeds their subscription limits.
+    
+    Args:
+        tenant: Tenant instance
+        resource_type: Type of resource ('users' or 'branches')
+        current_count: Current count of the resource
+        limit: Maximum allowed limit
+        
+    Returns:
+        bool: True if email sent successfully, False otherwise
+    """
+    
+    if not tenant.email:
+        print(f"Error: Tenant {tenant.business_name} has no email address.")
+        return False
+    
+    # Get tenant admin email
+    primary_admin = tenant.get_primary_admin()
+    admin_email = primary_admin.email if primary_admin else tenant.email
+    
+    if not admin_email:
+        print(f"Error: No admin email found for tenant {tenant.business_name}.")
+        return False
+    
+    subject = f'ServeSpare: {resource_type.capitalize()} Limit Exceeded'
+    
+    # Get the current site's domain for absolute URLs
+    try:
+        current_site = Site.objects.get_current()
+        domain = current_site.domain
+        protocol = 'https' if getattr(settings, 'SECURE_SSL_REDIRECT', False) else 'http'
+    except Exception as e:
+        print(f"Failed to get site domain. Using default. Error: {e}")
+        domain = 'localhost:8000'
+        protocol = 'http'
+    
+    # Define the context for the template
+    context = {
+        'business_name': tenant.business_name,
+        'resource_type': resource_type,
+        'current_count': current_count,
+        'limit': limit,
+        'subscription_plan': tenant.package.plan_name if tenant.package else 'N/A',
+        'domain': domain,
+        'protocol': protocol,
+        'admin_name': primary_admin.full_name or primary_admin.username if primary_admin else 'Tenant Admin',
+    }
+    
+    # Create a plain text message
+    plain_message = (
+        f'Hello {context["admin_name"]},\n\n'
+        f'Your {context["resource_type"]} limit has been exceeded for {context["business_name"]}.\n\n'
+        f'Current Details:\n'
+        f'Resource Type: {context["resource_type"].capitalize()}\n'
+        f'Current Count: {context["current_count"]}\n'
+        f'Allowed Limit: {context["limit"]}\n'
+        f'Subscription Plan: {context["subscription_plan"]}\n\n'
+        f'Action Required:\n'
+        f'Please upgrade your subscription plan to add more {context["resource_type"]}, or delete existing unused {context["resource_type"]}.\n\n'
+        f'To manage your subscription, please visit your account dashboard.\n\n'
+        f'If you have any questions, please contact our support team.\n\n'
+        f'Best regards,\n'
+        f'ServeSpare Team\n'
+    )
+    
+    try:
+        # Try to render HTML template
+        try:
+            html_message = render_to_string('email/subscription_limit_exceeded.html', context)
+        except Exception as e:
+            print(f"Failed to render subscription limit exceeded HTML template. Using plain fallback. Error: {e}")
+            html_message = (
+                f"<p>Hello {context['admin_name']},</p>"
+                f"<p>Your <strong>{context['resource_type']}</strong> limit has been exceeded for <strong>{context['business_name']}</strong>.</p>"
+                f"<h4>Current Details:</h4>"
+                f"<ul>"
+                f"<li>Resource Type: {context['resource_type'].capitalize()}</li>"
+                f"<li>Current Count: <strong>{context['current_count']}</strong></li>"
+                f"<li>Allowed Limit: <strong>{context['limit']}</strong></li>"
+                f"<li>Subscription Plan: {context['subscription_plan']}</li>"
+                f"</ul>"
+                f"<h4>Action Required:</h4>"
+                f"<p>Please upgrade your subscription plan to add more {context['resource_type']}, or delete existing unused {context['resource_type']}.</p>"
+                f"<p>To manage your subscription, please visit your account dashboard.</p>"
+                f"<p>If you have any questions, please contact our support team.</p>"
+                f"<p>Best regards,<br>ServeSpare Team</p>"
+            )
+        
+        # Use EmailMultiAlternatives to send the email
+        email = EmailMultiAlternatives(
+            subject,
+            plain_message,
+            settings.DEFAULT_FROM_EMAIL,
+            [admin_email],
+        )
+        
+        # Attach the HTML version
+        email.attach_alternative(html_message, "text/html")
+        
+        email.send(fail_silently=False)
+        print(f"Subscription limit exceeded email sent successfully to {admin_email}")
+        return True
+    except Exception as e:
+        print(f"Failed to send subscription limit exceeded email. Error: {e}")
+        return False
+
+
 def send_password_change_notification_email(user):
     """
     Sends a notification email when a user changes their password.

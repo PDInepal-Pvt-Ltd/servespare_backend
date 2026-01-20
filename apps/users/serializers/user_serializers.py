@@ -120,11 +120,24 @@ class UserCreateSerializer(ModelCleanValidationMixin, serializers.ModelSerialize
         }
     
     def validate(self, attrs):
-        """Validate password confirmation."""
+        """Validate password confirmation and subscription limits."""
         if attrs['password'] != attrs['password_confirm']:
             raise serializers.ValidationError({
                 'password_confirm': 'Password fields do not match.'
             })
+        
+        # Check subscription limit for user creation
+        tenant = attrs.get('tenant')
+        if tenant:
+            if not tenant.can_add_user():
+                raise serializers.ValidationError({
+                    'tenant': (
+                        f'Cannot create user. Your subscription plan allows {tenant.get_allowed_users()} users, '
+                        f'but you already have {tenant.get_user_count()} active users. '
+                        f'Please upgrade your subscription or deactivate existing users.'
+                    )
+                })
+        
         return _validate_branch_with_tenant(attrs)
     
     def create(self, validated_data):
