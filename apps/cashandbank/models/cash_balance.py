@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from decimal import Decimal
 
 from apps.base.models import BaseModel
@@ -55,6 +56,22 @@ class CashBalance(BaseModel):
         t = self.tenant and f"Tenant:{self.tenant.id}" or 'Global'
         b = self.branch and f"Branch:{self.branch.id}" or 'NoBranch'
         return f"{t} {b} Balance: {self.balance}"
+
+    def clean(self):
+        errors = {}
+
+        if self.balance is not None and self.balance < Decimal('0.00'):
+            errors['balance'] = 'Balance cannot be negative.'
+
+        if not self.last_updated:
+            errors['last_updated'] = 'Last updated timestamp is required.'
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def adjust(self, amount):
         """Adjust the balance by `amount` (Decimal). Positive to add, negative to subtract."""

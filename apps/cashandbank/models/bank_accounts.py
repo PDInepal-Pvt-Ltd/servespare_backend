@@ -1,4 +1,6 @@
 from django.db import models
+from django.core.exceptions import ValidationError
+from decimal import Decimal
 from apps.base.models import BaseModel
 from apps.base.managers import TenantManager
 
@@ -93,4 +95,36 @@ class BankAccount(BaseModel):
         return f"{self.account_name} ({account_type_display})"
 
     objects = TenantManager()
+
+    def clean(self):
+        errors = {}
+
+        if not self.account_type:
+            errors['account_type'] = 'Account type is required.'
+        elif self.account_type not in dict(self.ACCOUNT_TYPE_CHOICES):
+            errors['account_type'] = 'Invalid account type.'
+
+        if not self.account_name or not self.account_name.strip():
+            errors['account_name'] = 'Account name is required.'
+        elif len(self.account_name.strip()) > 255:
+            errors['account_name'] = 'Account name cannot exceed 255 characters.'
+
+        if self.bank_name and len(self.bank_name.strip()) > 255:
+            errors['bank_name'] = 'Bank name cannot exceed 255 characters.'
+
+        if self.account_number and len(self.account_number.strip()) > 100:
+            errors['account_number'] = 'Account number cannot exceed 100 characters.'
+
+        if self.account_holders_name and len(self.account_holders_name.strip()) > 255:
+            errors['account_holders_name'] = 'Account holder name cannot exceed 255 characters.'
+
+        if self.balance is not None and self.balance < Decimal('0.00'):
+            errors['balance'] = 'Balance cannot be negative.'
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 

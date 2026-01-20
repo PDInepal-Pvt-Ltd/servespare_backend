@@ -1,5 +1,6 @@
 from django.db import models, transaction
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from decimal import Decimal
 
 from apps.base.models import BaseModel
@@ -131,8 +132,8 @@ class ShiftTransaction(BaseModel):
         - `closing`: no effect (final count, doesn't change balance)
         """
         from apps.cashandbank.models.cash_balance import CashBalance
-        from django.core.exceptions import ValidationError
 
+        self.full_clean()
         is_create = self._state.adding
 
         # Validate that shift is open when creating non-opening/closing transactions
@@ -172,3 +173,34 @@ class ShiftTransaction(BaseModel):
 
                     cb.last_updated = timezone.now()
                     cb.save(update_fields=['balance', 'last_updated'])
+
+    def clean(self):
+        errors = {}
+
+        if not self.shift_id and not self.shift:
+            errors['shift'] = 'Shift is required.'
+
+        if not self.transaction_type:
+            errors['transaction_type'] = 'Transaction type is required.'
+        elif self.transaction_type not in dict(self.TYPE_CHOICES):
+            errors['transaction_type'] = 'Invalid transaction type.'
+
+        if self.amount is None:
+            errors['amount'] = 'Amount is required.'
+        elif self.amount < 0:
+            errors['amount'] = 'Amount cannot be negative.'
+
+        if self.description and len(self.description.strip()) > 2000:
+            errors['description'] = 'Description cannot exceed 2000 characters.'
+
+        if self.reference_type and len(self.reference_type.strip()) > 50:
+            errors['reference_type'] = 'Reference type cannot exceed 50 characters.'
+
+        if self.reference_id and len(self.reference_id.strip()) > 100:
+            errors['reference_id'] = 'Reference ID cannot exceed 100 characters.'
+
+        if not self.transaction_date:
+            errors['transaction_date'] = 'Transaction date is required.'
+
+        if errors:
+            raise ValidationError(errors)

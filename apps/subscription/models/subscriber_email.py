@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.validators import EmailValidator
 from apps.base.models import BaseModel
 
 
@@ -8,7 +9,14 @@ class SubscriberEmail(BaseModel):
     This is intentionally minimal: only an email address and timestamps.
     Non-authenticated users may POST to the API to create entries.
     """
-    email = models.EmailField(max_length=254, unique=True)
+    email = models.EmailField(
+        max_length=254,
+        unique=True,
+        null=False,
+        blank=False,
+        validators=[EmailValidator()],
+        help_text='Valid email address for subscriber'
+    )
 
     class Meta:
         db_table = 'subscription_subscriber_email'

@@ -1,8 +1,43 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 from apps.base.models import BaseModel
 from apps.base.managers import TenantManager
 from django.conf import settings
+import re
+
+
+def validate_phone_number(value):
+    """Validate Nepali phone number format."""
+    if not value:
+        return
+
+    cleaned = re.sub(r'[\s\-\(\)]', '', value)
+
+    if cleaned.startswith('+977'):
+        cleaned = cleaned[4:]
+    elif cleaned.startswith('977'):
+        cleaned = cleaned[3:]
+
+    if not cleaned.isdigit():
+        raise ValidationError(
+            _('Phone number must contain only digits, spaces, hyphens, parentheses, or +977 for international format.'),
+            code='invalid_phone_format'
+        )
+
+    if len(cleaned) == 10:
+        if not (cleaned.startswith('97') or cleaned.startswith('98')):
+            raise ValidationError(
+                _('Nepali mobile number must start with 97 or 98.'),
+                code='invalid_mobile_prefix'
+            )
+    elif 6 <= len(cleaned) <= 8:
+        pass
+    else:
+        raise ValidationError(
+            _('Phone number must be either 10 digits (mobile) or 6-8 digits (landline).'),
+            code='invalid_phone_length'
+        )
 
 
 class Party(BaseModel):
@@ -93,7 +128,8 @@ class Party(BaseModel):
         max_length=20,
         blank=True,
         null=True,
-        help_text='Phone number'
+        help_text='Phone number',
+        validators=[validate_phone_number]
     )
     email = models.EmailField(
         blank=True,
@@ -161,15 +197,65 @@ class Party(BaseModel):
     objects = TenantManager()
     
     def clean(self):
-        """Validate that customer_type is set when party_type is customer"""
+        """Validate all fields"""
+        errors = {}
+        
+        # Validate party_name
+        if not self.party_name or not self.party_name.strip():
+            errors['party_name'] = 'Party name is required.'
+        elif len(self.party_name) < 2:
+            errors['party_name'] = 'Party name must be at least 2 characters.'
+        
+        # Validate party_type and customer_type relationship
         if self.party_type == 'customer' and not self.customer_type:
-            raise ValidationError({
-                'customer_type': 'Customer type is required when party type is Customer.'
-            })
+            errors['customer_type'] = 'Customer type is required when party type is Customer.'
         if self.party_type == 'supplier' and self.customer_type:
-            raise ValidationError({
-                'customer_type': 'Customer type should not be set for suppliers.'
-            })
+            errors['customer_type'] = 'Customer type should not be set for suppliers.'
+        
+        # Validate contact_person
+        if self.contact_person and len(self.contact_person) < 2:
+            errors['contact_person'] = 'Contact person name must be at least 2 characters.'
+        
+        # Validate phone
+        if self.phone:
+            try:
+                validate_phone_number(self.phone)
+            except ValidationError as exc:
+                errors['phone'] = exc.messages[0] if exc.messages else 'Invalid phone number.'
+        
+        # Validate email (basic format check)
+        if self.email:
+            if '@' not in self.email or '.' not in self.email.split('@')[-1]:
+                errors['email'] = 'Email address is not valid.'
+        
+        # Validate address
+        if self.address and len(self.address) < 5:
+            errors['address'] = 'Address must be at least 5 characters.'
+        
+        # Validate city and state
+        if self.city and len(self.city) < 2:
+            errors['city'] = 'City name must be at least 2 characters.'
+        if self.state_province and len(self.state_province) < 2:
+            errors['state_province'] = 'State/Province must be at least 2 characters.'
+        
+        # Validate PAN number format (Indian PAN: 10 characters)
+        if self.pan_number:
+            pan_clean = self.pan_number.strip()
+            if len(pan_clean) != 10:
+                errors['pan_number'] = 'PAN number must be exactly 10 characters.'
+            elif not pan_clean.isalnum():
+                errors['pan_number'] = 'PAN number can only contain letters and numbers.'
+        
+        # Validate credit_limit
+        if self.credit_limit < 0:
+            errors['credit_limit'] = 'Credit limit cannot be negative.'
+        
+        # Validate opening_balance
+        if self.opening_balance is None:
+            self.opening_balance = 0.00
+        
+        if errors:
+            raise ValidationError(errors)
     
     def save(self, *args, **kwargs):
         """Override save to run validation"""
