@@ -474,6 +474,37 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         serializer = ShiftTransactionSerializer(transactions, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'], url_path='transactions')
+    def create_transaction(self, request, pk=None):
+        """Create a new cash_in / cash_out / sale transaction for an open shift."""
+        shift = self.get_object()
+
+        if shift.status != 'open':
+            return Response(
+                {'detail': 'Shift must be open to add a transaction.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        allowed_types = {'cash_in', 'cash_out', 'sale'}
+        txn_type = request.data.get('transaction_type')
+        if txn_type not in allowed_types:
+            return Response(
+                {'transaction_type': 'Invalid transaction type. Allowed: cash_in, cash_out, sale.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = ShiftTransactionSerializer(
+            data=request.data,
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(
+            shift=shift,
+            tenant=shift.tenant,
+            performed_by=request.user,
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=['get'])
     def available_cashiers(self, request, pk=None):
         """
