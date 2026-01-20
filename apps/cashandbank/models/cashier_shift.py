@@ -123,11 +123,13 @@ class CashierShift(BaseModel):
 
 
     # Transfer tracking
-    transferred_to = models.CharField(
-        max_length=255,
-        blank=True,
+    transferred_to = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
         null=True,
-        help_text='Name of the person/cashier this shift was transferred to'
+        blank=True,
+        related_name='shifts_transferred_to',
+        help_text='Cashier who received this shift transfer'
     )
 
     transferred_at = models.DateTimeField(
@@ -207,13 +209,10 @@ class CashierShift(BaseModel):
                 errors['closed_at'] = 'Closed timestamp is required to close shift.'
 
         if self.status == 'transferred':
-            if not self.transferred_to or not self.transferred_to.strip():
-                errors['transferred_to'] = 'Transferred-to name is required when status is transferred.'
+            if not self.transferred_to:
+                errors['transferred_to'] = 'Transferred-to user is required when status is transferred.'
             if self.transferred_at is None:
                 errors['transferred_at'] = 'Transferred timestamp is required when status is transferred.'
-
-        if self.transferred_to and len(self.transferred_to.strip()) > 255:
-            errors['transferred_to'] = 'Transferred-to name cannot exceed 255 characters.'
 
         if self.variance_reason and len(self.variance_reason.strip()) > 2000:
             errors['variance_reason'] = 'Variance reason cannot exceed 2000 characters.'
@@ -349,7 +348,7 @@ class CashierShift(BaseModel):
 
         Args:
             counted_cash: Decimal amount of cash counted
-            transferred_to: Name of target cashier
+            transferred_to: User object (cashier) receiving the shift
             transferred_by: User performing the transfer
             variance_reason: Optional reason for variance if mismatch
 
@@ -359,8 +358,8 @@ class CashierShift(BaseModel):
         if self.status != 'open':
             raise ValidationError('Can only transfer open shifts')
 
-        if not transferred_to or transferred_to.strip() == '':
-            raise ValidationError('Target name is required for transfer')
+        if not transferred_to:
+            raise ValidationError('Target cashier is required for transfer')
 
         if counted_cash is None or counted_cash <= 0:
             raise ValidationError('Counted cash must be greater than zero')
@@ -379,7 +378,7 @@ class CashierShift(BaseModel):
         self.actual_amount = counted_cash
         self.variance_amount = variance
         self.status = 'transferred'
-        self.transferred_to = transferred_to.strip()
+        self.transferred_to = transferred_to
         self.transferred_at = timezone.now()
         self.transferred_by = transferred_by
         self.closed_at = timezone.now()  # Set closed_at on transfer

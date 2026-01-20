@@ -326,7 +326,7 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
 
         if actual_amount is None:
             return Response(
-                {'actxpected_amountual_amount': 'This field is required'},
+                 {'actual_amount': 'This field is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -342,14 +342,15 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
 
         with db_transaction.atomic():
             # Check if balanced (within tolerance)
-            expected = shift.expected_amount or Decimal('0.00')
-            variance = actual_amount - expected
+            # Variance is calculated against opening_float, not expected_amount
+            opening = shift.opening_float or Decimal('0.00')
+            variance = actual_amount - opening
 
             if abs(variance) > Decimal('0.01'):
                 return Response(
                     {
                         'detail': 'Shift is not balanced',
-                        'expected': str(expected),
+                        'opening_float': str(opening),
                         'actual': str(actual_amount),
                         'variance': str(variance)
                     },
@@ -419,16 +420,16 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             )
 
         with db_transaction.atomic():
-            # Calculate variance
-            expected = shift.expected_amount or Decimal('0.00')
-            variance = actual_amount - expected
+            # Calculate variance against opening_float, not expected_amount
+            opening = shift.opening_float or Decimal('0.00')
+            variance = actual_amount - opening
             
             # Require variance_reason if there's any variance
             if abs(variance) > Decimal('0.01') and not variance_reason:
                 return Response(
                     {
-                        'variance_reason': 'This field is required when actual amount differs from expected',
-                        'expected_amount': str(expected),
+                        'variance_reason': 'This field is required when actual amount differs from opening float',
+                        'opening_float': str(opening),
                         'actual_amount': str(actual_amount),
                         'variance_amount': str(variance)
                     },
@@ -519,9 +520,11 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         Request body:
         {
             "counted_cash": 2000.00,
-            "transferred_to": "John Doe",
+            "transferred_to_id": 5,
             "variance_reason": "Optional: reason if variance"
         }
+        
+        Note: transferred_to_id must be a valid cashier ID in the same branch/tenant
         """
         from apps.cashandbank.serializers import ShiftTransferInputSerializer
 
@@ -538,7 +541,7 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         counted_cash = serializer.validated_data['counted_cash']
-        transferred_to = serializer.validated_data['transferred_to']
+        transferred_to = serializer.validated_data['transferred_to_id']  # Now a User object
         variance_reason = serializer.validated_data.get('variance_reason', '')
 
         expected = shift.expected_amount or Decimal('0.00')
@@ -596,7 +599,7 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         Request body:
         {
             "counted_cash": 2000.00,
-            "transferred_to": "John Doe",
+            "transferred_to_id": 5,
             "variance_reason": "Miscounted during count"
         }
         """
@@ -615,7 +618,7 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         counted_cash = serializer.validated_data['counted_cash']
-        transferred_to = serializer.validated_data['transferred_to']
+        transferred_to = serializer.validated_data['transferred_to_id']  # Now a User object
         variance_reason = serializer.validated_data.get('variance_reason', '')
 
         expected = shift.expected_amount or Decimal('0.00')
