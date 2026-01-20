@@ -10,6 +10,7 @@ class PurchaseOrderItemSerializer(ModelCleanValidationMixin, serializers.ModelSe
     Serializer for PurchaseOrderItem model
     """
     subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    subtotal_after_discount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     tax_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     total_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     
@@ -24,16 +25,17 @@ class PurchaseOrderItemSerializer(ModelCleanValidationMixin, serializers.ModelSe
             'quantity',
             'unit_price',
             'tax',
-            'discount_description',
+            'discount_amount',
             'branch',
             'subtotal',
+            'subtotal_after_discount',
             'tax_amount',
             'total_price',
             'is_active',
             'created',
             'modified'
         ]
-        read_only_fields = ['id', 'tenant', 'created', 'modified', 'subtotal', 'tax_amount', 'total_price']
+        read_only_fields = ['id', 'tenant', 'created', 'modified', 'subtotal', 'subtotal_after_discount', 'tax_amount', 'total_price']
         # Allow nested create (via PurchaseOrderCreateWithItemsSerializer) without requiring purchase_order in each item
         extra_kwargs = {
             'purchase_order': {'required': False}
@@ -55,6 +57,12 @@ class PurchaseOrderItemSerializer(ModelCleanValidationMixin, serializers.ModelSe
         """Validate tax"""
         if value < 0:
             raise serializers.ValidationError("Tax cannot be negative.")
+        return value
+    
+    def validate_discount_amount(self, value):
+        """Validate discount amount"""
+        if value < 0:
+            raise serializers.ValidationError("Discount amount cannot be negative.")
         return value
 
     def create(self, validated_data):
