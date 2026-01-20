@@ -204,7 +204,7 @@ class PurchaseOrderItem(BaseModel):
     tax = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        default=Decimal('0.00'),
+        default=Decimal('13.00'),
         validators=[MinValueValidator(Decimal('0.00'))],
         help_text='Tax percentage (e.g., 18.00 for 18%)'
     )
