@@ -1,8 +1,9 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.branch.models import Branch
 
 
-class BranchSerializer(serializers.ModelSerializer):
+class BranchSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     class Meta:
         model = Branch
         fields = '__all__'

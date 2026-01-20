@@ -1,10 +1,11 @@
 from rest_framework import serializers
 from django.db import transaction
 from django.utils import timezone
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.sales.models import SalesOrder, SalesOrderItem
 
 
-class SalesOrderItemSerializer(serializers.ModelSerializer):
+class SalesOrderItemSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for sales order items"""
     
     inventory_name = serializers.CharField(source='inventory.item_name', read_only=True)
@@ -207,7 +208,7 @@ class CustomerOrderStatusSerializer(serializers.ModelSerializer):
         return None  # No estimate available
 
 
-class SalesOrderItemCreateSerializer(serializers.ModelSerializer):
+class SalesOrderItemCreateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for creating sales order items"""
     
     class Meta:
@@ -226,7 +227,7 @@ class SalesOrderItemCreateSerializer(serializers.ModelSerializer):
         return value
 
 
-class SalesOrderCreateSerializer(serializers.ModelSerializer):
+class SalesOrderCreateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for creating sales orders"""
     
     items = SalesOrderItemCreateSerializer(many=True, write_only=True)
@@ -314,7 +315,7 @@ class SalesOrderCreateSerializer(serializers.ModelSerializer):
         return order
 
 
-class SalesOrderUpdateSerializer(serializers.ModelSerializer):
+class SalesOrderUpdateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for updating sales orders"""
     
     class Meta:

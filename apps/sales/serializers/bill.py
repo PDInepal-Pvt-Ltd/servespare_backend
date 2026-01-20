@@ -1,8 +1,9 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.sales.models import Bill, PurchaseItem
 
 
-class PurchaseItemSerializer(serializers.ModelSerializer):
+class PurchaseItemSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for PurchaseItem model with nested inventory information
     Price auto-populates from inventory if not provided
@@ -42,7 +43,7 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-class BillSerializer(serializers.ModelSerializer):
+class BillSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for Bill model with nested purchase items
     Supports creating purchase items during bill creation via inventory_id field

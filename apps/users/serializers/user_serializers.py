@@ -8,6 +8,7 @@ from apps.users.utils import (
     send_welcome_credentials_email,
 )
 from apps.tenant.serializers import TenantSerializer
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 
 
 def _validate_branch_with_tenant(attrs, instance=None):
@@ -80,11 +81,12 @@ class UserDetailSerializer(serializers.ModelSerializer):
         return list(obj.groups.values_list('name', flat=True))
 
 
-class UserCreateSerializer(serializers.ModelSerializer):
+class UserCreateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for creating new users by admin/super admin.
     
     Allows super admin/admin users to assign roles to newly created users.
     Users default to CUSTOMER role if not specified.
+    Includes model-level validation from User.clean() method.
     """
     
     password = serializers.CharField(
@@ -155,8 +157,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return user
 
 
-class UserUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for updating user information."""
+class UserUpdateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
+    """Serializer for updating user information.
+    Includes model-level validation from User.clean() method.
+    """
     
     class Meta:
         model = User
@@ -327,7 +331,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         ]
 
 
-class UserProfileUpdateSerializer(serializers.ModelSerializer):
+class UserProfileUpdateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for users to update their own profile."""
     
     class Meta:
@@ -413,7 +417,7 @@ class UserLoginSerializer(serializers.Serializer):
     )
 
 
-class UserRegistrationSerializer(serializers.ModelSerializer):
+class UserRegistrationSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for user self-registration."""
     
     password = serializers.CharField(
@@ -475,7 +479,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
-class AdminAccountSerializer(serializers.ModelSerializer):
+class AdminAccountSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for listing admin accounts with tenant and subscription information.
     Shows admin details along with their tenant's subscription package and user count.

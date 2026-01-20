@@ -1,8 +1,9 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.stock_management.models import Party
 
 
-class PartySerializer(serializers.ModelSerializer):
+class PartySerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for Party model
     """
