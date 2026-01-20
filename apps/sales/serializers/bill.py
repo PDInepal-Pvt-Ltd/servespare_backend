@@ -145,6 +145,7 @@ class BillSerializer(serializers.ModelSerializer):
         """
         Create bill and associated purchase items
         Price is always auto-populated from inventory
+        Validates that quantity information is provided for all items
         """
         # Extract purchase items data before creating bill
         purchase_items_data = validated_data.pop('purchase_items_data', [])
@@ -162,15 +163,34 @@ class BillSerializer(serializers.ModelSerializer):
         # Create purchase items if provided
         if purchase_items_data:
             from apps.stock_management.models import Inventory
+            from decimal import Decimal
             
             for item_data in purchase_items_data:
                 inventory_id = item_data.get('inventory_id')
                 quantity = item_data.get('quantity')
                 
-                # Only inventory_id and quantity are required
-                if not inventory_id or quantity is None:
+                # Validate inventory_id is provided
+                if not inventory_id:
                     raise serializers.ValidationError(
-                        'Each purchase item must have inventory_id and quantity'
+                        'Each purchase item must have inventory_id'
+                    )
+                
+                # Check if quantity information is missing
+                if quantity is None:
+                    raise serializers.ValidationError(
+                        'Quantity information is required for all items. Please provide quantity first.'
+                    )
+                
+                # Validate quantity is a valid number and greater than zero
+                try:
+                    quantity_decimal = Decimal(str(quantity))
+                    if quantity_decimal <= 0:
+                        raise serializers.ValidationError(
+                            'Quantity must be greater than zero'
+                        )
+                except (ValueError, TypeError):
+                    raise serializers.ValidationError(
+                        'Quantity must be a valid number'
                     )
                 
                 try:
@@ -180,7 +200,19 @@ class BillSerializer(serializers.ModelSerializer):
                         f'Inventory with id {inventory_id} does not exist'
                     )
                 
-                # Create purchase item without price - it will be auto-populated from inventory in save()
+                    # Check if inventory quantity is null/missing
+                    if inventory.quantity is None:
+                        raise serializers.ValidationError(
+                            f'Product "{inventory.item_name}" does not have quantity information. Please add quantity to inventory first.'
+                        )
+                
+                    # Check if inventory has enough quantity
+                    if inventory.quantity < quantity_decimal:
+                        raise serializers.ValidationError(
+                            f'Product "{inventory.item_name}" has insufficient stock. Available: {inventory.quantity}, Requested: {quantity_decimal}'
+                        )
+                
+                    # Create purchase item without price - it will be auto-populated from inventory in save()
                 PurchaseItem.objects.create(
                     bill=bill,
                     inventory=inventory,

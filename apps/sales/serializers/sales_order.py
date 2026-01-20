@@ -218,7 +218,9 @@ class SalesOrderItemCreateSerializer(serializers.ModelSerializer):
         ]
     
     def validate_quantity(self, value):
-        """Validate quantity is positive"""
+        """Validate quantity is positive and information is provided"""
+        if value is None:
+            raise serializers.ValidationError("Quantity information is required for all items. Please provide quantity first.")
         if value <= 0:
             raise serializers.ValidationError("Quantity must be greater than 0")
         return value
@@ -246,14 +248,51 @@ class SalesOrderCreateSerializer(serializers.ModelSerializer):
         return value
     
     def validate(self, attrs):
-        """Validate order data"""
+        """Validate order data and collect all item-level errors"""
+        items = attrs.get('items') or []
+        item_errors = []
+
+        for index, item_data in enumerate(items):
+            errors = {}
+            inventory = item_data.get('inventory')
+            quantity = item_data.get('quantity')
+
+            if quantity is None:
+                errors['quantity'] = 'Quantity information is required for all items. Please provide quantity first.'
+            elif quantity <= 0:
+                errors['quantity'] = 'Quantity must be greater than 0'
+
+            if inventory:
+                if inventory.quantity is None:
+                    errors['inventory'] = (
+                        f'Product "{inventory.item_name}" does not have quantity information. '
+                        'Please add quantity to inventory first.'
+                    )
+                elif inventory.quantity < quantity:
+                    errors['inventory'] = (
+                        f'Product "{inventory.item_name}" has insufficient stock. '
+                        f'Available: {inventory.quantity}, Requested: {quantity}'
+                    )
+            else:
+                errors['inventory'] = 'Inventory is required for all items'
+
+            if errors:
+                item_errors.append({
+                    'index': index,
+                    'item': getattr(inventory, 'item_name', None),
+                    'errors': errors
+                })
+
+        if item_errors:
+            raise serializers.ValidationError({'items': item_errors})
+
         return attrs
     
     @transaction.atomic
     def create(self, validated_data):
         """Create order with items"""
         items_data = validated_data.pop('items')
-        
+
         # Get created_by from context
         created_by = self.context['request'].user if 'request' in self.context else None
         if created_by:
