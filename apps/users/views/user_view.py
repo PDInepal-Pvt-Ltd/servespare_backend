@@ -265,11 +265,15 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """
-        Create user with role-based validation.
+        Create user with role-based validation and subscription limit checking.
         
         - Super Admin: Can create users with any role in any tenant
         - Tenant Admin: Can create users only in their own tenant
+        - Enforces subscription user limits
         """
+        from apps.users.utils import send_subscription_limit_exceeded_email
+        from rest_framework.exceptions import ValidationError
+        
         user = self.request.user
         branch = serializer.validated_data.get('branch')
         target_tenant = serializer.validated_data.get('tenant')
@@ -284,6 +288,24 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
 
         if branch and target_tenant and branch.tenant_id != target_tenant.id:
             raise PermissionDenied("Selected branch does not belong to the chosen tenant.")
+        
+        # Verify subscription limit one more time before saving
+        if target_tenant and not target_tenant.can_add_user():
+            # Send limit exceeded email to tenant admin
+            send_subscription_limit_exceeded_email(
+                target_tenant,
+                'users',
+                target_tenant.get_user_count(),
+                target_tenant.get_allowed_users()
+            )
+            raise ValidationError({
+                'detail': (
+                    f'Cannot create user. Your subscription plan allows {target_tenant.get_allowed_users()} users, '
+                    f'but you already have {target_tenant.get_user_count()} active users. '
+                    f'Please upgrade your subscription or deactivate existing users. '
+                    f'A notification email has been sent to your admin.'
+                )
+            })
         
         serializer.save(created_by=user)
     
