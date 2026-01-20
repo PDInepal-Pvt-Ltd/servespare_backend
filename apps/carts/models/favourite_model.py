@@ -41,17 +41,31 @@ class Favorite(TimeStampedModel):
     
     def clean(self):
         """Validate favorite entry"""
+        errors = {}
+
+        if not self.user_id and not self.user:
+            errors['user'] = 'User is required.'
+
+        if not self.inventory_id and not self.inventory:
+            errors['inventory'] = 'Inventory item is required.'
+
         # Check if this product is already in user's favorites
-        existing = Favorite.objects.filter(
-            user=self.user,
-            inventory=self.inventory,
-            is_active=True
-        ).exclude(pk=self.pk).exists()
-        
-        if existing:
-            raise ValidationError(
-                'This product is already in your favorites.'
-            )
+        if self.user_id and self.inventory_id:
+            existing = Favorite.objects.filter(
+                user_id=self.user_id,
+                inventory_id=self.inventory_id,
+                is_active=True
+            ).exclude(pk=self.pk).exists()
+            
+            if existing:
+                errors['inventory'] = 'This product is already in your favorites.'
+
+        if errors:
+            raise ValidationError(errors)
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
     
     @classmethod
     def add_to_favorites(cls, user, inventory):

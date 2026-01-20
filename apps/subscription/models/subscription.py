@@ -1,7 +1,14 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+from datetime import date
 from apps.base.models import BaseModel
 from apps.base.managers import TenantManager
+
+
+def no_past_date(value):
+    """Validator to ensure date is not in the past"""
+    if value < date.today():
+        raise ValidationError('Date cannot be in the past.')
 
 
 class Subscription(BaseModel):
@@ -11,17 +18,32 @@ class Subscription(BaseModel):
     tenant = models.ForeignKey(
         'tenant.Tenant',
         on_delete=models.CASCADE,
-        related_name='subscriptions'
+        related_name='subscriptions',
+        null=False,
+        blank=False,
+        help_text='Tenant subscribed to the plan'
     )
     subscription_plan = models.ForeignKey(
         'subscription.SubscriptionPlan',
         on_delete=models.CASCADE,
-        related_name='subscriptions'
+        related_name='subscriptions',
+        null=False,
+        blank=False,
+        help_text='Subscription plan associated'
     )
 
-    subscription_date = models.DateField()
-    finish_date = models.DateField()
-   
+    subscription_date = models.DateField(
+        null=False,
+        blank=False,
+        validators=[no_past_date],
+        help_text='Date when subscription starts (cannot be in the past)'
+    )
+    finish_date = models.DateField(
+        null=False,
+        blank=False,
+        validators=[no_past_date],
+        help_text='Date when subscription ends (cannot be in the past)'
+    )
     
     class Meta:
         db_table = 'subscription'

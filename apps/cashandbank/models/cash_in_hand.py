@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Sum, F, Case, When, DecimalField
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 from apps.base.models import BaseModel
 from apps.base.managers import TenantManager, TenantQuerySet
@@ -137,6 +138,27 @@ class CashTransaction(BaseModel):
         return -self.amount
 
     def clean(self):
-        from django.core.exceptions import ValidationError
-        if self.amount is None or self.amount < 0:
-            raise ValidationError({'amount': 'Amount must be a non-negative value.'})
+        errors = {}
+
+        if not self.transaction_type:
+            errors['transaction_type'] = 'Transaction type is required.'
+        elif self.transaction_type not in dict(self.TYPE_CHOICES):
+            errors['transaction_type'] = 'Invalid transaction type.'
+
+        if self.amount is None:
+            errors['amount'] = 'Amount is required.'
+        elif self.amount < 0:
+            errors['amount'] = 'Amount must be a non-negative value.'
+
+        if self.source_description and len(self.source_description.strip()) > 2000:
+            errors['source_description'] = 'Source description cannot exceed 2000 characters.'
+
+        if not self.transaction_date:
+            errors['transaction_date'] = 'Transaction date is required.'
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)

@@ -123,11 +123,13 @@ class CashierShift(BaseModel):
 
 
     # Transfer tracking
-    transferred_to = models.CharField(
-        max_length=255,
-        blank=True,
+    transferred_to = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
         null=True,
-        help_text='Name of the person/cashier this shift was transferred to'
+        blank=True,
+        related_name='shifts_transferred_to',
+        help_text='Cashier who received this shift transfer'
     )
 
     transferred_at = models.DateTimeField(
@@ -166,19 +168,63 @@ class CashierShift(BaseModel):
         cashier_name = self.cashier.username if self.cashier else 'Unknown'
         return f"Shift {self.id} - {cashier_name} ({self.status}) on {self.opened_at:%Y-%m-%d}"
 
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def clean(self):
         """Validate shift state"""
+        errors = {}
+
+        if not self.status:
+            errors['status'] = 'Status is required.'
+        elif self.status not in dict(self.STATUS_CHOICES):
+            errors['status'] = 'Invalid status.'
+
+        if self.opening_float is None or self.opening_float < 0:
+            errors['opening_float'] = 'Opening float must be a non-negative value.'
+
+        for field_name in ['expected_amount', 'actual_amount']:
+            value = getattr(self, field_name, None)
+            if value is not None and value < 0:
+                errors[field_name] = f"{field_name.replace('_', ' ').title()} cannot be negative."
+
+        if self.variance_amount is not None and self.status == 'closed':
+            # variance can be negative or positive, so only check type
+            try:
+                Decimal(str(self.variance_amount))
+            except Exception:
+                errors['variance_amount'] = 'Variance amount must be numeric.'
+
         if self.status == 'open':
             if self.actual_amount is not None:
-                raise ValidationError({'actual_amount': 'Actual amount should be None for open shifts'})
+                errors['actual_amount'] = 'Actual amount should be None for open shifts.'
             if self.closed_at is not None:
-                raise ValidationError({'closed_at': 'Closed timestamp should be None for open shifts'})
-        
+                errors['closed_at'] = 'Closed timestamp should be None for open shifts.'
+
         if self.status == 'closed':
             if self.actual_amount is None:
-                raise ValidationError({'actual_amount': 'Actual amount is required to close shift'})
+                errors['actual_amount'] = 'Actual amount is required to close shift.'
             if self.closed_at is None:
-                raise ValidationError({'closed_at': 'Closed timestamp is required to close shift'})
+                errors['closed_at'] = 'Closed timestamp is required to close shift.'
+
+        if self.status == 'transferred':
+            if not self.transferred_to:
+                errors['transferred_to'] = 'Transferred-to user is required when status is transferred.'
+            if self.transferred_at is None:
+                errors['transferred_at'] = 'Transferred timestamp is required when status is transferred.'
+
+        if self.variance_reason and len(self.variance_reason.strip()) > 2000:
+            errors['variance_reason'] = 'Variance reason cannot exceed 2000 characters.'
+
+        if self.notes and len(self.notes.strip()) > 2000:
+            errors['notes'] = 'Notes cannot exceed 2000 characters.'
+
+        if not self.opened_at:
+            errors['opened_at'] = 'Opened timestamp is required.'
+
+        if errors:
+            raise ValidationError(errors)
 
     @property
     def duration(self):
@@ -302,7 +348,7 @@ class CashierShift(BaseModel):
 
         Args:
             counted_cash: Decimal amount of cash counted
-            transferred_to: Name of target cashier
+            transferred_to: User object (cashier) receiving the shift
             transferred_by: User performing the transfer
             variance_reason: Optional reason for variance if mismatch
 
@@ -312,8 +358,8 @@ class CashierShift(BaseModel):
         if self.status != 'open':
             raise ValidationError('Can only transfer open shifts')
 
-        if not transferred_to or transferred_to.strip() == '':
-            raise ValidationError('Target name is required for transfer')
+        if not transferred_to:
+            raise ValidationError('Target cashier is required for transfer')
 
         if counted_cash is None or counted_cash <= 0:
             raise ValidationError('Counted cash must be greater than zero')
@@ -332,7 +378,7 @@ class CashierShift(BaseModel):
         self.actual_amount = counted_cash
         self.variance_amount = variance
         self.status = 'transferred'
-        self.transferred_to = transferred_to.strip()
+        self.transferred_to = transferred_to
         self.transferred_at = timezone.now()
         self.transferred_by = transferred_by
         self.closed_at = timezone.now()  # Set closed_at on transfer

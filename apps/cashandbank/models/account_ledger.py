@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from decimal import Decimal
 
 from apps.base.models import BaseModel
@@ -173,6 +174,56 @@ class AccountLedger(BaseModel):
 
     def __str__(self):
         return f"{self.get_ledger_type_display()} - {self.description} ({self.transaction_date:%Y-%m-%d %H:%M})"
+
+    def clean(self):
+        errors = {}
+
+        # Choice validations
+        if not self.ledger_type:
+            errors['ledger_type'] = 'Ledger type is required.'
+        elif self.ledger_type not in dict(self.LEDGER_TYPE_CHOICES):
+            errors['ledger_type'] = 'Invalid ledger type.'
+
+        if not self.transaction_type:
+            errors['transaction_type'] = 'Transaction type is required.'
+        elif self.transaction_type not in dict(self.TRANSACTION_TYPE_CHOICES):
+            errors['transaction_type'] = 'Invalid transaction type.'
+
+        # Amount validations
+        for field in ['debit', 'credit', 'balance']:
+            value = getattr(self, field, None)
+            if value is not None and value < 0:
+                errors[field] = f"{field.capitalize()} cannot be negative."
+
+        # Require at least one of debit/credit to be positive (or non-zero)
+        if (self.debit is None or self.debit == 0) and (self.credit is None or self.credit == 0):
+            errors['debit'] = 'Either debit or credit must be greater than zero.'
+
+        if self.description:
+            desc = self.description.strip()
+            if not desc:
+                errors['description'] = 'Description cannot be blank.'
+        else:
+            errors['description'] = 'Description is required.'
+
+        if self.reference and len(self.reference) > 100:
+            errors['reference'] = 'Reference cannot exceed 100 characters.'
+
+        if self.reference_type and len(self.reference_type) > 50:
+            errors['reference_type'] = 'Reference type cannot exceed 50 characters.'
+
+        if self.reference_id and len(self.reference_id) > 100:
+            errors['reference_id'] = 'Reference ID cannot exceed 100 characters.'
+
+        if not self.transaction_date:
+            errors['transaction_date'] = 'Transaction date is required.'
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     @property
     def total_inflow(self):
