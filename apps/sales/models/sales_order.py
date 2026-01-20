@@ -7,6 +7,17 @@ from apps.base.models import BaseModel
 from apps.base.managers import TenantManager
 import uuid
 
+# Nepal Province-District Mapping
+NEPAL_PROVINCE_DISTRICTS = {
+    'Koshi': ['Bhojpur', 'Dhankuta', 'Ilam', 'Jhapa', 'Khotang', 'Morang', 'Okhaldhunga', 'Panchthar', 'Sankhuwasabha', 'Solukhumbu', 'Sunsari', 'Taplejung', 'Terhathum', 'Udayapur'],
+    'Madhesh': ['Bara', 'Dhanusha', 'Mahottari', 'Parsa', 'Rautahat', 'Saptari', 'Sarlahi', 'Siraha'],
+    'Bagmati': ['Bhaktapur', 'Chitwan', 'Dhading', 'Dolakha', 'Kathmandu', 'Kavrepalanchok', 'Lalitpur', 'Makwanpur', 'Nuwakot', 'Ramechhap', 'Rasuwa', 'Sindhuli', 'Sindhupalchok'],
+    'Gandaki': ['Baglung', 'Gorkha', 'Kaski', 'Lamjung', 'Manang', 'Mustang', 'Myagdi', 'Nawalpur', 'Parbat', 'Syangja', 'Tanahun'],
+    'Lumbini': ['Arghakhanchi', 'Banke', 'Bardiya', 'Dang', 'Gulmi', 'Kapilvastu', 'Palpa', 'Pyuthan', 'Rolpa', 'Rupandehi', 'Rukum East', 'Nawalparasi West'],
+    'Karnali': ['Dailekh', 'Dolpa', 'Humla', 'Jajarkot', 'Jumla', 'Kalikot', 'Mugu', 'Rukum West', 'Salyan', 'Surkhet'],
+    'Sudurpashchim': ['Achham', 'Baitadi', 'Bajhang', 'Bajura', 'Dadeldhura', 'Darchula', 'Doti', 'Kailali', 'Kanchanpur'],
+}
+
 
 class SalesOrder(BaseModel):
     """
@@ -129,11 +140,17 @@ class SalesOrder(BaseModel):
         max_length=100,
         help_text='Delivery city'
     )
-    delivery_state = models.CharField(
+    delivery_province = models.CharField(
         max_length=100,
         blank=True,
         null=True,
-        help_text='Delivery state'
+        help_text='Delivery province'
+    )
+    delivery_district = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text='Delivery district'
     )
     delivery_pincode = models.CharField(
         max_length=20,
@@ -274,8 +291,20 @@ class SalesOrder(BaseModel):
         elif len(self.delivery_city.strip()) > 100:
             errors['delivery_city'] = 'Delivery city cannot exceed 100 characters.'
 
-        if self.delivery_state and len(self.delivery_state.strip()) > 100:
-            errors['delivery_state'] = 'Delivery state cannot exceed 100 characters.'
+        if self.delivery_province and len(self.delivery_province.strip()) > 100:
+            errors['delivery_province'] = 'Delivery province cannot exceed 100 characters.'
+        elif self.delivery_province and self.delivery_province not in NEPAL_PROVINCE_DISTRICTS:
+            errors['delivery_province'] = f'Invalid province. Must be one of: {", ".join(NEPAL_PROVINCE_DISTRICTS.keys())}'
+
+        if self.delivery_district and len(self.delivery_district.strip()) > 100:
+            errors['delivery_district'] = 'Delivery district cannot exceed 100 characters.'
+        elif self.delivery_district and self.delivery_province:
+            # Validate that district belongs to selected province
+            valid_districts = NEPAL_PROVINCE_DISTRICTS.get(self.delivery_province, [])
+            if self.delivery_district not in valid_districts:
+                errors['delivery_district'] = f'Invalid district for {self.delivery_province}. Must be one of: {", ".join(valid_districts)}'
+        elif self.delivery_district and not self.delivery_province:
+            errors['delivery_district'] = 'Delivery province must be selected when specifying a district.'
 
         if self.delivery_pincode and len(self.delivery_pincode.strip()) > 20:
             errors['delivery_pincode'] = 'Delivery pincode cannot exceed 20 characters.'

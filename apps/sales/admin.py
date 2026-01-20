@@ -1,6 +1,39 @@
 from django.contrib import admin
 from django import forms
-from apps.sales.models import SalesOrder, SalesOrderItem, Bill, Invoice, InvoiceItem, PurchaseItem
+from apps.sales.models import SalesOrder, SalesOrderItem, Bill, Invoice, InvoiceItem, PurchaseItem, NEPAL_PROVINCE_DISTRICTS
+
+
+class SalesOrderForm(forms.ModelForm):
+    """Custom form for SalesOrder with province-district validation"""
+    
+    delivery_province = forms.ChoiceField(
+        choices=[('', '--- Select Province ---')] + [(p, p) for p in NEPAL_PROVINCE_DISTRICTS.keys()],
+        required=False,
+        widget=forms.Select(attrs={'class': 'django-admin-form-select'})
+    )
+    delivery_district = forms.CharField(
+        required=False,
+        max_length=100,
+        widget=forms.Select(attrs={'class': 'django-admin-form-select'}),
+        help_text='Districts will be populated after selecting a province'
+    )
+    
+    class Meta:
+        model = SalesOrder
+        fields = '__all__'
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # If editing existing order with a province, populate districts
+        if self.instance.pk and self.instance.delivery_province:
+            province = self.instance.delivery_province
+            districts = NEPAL_PROVINCE_DISTRICTS.get(province, [])
+            self.fields['delivery_district'] = forms.ChoiceField(
+                choices=[('', '--- Select District ---')] + [(d, d) for d in districts],
+                required=False,
+                initial=self.instance.delivery_district,
+                widget=forms.Select(attrs={'class': 'django-admin-form-select'})
+            )
 
 
 class SalesOrderItemInline(admin.TabularInline):
@@ -18,6 +51,7 @@ class SalesOrderItemInline(admin.TabularInline):
 class SalesOrderAdmin(admin.ModelAdmin):
     """Admin interface for SalesOrder model"""
     
+    form = SalesOrderForm
     list_display = [
         'order_number', 'tenant', 'branch', 'customer', 'order_date', 'order_status', 
         'total_amount', 'created_by'
@@ -48,7 +82,7 @@ class SalesOrderAdmin(admin.ModelAdmin):
         ('Delivery Address', {
             'fields': (
                 'delivery_address', 'delivery_city', 
-                'delivery_state', 'delivery_pincode'
+                'delivery_province', 'delivery_district', 'delivery_pincode'
             )
         }),
         ('Delivery Details', {
@@ -70,6 +104,10 @@ class SalesOrderAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    class Media:
+        """JavaScript for handling cascading province-district dropdowns"""
+        js = ('admin/sales_order_admin.js',)
     
     def save_model(self, request, obj, form, change):
         """Set created_by when saving"""

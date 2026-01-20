@@ -3,7 +3,7 @@ from rest_framework import serializers
 from django.db import transaction
 from django.utils import timezone
 from apps.base.serializer_mixins import ModelCleanValidationMixin
-from apps.sales.models import SalesOrder, SalesOrderItem
+from apps.sales.models import SalesOrder, SalesOrderItem, NEPAL_PROVINCE_DISTRICTS
 
 
 class SalesOrderItemSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
@@ -91,7 +91,7 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
             'order_status', 'order_status_display', 'status_display_description',
             'subtotal', 'discount_percentage', 'discount_amount',
             'tax_percentage', 'tax_amount', 'shipping_charges', 'total_amount',
-            'delivery_address', 'delivery_city', 'delivery_state', 'delivery_pincode',
+            'delivery_address', 'delivery_city', 'delivery_province', 'delivery_district', 'delivery_pincode',
             'expected_delivery_date', 'actual_delivery_date',
             'tracking_number', 'courier_partner',
             'notes', 'internal_notes',
@@ -130,7 +130,7 @@ class CustomerOrderStatusSerializer(serializers.ModelSerializer):
             'status_progress', 'is_cancellable',
             'subtotal', 'discount_percentage', 'discount_amount',
             'tax_percentage', 'tax_amount', 'shipping_charges', 'total_amount',
-            'delivery_address', 'delivery_city', 'delivery_state', 'delivery_pincode',
+            'delivery_address', 'delivery_city', 'delivery_province', 'delivery_district', 'delivery_pincode',
             'expected_delivery_date', 'actual_delivery_date', 'estimated_delivery_days',
             'tracking_number', 'courier_partner',
             'notes',
@@ -392,4 +392,30 @@ class SalesOrderStatusUpdateSerializer(serializers.Serializer):
         return instance
 
 
-
+class ProvinceDistrictSerializer(serializers.Serializer):
+    """
+    Serializer to provide province-district mapping for dropdown selections.
+    Used for populating delivery location dropdowns.
+    """
+    
+    provinces = serializers.SerializerMethodField()
+    
+    class Meta:
+        fields = ['provinces']
+    
+    def get_provinces(self, obj):
+        """Return all provinces with their associated districts"""
+        provinces_data = []
+        for province, districts in NEPAL_PROVINCE_DISTRICTS.items():
+            provinces_data.append({
+                'id': province,
+                'name': province,
+                'districts': [
+                    {
+                        'id': district,
+                        'name': district
+                    }
+                    for district in districts
+                ]
+            })
+        return provinces_data
