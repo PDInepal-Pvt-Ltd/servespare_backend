@@ -346,6 +346,12 @@ class User(AbstractUser, BaseModel):
         help_text=_('Indicates if the user must change their password on next login.')
     )
     
+    two_factor_enabled = models.BooleanField(
+        _('two factor authentication enabled'),
+        default=False,
+        help_text=_('Indicates if two-factor authentication is enabled for this user account.')
+    )
+    
     last_login_at = models.DateTimeField(
         _('last login at'),
         null=True,

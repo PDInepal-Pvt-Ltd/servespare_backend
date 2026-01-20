@@ -13,11 +13,11 @@ class UserAdmin(TenantAdminMixin, BaseUserAdmin):
     # Display configuration
     list_display = [
         'username', 'email', 'full_name', 'role', 'status', 'branch', 'is_staff', 
-        'is_active', 'tenant', 'workspace_id', 'created', 'last_login_at'
+        'is_active', 'two_factor_enabled', 'tenant', 'workspace_id', 'created', 'last_login_at'
     ]
     list_filter = [
         'role', 'status', 'branch', 'is_staff', 'is_superuser', 'is_active', 'tenant',
-        'must_change_password', 'groups', 'created'
+        'must_change_password', 'two_factor_enabled', 'groups', 'created'
     ]
     search_fields = [
         'username', 'email', 'full_name', 'phone', 'tenant__name', 'branch__branch_name',
@@ -38,7 +38,7 @@ class UserAdmin(TenantAdminMixin, BaseUserAdmin):
             'fields': ('tenant', 'branch', 'workspace_id',)
         }),
         (_('Role & Status'), {
-            'fields': ('role', 'status', 'is_active', 'must_change_password')
+            'fields': ('role', 'status', 'is_active', 'must_change_password', 'two_factor_enabled')
         }),
         (_('Permissions'), {
             'fields': ('is_staff', 'is_superuser', 'groups', 'user_permissions'),
