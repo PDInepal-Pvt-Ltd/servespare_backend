@@ -7,6 +7,7 @@ from .sales_order import (
     SalesOrderUpdateSerializer,
     SalesOrderStatusUpdateSerializer,
     CustomerOrderStatusSerializer,
+    ProvinceDistrictSerializer,
 )
 from .bill import BillSerializer, PurchaseItemSerializer
 from .invoice import (
@@ -26,6 +27,7 @@ __all__ = [
     'SalesOrderUpdateSerializer',
     'SalesOrderStatusUpdateSerializer',
     'CustomerOrderStatusSerializer',
+    'ProvinceDistrictSerializer',
     'BillSerializer',
     'PurchaseItemSerializer',
     'InvoiceItemSerializer',

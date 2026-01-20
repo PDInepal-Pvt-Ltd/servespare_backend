@@ -1,10 +1,12 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from .models import Message
 
 
-class MessageCreateSerializer(serializers.ModelSerializer):
+class MessageCreateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for creating messages (public endpoint - no authentication required).
+    Includes model-level validation from Message.clean() method.
     """
     class Meta:
         model = Message

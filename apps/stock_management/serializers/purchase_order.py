@@ -1,10 +1,11 @@
 from django.db import transaction
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem, Party
 from apps.stock_management.serializers.party import PartySerializer
 
 
-class PurchaseOrderItemSerializer(serializers.ModelSerializer):
+class PurchaseOrderItemSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for PurchaseOrderItem model
     """
@@ -76,7 +77,7 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class PurchaseOrderSerializer(serializers.ModelSerializer):
+class PurchaseOrderSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for PurchaseOrder model
     """

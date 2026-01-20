@@ -1,9 +1,10 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 
 from apps.cashandbank.models import CashTransaction
 
 
-class CashTransactionSerializer(serializers.ModelSerializer):
+class CashTransactionSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     type_label = serializers.CharField(source='get_transaction_type_display', read_only=True)
     signed_amount = serializers.SerializerMethodField()
 

@@ -7,7 +7,7 @@ from django.db.models import Sum, Q
 from django.utils import timezone
 
 from apps.base.pagination import StandardResultsSetPagination
-from apps.sales.models import SalesOrder
+from apps.sales.models import SalesOrder, NEPAL_PROVINCE_DISTRICTS
 from apps.sales.serializers import (
     SalesOrderListSerializer,
     SalesOrderDetailSerializer,
@@ -15,6 +15,7 @@ from apps.sales.serializers import (
     SalesOrderUpdateSerializer,
     SalesOrderStatusUpdateSerializer,
     CustomerOrderStatusSerializer,
+    ProvinceDistrictSerializer,
 )
 from apps.base.drf import TenantViewSetMixin
 from apps.base.permissions import CanViewOwnOrders
@@ -432,3 +433,27 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         }
         
         return Response(invoice_data)
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def province_districts(self, request):
+        """
+        Get all provinces and their associated districts for dropdown selection.
+        
+        GET /api/sales-orders/province-districts/
+        
+        Response:
+        {
+            "provinces": [
+                {
+                    "id": "Koshi",
+                    "name": "Koshi",
+                    "districts": [
+                        {"id": "Bhojpur", "name": "Bhojpur"},
+                        ...
+                    ]
+                },
+                ...
+            ]
+        }
+        """
+        serializer = ProvinceDistrictSerializer({})
+        return Response(serializer.data)

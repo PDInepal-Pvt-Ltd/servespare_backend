@@ -1,8 +1,9 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.cashandbank.models import BankAccount
 
 
-class BankAccountSerializer(serializers.ModelSerializer):
+class BankAccountSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for BankAccount model
     """

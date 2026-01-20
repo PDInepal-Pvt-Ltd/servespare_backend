@@ -1,9 +1,10 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.tenant.models import Tenant
 from apps.subscription.serializers.subscription_plan import SubscriptionPlanSerializer
 
 
-class TenantSerializer(serializers.ModelSerializer):
+class TenantSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for Tenant model
     All validation logic is handled in the model's clean() method

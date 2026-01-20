@@ -1,8 +1,9 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.cashandbank.models import AccountLedger
 
 
-class AccountLedgerSerializer(serializers.ModelSerializer):
+class AccountLedgerSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for Account Ledger with complete transaction history and running balance.
     """
