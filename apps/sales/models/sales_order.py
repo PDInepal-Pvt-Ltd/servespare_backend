@@ -95,7 +95,7 @@ class SalesOrder(BaseModel):
     tax_percentage = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        default=Decimal('0.00'),
+        default=Decimal('13.00'),
         validators=[MinValueValidator(Decimal('0.00')), MaxValueValidator(Decimal('100.00'))],
         help_text='Tax percentage (GST/VAT)'
     )
@@ -226,7 +226,7 @@ class SalesOrder(BaseModel):
         items = self.items.all()
         
         # Calculate subtotal from items
-        self.subtotal = sum(item.line_total for item in items)
+        self.subtotal = sum((item.line_total for item in items), start=Decimal('0.00'))
         
         # Calculate discount
         if self.discount_percentage > 0:
@@ -235,9 +235,15 @@ class SalesOrder(BaseModel):
         # Calculate amount after discount
         amount_after_discount = self.subtotal - self.discount_amount
         
+        # Ensure tax percentage defaults to 13% if not provided
+        self.tax_percentage = self.tax_percentage or Decimal('13.00')
+
         # Calculate tax
         if self.tax_percentage > 0:
-            self.tax_amount = (amount_after_discount * self.tax_percentage) / Decimal('100.00')
+            tax_value = (amount_after_discount * self.tax_percentage) / Decimal('100.00')
+            self.tax_amount = tax_value.quantize(Decimal('0.01'))
+        else:
+            self.tax_amount = Decimal('0.00')
         
         # Calculate total
         self.total_amount = amount_after_discount + self.tax_amount + self.shipping_charges

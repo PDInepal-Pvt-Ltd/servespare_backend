@@ -90,6 +90,8 @@ class BillSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
             'discount_method_display',
             'discount_value',
             'discount_amount',
+            'tax_percentage',
+            'tax_amount',
             'total_after_discount',
             'payment_method',
             'payment_method_display',
@@ -109,6 +111,7 @@ class BillSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
             'modified',
             'subtotal',
             'discount_amount',
+            'tax_amount',
             'total_after_discount',
             'purchase_items',
             'customer_type_display',
@@ -220,6 +223,9 @@ class BillSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
                     quantity=quantity
                     # price is NOT set here - will be auto-populated from inventory in model's save()
                 )
+
+            # Recalculate tax after adding purchase items so tax_amount reflects current totals
+            bill.save(update_fields=['tax_amount', 'modified'])
         
         return bill
 

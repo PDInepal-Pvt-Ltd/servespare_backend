@@ -1,3 +1,4 @@
+from decimal import Decimal
 from rest_framework import serializers
 from django.db import transaction
 from django.utils import timezone
@@ -301,6 +302,9 @@ class SalesOrderCreateSerializer(ModelCleanValidationMixin, serializers.ModelSer
             validated_data.setdefault('tenant', created_by.tenant)
             if 'branch' not in validated_data and getattr(created_by, 'branch', None):
                 validated_data['branch'] = created_by.branch
+
+        # Default tax percentage to 13% if not provided
+        validated_data.setdefault('tax_percentage', Decimal('13.00'))
         
         # Create order
         order = SalesOrder.objects.create(**validated_data)
