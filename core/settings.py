@@ -41,7 +41,7 @@ CORS_ALLOWED_ORIGINS = [
     'https://imspravidhi.vercel.app',
     'https://backend.servespare.xyz',
     'https://servespare.xyz',
-    'api-demo.servespare.xyz',
+    'https://api-demo.servespare.xyz',
 ]
 
 CORS_ALLOW_CREDENTIALS = True
