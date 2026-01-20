@@ -1,5 +1,56 @@
 from django.db import models
+from django.core.validators import RegexValidator, EmailValidator, MinLengthValidator, MaxLengthValidator
+from django.core.exceptions import ValidationError
+import re
+from django.utils.translation import gettext_lazy as _
 from apps.base.models import BaseModel
+
+
+def validate_phone_number(value):
+    """
+    Validate Nepali phone number format.
+    Accepts:
+    - Mobile: 10 digits starting with 97 or 98 (e.g., 9841234567)
+    - Landline: 6-8 digits with area code (e.g., 01-4445678)
+    - International format: +977 followed by mobile/landline
+    - Formats accepted: with/without spaces, hyphens, parentheses
+    """
+    if not value:
+        return
+    
+    # Remove common separators for validation
+    cleaned = re.sub(r'[\s\-\(\)]', '', value)
+    
+    # Check for international format (+977)
+    if cleaned.startswith('+977'):
+        cleaned = cleaned[4:]  # Remove +977
+    elif cleaned.startswith('977'):
+        cleaned = cleaned[3:]  # Remove 977
+    
+    # Must contain only digits after cleaning
+    if not cleaned.isdigit():
+        raise ValidationError(
+            _('Phone number must contain only digits, spaces, hyphens, parentheses, or +977 for international format.'),
+            code='invalid_phone_format'
+        )
+    
+    # Validate based on number type
+    if len(cleaned) == 10:
+        # Mobile number validation (must start with 97 or 98)
+        if not (cleaned.startswith('97') or cleaned.startswith('98')):
+            raise ValidationError(
+                _('Nepali mobile number must start with 97 or 98.'),
+                code='invalid_mobile_prefix'
+            )
+    elif len(cleaned) >= 6 and len(cleaned) <= 8:
+        # Landline number (6-8 digits)
+        # Valid - no additional prefix validation needed for landlines
+        pass
+    else:
+        raise ValidationError(
+            _('Phone number must be either 10 digits (mobile) or 6-8 digits (landline).'),
+            code='invalid_phone_length'
+        )
 
 
 class Tenant(BaseModel):
@@ -12,22 +63,90 @@ class Tenant(BaseModel):
         ('rejected', 'Rejected'),
     ]
     
-    business_name = models.CharField(max_length=255)
-    email = models.EmailField(unique=True)
-    phone = models.CharField(max_length=20, blank=True, null=True)
-    pan_number = models.CharField(max_length=20, blank=True, null=True)
-    location = models.CharField(max_length=255, blank=True, null=True)
+    # Phone number validator - uses comprehensive Nepali phone validation function
+    
+    # PAN number validator - exactly 9 digits, numeric only
+    pan_validator = RegexValidator(
+        regex=r'^[0-9]{9}$',
+        message="PAN number must be exactly 9 digits (numeric only)"
+    )
+    
+    # Province validator - only letters, spaces, and hyphens
+    province_validator = RegexValidator(
+        regex=r'^[a-zA-Z\s-]+$',
+        message="Province name can only contain letters, spaces, and hyphens"
+    )
+    
+    # District validator - only letters, spaces, and hyphens
+    district_validator = RegexValidator(
+        regex=r'^[a-zA-Z\s-]+$',
+        message="District name can only contain letters, spaces, and hyphens"
+    )
+    
+    business_name = models.CharField(
+        max_length=255,
+        validators=[MinLengthValidator(2, message="Business name must be at least 2 characters long")],
+        help_text="Name of the business/tenant"
+    )
+    email = models.EmailField(
+        unique=True,
+        validators=[EmailValidator(message="Enter a valid email address")],
+        help_text="Business email address (must be unique)"
+    )
+    phone = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        validators=[validate_phone_number],
+        help_text="Contact phone number (mobile: 10 digits starting with 97/98, landline: 6-8 digits, supports +977 format)"
+    )
+    pan_number = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        validators=[pan_validator],
+        help_text="PAN/Tax registration number"
+    )
+    location = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        validators=[MinLengthValidator(3, message="Location must be at least 3 characters long")],
+        help_text="Business location/address"
+    )
+    province = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        validators=[
+            MinLengthValidator(2, message="Province name must be at least 2 characters long"),
+            province_validator
+        ],
+        help_text="Province/State where business is located"
+    )
+    district = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        validators=[
+            MinLengthValidator(2, message="District name must be at least 2 characters long"),
+            district_validator
+        ],
+        help_text="District/County where business is located"
+    )
     package = models.ForeignKey(
         'subscription.SubscriptionPlan',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='tenants'
+        related_name='tenants',
+        help_text="Subscription plan for this tenant"
     )
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default='trial'
+        default='trial',
+        help_text="Current status of the tenant"
     )
     
     class Meta:
@@ -38,6 +157,91 @@ class Tenant(BaseModel):
     
     def __str__(self):
         return f"{self.business_name} ({self.email})"
+    
+    def clean(self):
+        """Custom model validation"""
+        super().clean()
+        errors = {}
+        
+        # Validate business name
+        if self.business_name:
+            self.business_name = self.business_name.strip()
+            if not self.business_name:
+                errors['business_name'] = 'Business name cannot be empty or just whitespace'
+            elif len(self.business_name) < 2:
+                errors['business_name'] = 'Business name must be at least 2 characters long'
+            elif len(self.business_name) > 255:
+                errors['business_name'] = 'Business name cannot exceed 255 characters'
+        
+        # Validate and normalize email
+        if self.email:
+            self.email = self.email.lower().strip()
+            # Check email uniqueness
+            queryset = Tenant.objects.filter(email=self.email)
+            if self.pk:
+                queryset = queryset.exclude(pk=self.pk)
+            if queryset.exists():
+                errors['email'] = 'A tenant with this email already exists'
+        
+        # Validate phone number if provided
+        if self.phone:
+            self.phone = self.phone.strip()
+            if self.phone:
+                try:
+                    validate_phone_number(self.phone)
+                except ValidationError as e:
+                    errors['phone'] = e.message
+        
+        # Validate PAN number if provided
+        if self.pan_number:
+            self.pan_number = self.pan_number.strip()
+            if self.pan_number:
+                pan_pattern = r'^[0-9]{9}$'
+                if not re.match(pan_pattern, self.pan_number):
+                    errors['pan_number'] = 'PAN number must be exactly 9 digits (numeric only, no letters or special characters)'
+        
+        # Validate location if provided
+        if self.location:
+            self.location = self.location.strip()
+            if self.location:
+                if len(self.location) < 3:
+                    errors['location'] = 'Location must be at least 3 characters long'
+                elif len(self.location) > 255:
+                    errors['location'] = 'Location cannot exceed 255 characters'
+        
+        # Validate province if provided
+        if self.province:
+            self.province = self.province.strip().title()
+            if self.province:
+                if len(self.province) < 2:
+                    errors['province'] = 'Province name must be at least 2 characters long'
+                elif len(self.province) > 100:
+                    errors['province'] = 'Province name cannot exceed 100 characters'
+                elif not re.match(r'^[a-zA-Z\s-]+$', self.province):
+                    errors['province'] = 'Province name can only contain letters, spaces, and hyphens'
+        
+        # Validate district if provided
+        if self.district:
+            self.district = self.district.strip().title()
+            if self.district:
+                if len(self.district) < 2:
+                    errors['district'] = 'District name must be at least 2 characters long'
+                elif len(self.district) > 100:
+                    errors['district'] = 'District name cannot exceed 100 characters'
+                elif not re.match(r'^[a-zA-Z\s-]+$', self.district):
+                    errors['district'] = 'District name can only contain letters, spaces, and hyphens'
+        
+        # Cross-field validation: If district is provided, province should also be provided
+        if self.district and not self.province:
+            errors['province'] = 'Province is required when district is specified'
+        
+        if errors:
+            raise ValidationError(errors)
+    
+    def save(self, *args, **kwargs):
+        """Override save to run full_clean before saving"""
+        self.full_clean()
+        super().save(*args, **kwargs)
     
     def get_user_count(self):
         """Get the total number of active users for this tenant"""

@@ -211,10 +211,7 @@ class SalesOrder(BaseModel):
         """Generate order number if not exists and calculate totals"""
         if not self.order_number:
             self.order_number = self.generate_order_number()
-        
-        # Delivery address must be provided explicitly
-        # (User model doesn't have address fields)
-        
+        self.full_clean()
         super().save(*args, **kwargs)
     
     def generate_order_number(self):
@@ -249,6 +246,66 @@ class SalesOrder(BaseModel):
             'subtotal', 'discount_amount', 'tax_amount', 'total_amount', 
             'modified'
         ])
+
+    def clean(self):
+        errors = {}
+
+        if not self.customer_id and not self.customer:
+            errors['customer'] = 'Customer is required.'
+
+        if not self.order_status:
+            errors['order_status'] = 'Order status is required.'
+        elif self.order_status not in dict(self.ORDER_STATUS_CHOICES):
+            errors['order_status'] = 'Invalid order status.'
+
+        if not self.delivery_address or not self.delivery_address.strip():
+            errors['delivery_address'] = 'Delivery address is required.'
+        elif len(self.delivery_address.strip()) < 5:
+            errors['delivery_address'] = 'Delivery address must be at least 5 characters.'
+
+        if not self.delivery_city or not self.delivery_city.strip():
+            errors['delivery_city'] = 'Delivery city is required.'
+        elif len(self.delivery_city.strip()) > 100:
+            errors['delivery_city'] = 'Delivery city cannot exceed 100 characters.'
+
+        if self.delivery_state and len(self.delivery_state.strip()) > 100:
+            errors['delivery_state'] = 'Delivery state cannot exceed 100 characters.'
+
+        if self.delivery_pincode and len(self.delivery_pincode.strip()) > 20:
+            errors['delivery_pincode'] = 'Delivery pincode cannot exceed 20 characters.'
+
+        if self.tracking_number and len(self.tracking_number.strip()) > 100:
+            errors['tracking_number'] = 'Tracking number cannot exceed 100 characters.'
+
+        if self.courier_partner and len(self.courier_partner.strip()) > 100:
+            errors['courier_partner'] = 'Courier partner cannot exceed 100 characters.'
+
+        money_fields = {
+            'subtotal': self.subtotal,
+            'discount_amount': self.discount_amount,
+            'tax_amount': self.tax_amount,
+            'shipping_charges': self.shipping_charges,
+            'total_amount': self.total_amount,
+        }
+        for field, value in money_fields.items():
+            if value is not None and value < 0:
+                errors[field] = f"{field.replace('_', ' ').title()} cannot be negative."
+
+        if self.discount_percentage is not None and self.discount_percentage > Decimal('100.00'):
+            errors['discount_percentage'] = 'Discount percentage cannot exceed 100%.'
+
+        if self.tax_percentage is not None and self.tax_percentage > Decimal('100.00'):
+            errors['tax_percentage'] = 'Tax percentage cannot exceed 100%.'
+
+        if self.subtotal is not None and self.discount_amount is not None:
+            if self.discount_amount > self.subtotal:
+                errors['discount_amount'] = 'Discount amount cannot exceed subtotal.'
+
+        if self.total_amount is not None and self.total_amount < Decimal('0.00'):
+            errors['total_amount'] = 'Total amount cannot be negative.'
+
+        if errors:
+            raise ValidationError(errors)
     
     def update_order_status(self, new_status):
         """Update order status"""
@@ -537,12 +594,59 @@ class SalesOrderItem(BaseModel):
         # Calculate line total
         self.line_total = amount_after_discount + self.tax_amount
         
+        self.full_clean()
+
         is_new = self.pk is None
         super().save(*args, **kwargs)
         
         # Do not deduct inventory at item creation; defer to delivery status
         # Recalculate order totals
         self.order.calculate_totals()
+
+    def clean(self):
+        errors = {}
+
+        if not self.order_id and not self.order:
+            errors['order'] = 'Order is required.'
+
+        if not self.inventory_id and not self.inventory:
+            errors['inventory'] = 'Inventory item is required.'
+
+        if not self.item_name or not self.item_name.strip():
+            errors['item_name'] = 'Item name is required.'
+        elif len(self.item_name.strip()) > 255:
+            errors['item_name'] = 'Item name cannot exceed 255 characters.'
+
+        if self.part_number and len(self.part_number.strip()) > 100:
+            errors['part_number'] = 'Part number cannot exceed 100 characters.'
+
+        if self.quantity is None or self.quantity <= 0:
+            errors['quantity'] = 'Quantity must be greater than zero.'
+
+        if self.unit_price is None or self.unit_price < 0:
+            errors['unit_price'] = 'Unit price cannot be negative.'
+
+        if self.discount_percentage is not None and self.discount_percentage > Decimal('100.00'):
+            errors['discount_percentage'] = 'Discount percentage cannot exceed 100%.'
+
+        gross_amount = self.quantity * self.unit_price if self.quantity and self.unit_price is not None else Decimal('0.00')
+
+        if self.discount_amount is not None and self.discount_amount < 0:
+            errors['discount_amount'] = 'Discount amount cannot be negative.'
+        elif self.discount_amount is not None and gross_amount and self.discount_amount > gross_amount:
+            errors['discount_amount'] = 'Discount amount cannot exceed gross amount.'
+
+        if self.tax_percentage is not None and self.tax_percentage > Decimal('100.00'):
+            errors['tax_percentage'] = 'Tax percentage cannot exceed 100%.'
+
+        if self.tax_amount is not None and self.tax_amount < 0:
+            errors['tax_amount'] = 'Tax amount cannot be negative.'
+
+        if self.line_total is not None and self.line_total < 0:
+            errors['line_total'] = 'Line total cannot be negative.'
+
+        if errors:
+            raise ValidationError(errors)
     
     def deduct_inventory(self):
         """Deduct quantity from inventory and mark as deducted"""

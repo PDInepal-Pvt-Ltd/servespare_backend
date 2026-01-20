@@ -1,5 +1,6 @@
 from django.db import models, transaction
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from decimal import Decimal
 
 from apps.base.models import BaseModel
@@ -72,6 +73,8 @@ class ManualEntry(BaseModel):
 
         is_create = self._state.adding
 
+        self.full_clean()
+
         with transaction.atomic():
             super().save(*args, **kwargs)
 
@@ -91,3 +94,25 @@ class ManualEntry(BaseModel):
 
                 cb.last_updated = timezone.now()
                 cb.save(update_fields=['balance', 'last_updated'])
+
+    def clean(self):
+        errors = {}
+
+        if not self.transaction_type:
+            errors['transaction_type'] = 'Transaction type is required.'
+        elif self.transaction_type not in dict(self.TYPE_CHOICES):
+            errors['transaction_type'] = 'Invalid transaction type.'
+
+        if self.amount is None:
+            errors['amount'] = 'Amount is required.'
+        elif self.amount <= 0:
+            errors['amount'] = 'Amount must be greater than zero.'
+
+        if self.description and len(self.description.strip()) > 1000:
+            errors['description'] = 'Description cannot exceed 1000 characters.'
+
+        if not self.entry_date:
+            errors['entry_date'] = 'Entry date is required.'
+
+        if errors:
+            raise ValidationError(errors)
