@@ -8,6 +8,7 @@ from apps.users.utils import (
     send_welcome_credentials_email,
 )
 from apps.tenant.serializers import TenantSerializer
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 
 
 def _validate_branch_with_tenant(attrs, instance=None):
@@ -44,7 +45,7 @@ class UserListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'full_name', 'role', 'role_display',
             'status', 'status_display', 'is_active', 'tenant', 'branch', 'branch_name',
-            'workspace_id', 'created', 'last_login_at'
+            'workspace_id', 'two_factor_enabled', 'created', 'last_login_at'
         ]
         read_only_fields = ['id', 'created', 'last_login_at']
 
@@ -65,7 +66,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
             'phone', 'location', 'avatar', 'tenant', 'branch', 'branch_name', 'workspace_id',
             'role', 'role_display', 'status', 'status_display',
             'is_active', 'is_staff', 'is_superuser',
-            'must_change_password',
+            'must_change_password', 'two_factor_enabled',
             'last_login', 'last_login_at', 'date_joined',
             'created', 'modified', 'created_by', 'created_by_username',
             'groups_list'
@@ -80,11 +81,12 @@ class UserDetailSerializer(serializers.ModelSerializer):
         return list(obj.groups.values_list('name', flat=True))
 
 
-class UserCreateSerializer(serializers.ModelSerializer):
+class UserCreateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for creating new users by admin/super admin.
     
     Allows super admin/admin users to assign roles to newly created users.
     Users default to CUSTOMER role if not specified.
+    Includes model-level validation from User.clean() method.
     """
     
     password = serializers.CharField(
@@ -109,7 +111,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
             'username', 'email', 'password', 'password_confirm',
             'full_name', 'first_name', 'last_name', 'phone', 'location',
             'avatar', 'tenant', 'branch', 'workspace_id',
-            'role', 'status', 'is_active', 'created_by'
+            'role', 'status', 'is_active', 'two_factor_enabled', 'created_by'
         ]
         extra_kwargs = {
             'email': {'required': False},
@@ -155,8 +157,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return user
 
 
-class UserUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for updating user information."""
+class UserUpdateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
+    """Serializer for updating user information.
+    Includes model-level validation from User.clean() method.
+    """
     
     class Meta:
         model = User
@@ -164,7 +168,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             'email', 'full_name', 'first_name', 'last_name', 'phone', 'location',
             'avatar', 'tenant', 'branch', 'workspace_id',
             'role', 'status', 'is_active', 'is_staff',
-            'must_change_password'
+            'must_change_password', 'two_factor_enabled'
         ]
 
     def validate(self, attrs):
@@ -318,16 +322,16 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'full_name', 'first_name', 'last_name',
             'phone', 'location', 'avatar', 'tenant', 'branch', 'branch_name', 'workspace_id',
             'role', 'role_display', 'status', 'status_display',
-            'must_change_password',
+            'must_change_password', 'two_factor_enabled',
             'last_login_at', 'date_joined', 'created'
         ]
         read_only_fields = [
             'id', 'username', 'role', 'status', 'branch',
-            'must_change_password', 'last_login_at', 'date_joined', 'created'
+            'must_change_password', 'two_factor_enabled', 'last_login_at', 'date_joined', 'created'
         ]
 
 
-class UserProfileUpdateSerializer(serializers.ModelSerializer):
+class UserProfileUpdateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for users to update their own profile."""
     
     class Meta:
@@ -413,7 +417,7 @@ class UserLoginSerializer(serializers.Serializer):
     )
 
 
-class UserRegistrationSerializer(serializers.ModelSerializer):
+class UserRegistrationSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for user self-registration."""
     
     password = serializers.CharField(
@@ -475,7 +479,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
-class AdminAccountSerializer(serializers.ModelSerializer):
+class AdminAccountSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for listing admin accounts with tenant and subscription information.
     Shows admin details along with their tenant's subscription package and user count.
@@ -508,6 +512,7 @@ class AdminAccountSerializer(serializers.ModelSerializer):
             'subscription_name',
             'tenant_user_count',
             'is_active',
+            'two_factor_enabled',
             'created',
             'last_login_at'
         ]
@@ -556,6 +561,7 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
             'role_display',
             'status',
             'status_display',
+            'two_factor_enabled',
             'total_orders',
             'active_orders',
             'favorites_count',
@@ -583,3 +589,62 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
     def get_favorites_count(self, obj):
         """Get count of customer's favorite items"""
         return obj.favorites.filter(is_active=True).count()
+
+
+class TwoFactorAuthLoginSerializer(serializers.Serializer):
+    """Serializer for two-factor authentication login response.
+    
+    When a user with 2FA enabled logs in, they receive a temporary token
+    to use for OTP verification, and an OTP is sent to their email.
+    """
+    
+    message = serializers.CharField(read_only=True)
+    requires_otp = serializers.BooleanField(read_only=True, default=True)
+    temp_token = serializers.CharField(read_only=True, help_text='Temporary token for OTP verification')
+    user = serializers.SerializerMethodField(read_only=True)
+    otp_sent_to = serializers.EmailField(read_only=True, help_text='Email address where OTP was sent')
+    
+    def get_user(self, obj):
+        """Return basic user information."""
+        user = obj.get('user')
+        if user:
+            return {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'full_name': user.full_name,
+                'role': user.role,
+                'role_display': user.get_role_display(),
+            }
+        return None
+
+
+class OTPVerificationSerializer(serializers.Serializer):
+    """Serializer for verifying OTP and obtaining JWT tokens."""
+    
+    temp_token = serializers.CharField(
+        required=True,
+        write_only=True,
+        help_text='Temporary token received after login'
+    )
+    otp_code = serializers.CharField(
+        required=True,
+        write_only=True,
+        min_length=6,
+        max_length=6,
+        help_text='6-digit OTP code received via email'
+    )
+    
+    def validate_otp_code(self, value):
+        """Validate OTP is numeric."""
+        if not value.isdigit():
+            raise serializers.ValidationError('OTP must contain only digits.')
+        return value
+
+
+class TwoFactorAuthResponseSerializer(serializers.Serializer):
+    """Serializer for successful 2FA verification response."""
+    
+    message = serializers.CharField(read_only=True)
+    user = serializers.DictField(read_only=True, help_text='User details')
+    tokens = serializers.DictField(read_only=True, help_text='Access and refresh tokens')

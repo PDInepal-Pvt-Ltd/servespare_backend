@@ -1,9 +1,10 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.stock_management.models import Inventory, InventoryImage
 from apps.stock_management.serializers.party import PartySerializer
 
 
-class InventoryImageSerializer(serializers.ModelSerializer):
+class InventoryImageSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for InventoryImage model
     """
@@ -35,7 +36,7 @@ class InventoryImageSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-class InventorySerializer(serializers.ModelSerializer):
+class InventorySerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for Inventory model
     """

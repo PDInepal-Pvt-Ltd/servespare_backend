@@ -1,8 +1,9 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.cashandbank.models import CashierShift
 
 
-class CashierShiftSerializer(serializers.ModelSerializer):
+class CashierShiftSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for CashierShift model with read-only computed fields.
     """

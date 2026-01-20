@@ -1,8 +1,9 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.cashandbank.models import ManualEntry
 
 
-class ManualEntrySerializer(serializers.ModelSerializer):
+class ManualEntrySerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     type_label = serializers.CharField(source='get_transaction_type_display', read_only=True)
 
     class Meta:

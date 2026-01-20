@@ -1,8 +1,9 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.cashandbank.models import Cheque
 
 
-class ChequeSerializer(serializers.ModelSerializer):
+class ChequeSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     class Meta:
         model = Cheque
         fields = [

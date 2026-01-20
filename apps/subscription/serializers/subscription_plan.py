@@ -1,8 +1,9 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.subscription.models import SubscriptionPlan
 
 
-class SubscriptionPlanSerializer(serializers.ModelSerializer):
+class SubscriptionPlanSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for SubscriptionPlan model
     """

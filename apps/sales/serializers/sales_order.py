@@ -1,10 +1,12 @@
+from decimal import Decimal
 from rest_framework import serializers
 from django.db import transaction
 from django.utils import timezone
-from apps.sales.models import SalesOrder, SalesOrderItem
+from apps.base.serializer_mixins import ModelCleanValidationMixin
+from apps.sales.models import SalesOrder, SalesOrderItem, NEPAL_PROVINCE_DISTRICTS
 
 
-class SalesOrderItemSerializer(serializers.ModelSerializer):
+class SalesOrderItemSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for sales order items"""
     
     inventory_name = serializers.CharField(source='inventory.item_name', read_only=True)
@@ -89,7 +91,7 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
             'order_status', 'order_status_display', 'status_display_description',
             'subtotal', 'discount_percentage', 'discount_amount',
             'tax_percentage', 'tax_amount', 'shipping_charges', 'total_amount',
-            'delivery_address', 'delivery_city', 'delivery_state', 'delivery_pincode',
+            'delivery_address', 'delivery_city', 'delivery_province', 'delivery_district', 'delivery_pincode',
             'expected_delivery_date', 'actual_delivery_date',
             'tracking_number', 'courier_partner',
             'notes', 'internal_notes',
@@ -128,7 +130,7 @@ class CustomerOrderStatusSerializer(serializers.ModelSerializer):
             'status_progress', 'is_cancellable',
             'subtotal', 'discount_percentage', 'discount_amount',
             'tax_percentage', 'tax_amount', 'shipping_charges', 'total_amount',
-            'delivery_address', 'delivery_city', 'delivery_state', 'delivery_pincode',
+            'delivery_address', 'delivery_city', 'delivery_province', 'delivery_district', 'delivery_pincode',
             'expected_delivery_date', 'actual_delivery_date', 'estimated_delivery_days',
             'tracking_number', 'courier_partner',
             'notes',
@@ -207,7 +209,7 @@ class CustomerOrderStatusSerializer(serializers.ModelSerializer):
         return None  # No estimate available
 
 
-class SalesOrderItemCreateSerializer(serializers.ModelSerializer):
+class SalesOrderItemCreateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for creating sales order items"""
     
     class Meta:
@@ -218,13 +220,15 @@ class SalesOrderItemCreateSerializer(serializers.ModelSerializer):
         ]
     
     def validate_quantity(self, value):
-        """Validate quantity is positive"""
+        """Validate quantity is positive and information is provided"""
+        if value is None:
+            raise serializers.ValidationError("Quantity information is required for all items. Please provide quantity first.")
         if value <= 0:
             raise serializers.ValidationError("Quantity must be greater than 0")
         return value
 
 
-class SalesOrderCreateSerializer(serializers.ModelSerializer):
+class SalesOrderCreateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for creating sales orders"""
     
     items = SalesOrderItemCreateSerializer(many=True, write_only=True)
@@ -246,14 +250,51 @@ class SalesOrderCreateSerializer(serializers.ModelSerializer):
         return value
     
     def validate(self, attrs):
-        """Validate order data"""
+        """Validate order data and collect all item-level errors"""
+        items = attrs.get('items') or []
+        item_errors = []
+
+        for index, item_data in enumerate(items):
+            errors = {}
+            inventory = item_data.get('inventory')
+            quantity = item_data.get('quantity')
+
+            if quantity is None:
+                errors['quantity'] = 'Quantity information is required for all items. Please provide quantity first.'
+            elif quantity <= 0:
+                errors['quantity'] = 'Quantity must be greater than 0'
+
+            if inventory:
+                if inventory.quantity is None:
+                    errors['inventory'] = (
+                        f'Product "{inventory.item_name}" does not have quantity information. '
+                        'Please add quantity to inventory first.'
+                    )
+                elif inventory.quantity < quantity:
+                    errors['inventory'] = (
+                        f'Product "{inventory.item_name}" has insufficient stock. '
+                        f'Available: {inventory.quantity}, Requested: {quantity}'
+                    )
+            else:
+                errors['inventory'] = 'Inventory is required for all items'
+
+            if errors:
+                item_errors.append({
+                    'index': index,
+                    'item': getattr(inventory, 'item_name', None),
+                    'errors': errors
+                })
+
+        if item_errors:
+            raise serializers.ValidationError({'items': item_errors})
+
         return attrs
     
     @transaction.atomic
     def create(self, validated_data):
         """Create order with items"""
         items_data = validated_data.pop('items')
-        
+
         # Get created_by from context
         created_by = self.context['request'].user if 'request' in self.context else None
         if created_by:
@@ -261,6 +302,9 @@ class SalesOrderCreateSerializer(serializers.ModelSerializer):
             validated_data.setdefault('tenant', created_by.tenant)
             if 'branch' not in validated_data and getattr(created_by, 'branch', None):
                 validated_data['branch'] = created_by.branch
+
+        # Default tax percentage to 13% if not provided
+        validated_data.setdefault('tax_percentage', Decimal('13.00'))
         
         # Create order
         order = SalesOrder.objects.create(**validated_data)
@@ -275,7 +319,7 @@ class SalesOrderCreateSerializer(serializers.ModelSerializer):
         return order
 
 
-class SalesOrderUpdateSerializer(serializers.ModelSerializer):
+class SalesOrderUpdateSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for updating sales orders"""
     
     class Meta:
@@ -348,4 +392,30 @@ class SalesOrderStatusUpdateSerializer(serializers.Serializer):
         return instance
 
 
-
+class ProvinceDistrictSerializer(serializers.Serializer):
+    """
+    Serializer to provide province-district mapping for dropdown selections.
+    Used for populating delivery location dropdowns.
+    """
+    
+    provinces = serializers.SerializerMethodField()
+    
+    class Meta:
+        fields = ['provinces']
+    
+    def get_provinces(self, obj):
+        """Return all provinces with their associated districts"""
+        provinces_data = []
+        for province, districts in NEPAL_PROVINCE_DISTRICTS.items():
+            provinces_data.append({
+                'id': province,
+                'name': province,
+                'districts': [
+                    {
+                        'id': district,
+                        'name': district
+                    }
+                    for district in districts
+                ]
+            })
+        return provinces_data

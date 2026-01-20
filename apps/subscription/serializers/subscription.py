@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.subscription.models import Subscription
 from apps.subscription.serializers.subscription_plan import SubscriptionPlanSerializer
 from apps.tenant.models import Tenant
@@ -11,7 +12,7 @@ class TenantBasicSerializer(serializers.ModelSerializer):
         fields = ['id', 'business_name', 'email']
 
 
-class SubscriptionSerializer(serializers.ModelSerializer):
+class SubscriptionSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for Subscription model
     """

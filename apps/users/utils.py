@@ -163,3 +163,73 @@ def send_password_change_notification_email(user):
     except Exception as e:
         print(f"Failed to send password change notification email. Error: {e}")
         return False
+
+
+def send_two_factor_otp_email(user, otp_code):
+    """
+    Sends a two-factor authentication OTP code to the user's email.
+    
+    Args:
+        user: User instance
+        otp_code: The 6-digit OTP code to send
+        
+    Returns:
+        bool: True if email sent successfully, False otherwise
+    """
+    
+    if not user.email:
+        print(f"Error: User {user.username} has no email address.")
+        return False
+    
+    subject = 'Your Two-Factor Authentication Code'
+    
+    try:
+        current_site = Site.objects.get_current()
+        domain = current_site.domain
+        protocol = 'https' if getattr(settings, 'SECURE_SSL_REDIRECT', False) else 'http'
+    except Exception as e:
+        print(f"Failed to get site domain. Using default. Error: {e}")
+        domain = 'localhost:8000'
+        protocol = 'http'
+
+    context = {
+        'full_name': user.full_name or user.username,
+        'otp_code': otp_code,
+        'domain': domain,
+        'protocol': protocol,
+    }
+
+    try:
+        html_message = render_to_string('email/two_factor_otp.html', context)
+    except Exception as e:
+        print(f"Failed to render 2FA OTP HTML template. Using plain fallback. Error: {e}")
+        html_message = (
+            f"<p>Hello {context['full_name']},</p>"
+            f"<p>Your two-factor authentication code is: <strong>{context['otp_code']}</strong></p>"
+            "<p>This code is valid for 5 minutes. Do not share this code with anyone.</p>"
+            "<p>If you did not request this code, please ignore this email.</p>"
+            "<p>Best regards,<br>ServeSpare Team</p>"
+        )
+
+    plain_message = (
+        f"Hello {context['full_name']},\n\n"
+        f"Your two-factor authentication code is: {context['otp_code']}\n"
+        "This code is valid for 5 minutes. Do not share this code with anyone.\n"
+        "If you did not request this code, please ignore this email.\n\n"
+        "Best regards,\nServeSpare Team"
+    )
+
+    try:
+        email = EmailMultiAlternatives(
+            subject,
+            plain_message,
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+        )
+        email.attach_alternative(html_message, "text/html")
+        email.send(fail_silently=False)
+        print(f"Two-factor authentication OTP email sent to {user.email}")
+        return True
+    except Exception as e:
+        print(f"Failed to send 2FA OTP email. Error: {e}")
+        return False
