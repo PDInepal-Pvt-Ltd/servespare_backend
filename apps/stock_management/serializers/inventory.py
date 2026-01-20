@@ -125,11 +125,24 @@ class InventorySerializer(ModelCleanValidationMixin, serializers.ModelSerializer
         return value
 
     def validate_barcode(self, value):
-        """Prevent duplicate barcodes from causing 500s on save."""
+        """
+        Validate barcode:
+        - Must be alphanumeric (numbers and letters a-z only)
+        - Cannot exceed 50 characters
+        - Must be unique per tenant (not enforced for empty/None values)
+        """
         if not value:
             return value
 
-        # Exclude current instance during updates
+        # Validate length
+        if len(value) > 50:
+            raise serializers.ValidationError('Barcode cannot exceed 50 characters.')
+        
+        # Validate alphanumeric only (numbers and letters a-z, case-insensitive)
+        if not value.replace('-', '').replace('_', '').isalnum():
+            raise serializers.ValidationError('Barcode must contain only numbers and letters (a-z).')
+
+        # Check for duplicates - exclude current instance during updates
         qs = Inventory.objects.filter(barcode=value, is_removed=False)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)

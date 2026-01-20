@@ -161,11 +161,11 @@ class Inventory(BaseModel):
     
     # Barcode
     barcode = models.CharField(
-        max_length=100,
+        max_length=50,
         blank=True,
         null=True,
         unique=True,
-        help_text='Barcode for scanning'
+        help_text='Barcode for scanning (alphanumeric only, max 50 characters)'
     )
     
     # Vehicle Details Section
@@ -278,10 +278,13 @@ class Inventory(BaseModel):
                 errors['retail_pricing'] = 'Retail price must be less than MRP.'
         
         # Validate barcode
-        if self.barcode and len(self.barcode) < 2:
-            errors['barcode'] = 'Barcode must be at least 2 characters.'
-        if self.barcode and len(self.barcode) > 100:
-            errors['barcode'] = 'Barcode cannot exceed 100 characters.'
+        if self.barcode:
+            # Check length
+            if len(self.barcode) > 50:
+                errors['barcode'] = 'Barcode cannot exceed 50 characters.'
+            # Check if alphanumeric only (numbers and letters a-z, case-insensitive)
+            elif not self.barcode.replace('-', '').replace('_', '').isalnum():
+                errors['barcode'] = 'Barcode must contain only numbers and letters (a-z).'
         
         # Validate vehicle_bike_details
         if self.vehicle_bike_details and len(self.vehicle_bike_details) < 5:

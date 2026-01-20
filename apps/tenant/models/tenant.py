@@ -295,4 +295,27 @@ class Tenant(BaseModel):
                 is_removed=False
             ).count()
         return users_by_role
+    
+    def get_branch_count(self):
+        """Get the total number of active branches for this tenant"""
+        return self.branches.filter(is_removed=False).count()
+    
+    def get_allowed_branches(self):
+        """Get the number of branches allowed by the current subscription plan"""
+        if self.package:
+            return self.package.no_of_branch
+        return 0
+    
+    def can_add_branch(self):
+        """Check if tenant can add more branches based on subscription plan limit"""
+        if not self.package:
+            return False
+        return self.get_branch_count() < self.get_allowed_branches()
+    
+    def get_remaining_branch_slots(self):
+        """Get the number of remaining branch slots available"""
+        if not self.package:
+            return 0
+        remaining = self.get_allowed_branches() - self.get_branch_count()
+        return max(0, remaining)
 
