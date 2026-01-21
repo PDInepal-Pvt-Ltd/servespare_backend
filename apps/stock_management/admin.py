@@ -116,7 +116,7 @@ class PurchaseOrderItemInline(admin.TabularInline):
         'quantity',
         'unit_price',
         'tax',
-        'discount_description',
+        'discount_amount',
         'is_active'
     ]
     readonly_fields = []
@@ -243,7 +243,7 @@ class PurchaseOrderItemAdmin(admin.ModelAdmin):
             'fields': ('purchase_order', 'item_name', 'part_number', 'is_active')
         }),
         ('Pricing', {
-            'fields': ('quantity', 'unit_price', 'tax', 'discount_description')
+            'fields': ('quantity', 'unit_price', 'tax', 'discount_amount')
         }),
         ('Calculations', {
             'fields': ('subtotal', 'tax_amount', 'total_price'),
