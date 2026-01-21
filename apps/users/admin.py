@@ -13,11 +13,11 @@ class UserAdmin(TenantAdminMixin, BaseUserAdmin):
     # Display configuration
     list_display = [
         'username', 'email', 'full_name', 'role', 'status', 'branch', 'is_staff', 
-        'is_active', 'tenant', 'workspace_id', 'created', 'last_login_at'
+        'is_active', 'two_factor_enabled', 'tenant', 'workspace_id', 'created', 'last_login_at'
     ]
     list_filter = [
         'role', 'status', 'branch', 'is_staff', 'is_superuser', 'is_active', 'tenant',
-        'must_change_password', 'groups', 'created'
+        'must_change_password', 'two_factor_enabled', 'groups', 'created'
     ]
     search_fields = [
         'username', 'email', 'full_name', 'phone', 'tenant__name', 'branch__branch_name',
@@ -38,7 +38,7 @@ class UserAdmin(TenantAdminMixin, BaseUserAdmin):
             'fields': ('tenant', 'branch', 'workspace_id',)
         }),
         (_('Role & Status'), {
-            'fields': ('role', 'status', 'is_active', 'must_change_password')
+            'fields': ('role', 'status', 'is_active', 'must_change_password', 'two_factor_enabled')
         }),
         (_('Permissions'), {
             'fields': ('is_staff', 'is_superuser', 'groups', 'user_permissions'),
@@ -132,3 +132,28 @@ class UserAdmin(TenantAdminMixin, BaseUserAdmin):
             if not request.user.is_superuser:
                 readonly.append('tenant')
         return readonly
+    
+    def save_model(self, request, obj, form, change):
+        """Override save_model to check subscription limits before adding new users."""
+        from apps.users.utils import send_subscription_limit_exceeded_email
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        
+        # Check subscription limit only when creating new users
+        if not change:  # change=False means we're adding a new user
+            tenant = obj.tenant
+            if tenant and not tenant.can_add_user():
+                # Send limit exceeded email to tenant admin
+                send_subscription_limit_exceeded_email(
+                    tenant,
+                    'users',
+                    tenant.get_user_count(),
+                    tenant.get_allowed_users()
+                )
+                raise DjangoValidationError(
+                    f'Cannot create user. Tenant "{tenant.business_name}" subscription plan allows '
+                    f'{tenant.get_allowed_users()} users, but already has {tenant.get_user_count()} '
+                    f'active users. Please upgrade subscription or deactivate existing users. '
+                    f'Notification email sent to tenant admin.'
+                )
+        
+        super().save_model(request, obj, form, change)

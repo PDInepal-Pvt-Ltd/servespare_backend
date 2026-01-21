@@ -1,14 +1,16 @@
 from django.db import transaction
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem, Party
 from apps.stock_management.serializers.party import PartySerializer
 
 
-class PurchaseOrderItemSerializer(serializers.ModelSerializer):
+class PurchaseOrderItemSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for PurchaseOrderItem model
     """
     subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    subtotal_after_discount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     tax_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     total_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     
@@ -23,16 +25,17 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
             'quantity',
             'unit_price',
             'tax',
-            'discount_description',
+            'discount_amount',
             'branch',
             'subtotal',
+            'subtotal_after_discount',
             'tax_amount',
             'total_price',
             'is_active',
             'created',
             'modified'
         ]
-        read_only_fields = ['id', 'tenant', 'created', 'modified', 'subtotal', 'tax_amount', 'total_price']
+        read_only_fields = ['id', 'tenant', 'created', 'modified', 'subtotal', 'subtotal_after_discount', 'tax_amount', 'total_price']
         # Allow nested create (via PurchaseOrderCreateWithItemsSerializer) without requiring purchase_order in each item
         extra_kwargs = {
             'purchase_order': {'required': False}
@@ -55,6 +58,12 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
         if value < 0:
             raise serializers.ValidationError("Tax cannot be negative.")
         return value
+    
+    def validate_discount_amount(self, value):
+        """Validate discount amount"""
+        if value < 0:
+            raise serializers.ValidationError("Discount amount cannot be negative.")
+        return value
 
     def create(self, validated_data):
         request = self.context.get('request')
@@ -76,7 +85,7 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class PurchaseOrderSerializer(serializers.ModelSerializer):
+class PurchaseOrderSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
     Serializer for PurchaseOrder model
     """
@@ -97,6 +106,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             'order_date',
             'expected_delivery_date',
             'purchase_invoice',
+            'invoice_pdf',
             'notes',
             'terms_and_condition',
             'branch',

@@ -9,10 +9,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django_filters.rest_framework import DjangoFilterBackend
+import jwt
+from django.conf import settings
 
 from apps.base.pagination import StandardResultsSetPagination
 from apps.branch.models import Branch
 from apps.users.models import User
+from apps.otp.models import OTP
 from apps.base.drf import TenantViewSetMixin
 from apps.base.permissions import (
     IsSuperAdmin,
@@ -42,8 +45,11 @@ from apps.users.serializers import (
     UserRegistrationSerializer,
     AdminAccountSerializer,
     CustomerProfileSerializer,
+    TwoFactorAuthLoginSerializer,
+    OTPVerificationSerializer,
+    TwoFactorAuthResponseSerializer,
 )
-from apps.users.utils import send_welcome_credentials_email
+from apps.users.utils import send_welcome_credentials_email, send_two_factor_otp_email
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -93,6 +99,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'branch': self.user.branch_id,
             'branch_name': self.user.branch.branch_name if self.user.branch else None,
             'must_change_password': self.user.must_change_password,
+            'two_factor_enabled': self.user.two_factor_enabled,
         }
         
         return data
@@ -258,11 +265,15 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """
-        Create user with role-based validation.
+        Create user with role-based validation and subscription limit checking.
         
         - Super Admin: Can create users with any role in any tenant
         - Tenant Admin: Can create users only in their own tenant
+        - Enforces subscription user limits
         """
+        from apps.users.utils import send_subscription_limit_exceeded_email
+        from rest_framework.exceptions import ValidationError
+        
         user = self.request.user
         branch = serializer.validated_data.get('branch')
         target_tenant = serializer.validated_data.get('tenant')
@@ -277,6 +288,24 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
 
         if branch and target_tenant and branch.tenant_id != target_tenant.id:
             raise PermissionDenied("Selected branch does not belong to the chosen tenant.")
+        
+        # Verify subscription limit one more time before saving
+        if target_tenant and not target_tenant.can_add_user():
+            # Send limit exceeded email to tenant admin
+            send_subscription_limit_exceeded_email(
+                target_tenant,
+                'users',
+                target_tenant.get_user_count(),
+                target_tenant.get_allowed_users()
+            )
+            raise ValidationError({
+                'detail': (
+                    f'Cannot create user. Your subscription plan allows {target_tenant.get_allowed_users()} users, '
+                    f'but you already have {target_tenant.get_user_count()} active users. '
+                    f'Please upgrade your subscription or deactivate existing users. '
+                    f'A notification email has been sent to your admin.'
+                )
+            })
         
         serializer.save(created_by=user)
     
@@ -415,6 +444,7 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             'role_display': user.get_role_display(),
             'is_active': user.is_active,
             'must_change_password': user.must_change_password,
+            'two_factor_enabled': user.two_factor_enabled,
             'branch': user.branch_id,
             'branch_name': user.branch.branch_name if user.branch else None,
             'total_orders': user.sales_orders.count(),
@@ -943,9 +973,26 @@ class AuthViewSet(viewsets.GenericViewSet):
     def login(self, request):
         """
         Login user and return JWT tokens.
+        Handles two-factor authentication if enabled.
         
         POST /api/auth/login/
         Body: {username, password}
+        
+        Response for users without 2FA:
+        {
+            "message": "Login successful.",
+            "user": {...},
+            "tokens": {"access": "...", "refresh": "..."}
+        }
+        
+        Response for users with 2FA enabled:
+        {
+            "message": "Two-factor authentication required.",
+            "requires_otp": true,
+            "temp_token": "...",
+            "user": {...},
+            "otp_sent_to": "user@example.com"
+        }
         """
         serializer = UserLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -989,7 +1036,41 @@ class AuthViewSet(viewsets.GenericViewSet):
                     'branch': user.branch_id,
                     'branch_name': user.branch.branch_name if user.branch else None,
                     'must_change_password': user.must_change_password,
+                    'two_factor_enabled': user.two_factor_enabled,
                 }
+            }, status=status.HTTP_200_OK)
+
+        # Check if user has two-factor authentication enabled
+        if user.two_factor_enabled:
+            # Generate OTP
+            from apps.otp.utils import generate_and_save_otp
+            otp = generate_and_save_otp(user)
+            
+            # Send OTP via email
+            send_two_factor_otp_email(user, otp.code)
+            
+            # Create temporary token for OTP verification (valid for 10 minutes)
+            temp_payload = {
+                'user_id': user.id,
+                'username': user.username,
+                'type': 'temp_2fa',
+                'exp': timezone.now() + timezone.timedelta(minutes=10)
+            }
+            temp_token = jwt.encode(temp_payload, settings.SECRET_KEY, algorithm='HS256')
+            
+            return Response({
+                'message': 'Two-factor authentication required. OTP sent to your email.',
+                'requires_otp': True,
+                'temp_token': temp_token,
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'full_name': user.full_name,
+                    'role': user.role,
+                    'role_display': user.get_role_display(),
+                },
+                'otp_sent_to': user.email,
             }, status=status.HTTP_200_OK)
 
         # Update last login
@@ -1017,6 +1098,113 @@ class AuthViewSet(viewsets.GenericViewSet):
                 'branch': user.branch_id,
                 'branch_name': user.branch.branch_name if user.branch else None,
                 'must_change_password': user.must_change_password,
+                'two_factor_enabled': user.two_factor_enabled,
+            },
+            'tokens': {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            }
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['post'])
+    def verify_2fa_otp(self, request):
+        """
+        Verify OTP for two-factor authentication and issue JWT tokens.
+        
+        POST /api/auth/verify_2fa_otp/
+        Body: {temp_token, otp_code}
+        
+        Returns:
+        {
+            "message": "Two-factor authentication successful.",
+            "user": {...},
+            "tokens": {"access": "...", "refresh": "..."}
+        }
+        """
+        serializer = OTPVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        temp_token = serializer.validated_data['temp_token']
+        otp_code = serializer.validated_data['otp_code']
+        
+        # Verify temp token
+        try:
+            payload = jwt.decode(temp_token, settings.SECRET_KEY, algorithms=['HS256'])
+            
+            # Check if token is valid temp token
+            if payload.get('type') != 'temp_2fa':
+                return Response(
+                    {'error': 'Invalid temporary token.'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            user_id = payload.get('user_id')
+            user = User.objects.get(id=user_id)
+            
+        except jwt.ExpiredSignatureError:
+            return Response(
+                {'error': 'Temporary token has expired. Please login again.'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        except (jwt.DecodeError, User.DoesNotExist):
+            return Response(
+                {'error': 'Invalid temporary token.'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Verify OTP
+        try:
+            otp = OTP.objects.filter(user=user).latest('created_at')
+            
+            if not otp.is_valid():
+                return Response(
+                    {'error': 'OTP has expired. Please login again to receive a new OTP.'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            if otp.code != otp_code:
+                return Response(
+                    {'error': 'Invalid OTP code.'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Delete OTP after successful verification
+            otp.delete()
+            
+        except OTP.DoesNotExist:
+            return Response(
+                {'error': 'No OTP found. Please login again.'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Update last login
+        user.update_last_login()
+        
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        refresh['username'] = user.username
+        refresh['email'] = user.email
+        refresh['role'] = user.role
+        refresh['role_display'] = user.get_role_display()
+        refresh['workspace_id'] = user.workspace_id
+        
+        response_data = {
+            'message': 'Two-factor authentication successful. Login completed.',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'full_name': user.full_name,
+                'role': user.role,
+                'role_display': user.get_role_display(),
+                'status': user.status,
+                'workspace_id': user.workspace_id,
+                'branch': user.branch_id,
+                'branch_name': user.branch.branch_name if user.branch else None,
+                'must_change_password': user.must_change_password,
+                'two_factor_enabled': user.two_factor_enabled,
             },
             'tokens': {
                 'refresh': str(refresh),

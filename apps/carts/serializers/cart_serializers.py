@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from decimal import Decimal
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.carts.models import Cart, CartItem
 from apps.stock_management.models import Inventory
 from apps.sales.models import SalesOrder, Bill
@@ -42,7 +43,7 @@ class InventoryBasicSerializer(serializers.ModelSerializer):
         return None
 
 
-class CartItemSerializer(serializers.ModelSerializer):
+class CartItemSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for cart items"""
     inventory = InventoryBasicSerializer(read_only=True)
     total_price = serializers.SerializerMethodField()

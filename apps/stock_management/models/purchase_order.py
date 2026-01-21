@@ -1,6 +1,6 @@
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, FileExtensionValidator
 from decimal import Decimal
 from apps.base.models import BaseModel
 from apps.base.managers import TenantManager
@@ -72,6 +72,14 @@ class PurchaseOrder(BaseModel):
         blank=True,
         null=True,
         help_text='Upload purchase invoice document'
+    )
+
+    invoice_pdf = models.FileField(
+        upload_to='purchase_invoices/pdfs/',
+        validators=[FileExtensionValidator(['pdf'])],
+        blank=True,
+        null=True,
+        help_text='Upload supplier invoice in PDF format'
     )
     
     # Additional Information
@@ -204,15 +212,16 @@ class PurchaseOrderItem(BaseModel):
     tax = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        default=Decimal('0.00'),
+        default=Decimal('13.00'),
         validators=[MinValueValidator(Decimal('0.00'))],
         help_text='Tax percentage (e.g., 18.00 for 18%)'
     )
-    discount_description = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text='Description of discount applied'
+    discount_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text='Discount amount in currency'
     )
 
     branch = models.ForeignKey(
@@ -264,11 +273,11 @@ class PurchaseOrderItem(BaseModel):
         if self.tax > 100:
             errors['tax'] = 'Tax percentage cannot exceed 100%.'
         
-        # Validate discount_description
-        if self.discount_description and len(self.discount_description) < 2:
-            errors['discount_description'] = 'Discount description must be at least 2 characters.'
-        if self.discount_description and len(self.discount_description) > 255:
-            errors['discount_description'] = 'Discount description cannot exceed 255 characters.'
+        # Validate discount_amount
+        if self.discount_amount < 0:
+            errors['discount_amount'] = 'Discount amount cannot be negative.'
+        if self.discount_amount > self.subtotal:
+            errors['discount_amount'] = 'Discount amount cannot exceed subtotal.'
         
         if errors:
             raise ValidationError(errors)
@@ -279,19 +288,24 @@ class PurchaseOrderItem(BaseModel):
     
     @property
     def subtotal(self):
-        """Calculate subtotal before tax"""
+        """Calculate subtotal before tax and discount"""
         return self.quantity * self.unit_price
     
     @property
+    def subtotal_after_discount(self):
+        """Calculate subtotal after discount"""
+        return self.subtotal - self.discount_amount
+    
+    @property
     def tax_amount(self):
-        """Calculate tax amount"""
-        subtotal = self.subtotal
-        return (subtotal * self.tax) / Decimal('100.00')
+        """Calculate tax amount on discounted subtotal"""
+        subtotal_after_discount = self.subtotal_after_discount
+        return (subtotal_after_discount * self.tax) / Decimal('100.00')
     
     @property
     def total_price(self):
-        """Calculate total price including tax"""
-        return self.subtotal + self.tax_amount
+        """Calculate total price including tax and discount"""
+        return self.subtotal_after_discount + self.tax_amount
     
     def __str__(self):
         return f"{self.item_name} - Qty: {self.quantity} (PO: {self.purchase_order.po_number})"

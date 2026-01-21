@@ -1104,7 +1104,7 @@ class Command(BaseCommand):
                         'quantity': Decimal('50.00'),
                         'unit_price': inventory[0].price,
                         'tax': Decimal('18.00'),
-                        'discount_description': 'Bulk discount 5%',
+                        'discount_amount': Decimal('500.00'),
                         'branch': warehouse_branch
                     },
                     {
@@ -1113,7 +1113,7 @@ class Command(BaseCommand):
                         'quantity': Decimal('40.00'),
                         'unit_price': inventory[1].price,
                         'tax': Decimal('18.00'),
-                        'discount_description': None,
+                        'discount_amount': Decimal('0.00'),
                         'branch': warehouse_branch
                     }
                 ]
@@ -1134,7 +1134,7 @@ class Command(BaseCommand):
                         'quantity': Decimal('30.00'),
                         'unit_price': inventory[2].price,
                         'tax': Decimal('18.00'),
-                        'discount_description': None,
+                        'discount_amount': Decimal('0.00'),
                         'branch': warehouse_branch
                     }
                 ]
@@ -1155,7 +1155,7 @@ class Command(BaseCommand):
                         'quantity': Decimal('60.00'),
                         'unit_price': inventory[3].price,
                         'tax': Decimal('18.00'),
-                        'discount_description': None,
+                        'discount_amount': Decimal('0.00'),
                         'branch': warehouse_branch
                     }
                 ]
@@ -1191,7 +1191,7 @@ class Command(BaseCommand):
                             'quantity': item_data['quantity'],
                             'unit_price': item_data['unit_price'],
                             'tax': item_data['tax'],
-                            'discount_description': item_data.get('discount_description'),
+                            'discount_amount': item_data.get('discount_amount', Decimal('0.00')),
                             'branch': item_data.get('branch'),
                             'tenant': getattr(purchase_order, 'tenant', None) or (getattr(item_data.get('branch'), 'tenant', None) if item_data.get('branch') else None)
                         }

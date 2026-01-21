@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from decimal import Decimal
 from apps.cashandbank.models import CashierShift
+from apps.users.models import User
 
 
 class ShiftTransferInputSerializer(serializers.Serializer):
@@ -9,7 +10,7 @@ class ShiftTransferInputSerializer(serializers.Serializer):
     
     Accepts:
     - counted_cash: Decimal amount of cash counted before transfer
-    - transferred_to: Name of target cashier
+    - transferred_to_id: ID of target cashier (User)
     - variance_reason: Optional reason if variance occurs
     """
     
@@ -20,10 +21,9 @@ class ShiftTransferInputSerializer(serializers.Serializer):
         help_text='Amount of cash counted before transfer'
     )
     
-    transferred_to = serializers.CharField(
-        max_length=255,
+    transferred_to_id = serializers.IntegerField(
         required=True,
-        help_text='Name of the target cashier'
+        help_text='ID of the target cashier user'
     )
     
     variance_reason = serializers.CharField(
@@ -39,11 +39,20 @@ class ShiftTransferInputSerializer(serializers.Serializer):
             raise serializers.ValidationError('Counted cash must be greater than zero')
         return value
 
-    def validate_transferred_to(self, value):
-        """Validate that transferred_to is not empty"""
-        if not value or value.strip() == '':
-            raise serializers.ValidationError('Target name cannot be empty')
-        return value.strip()
+    def validate_transferred_to_id(self, value):
+        """Validate that transferred_to_id user exists and is a cashier"""
+        try:
+            user = User.objects.get(id=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError('Target cashier user does not exist')
+        
+        if user.role != User.Role.CASHIER:
+            raise serializers.ValidationError('Target user must be a cashier')
+        
+        if user.status != User.Status.ACTIVE:
+            raise serializers.ValidationError('Target cashier must be active')
+        
+        return user
 
 
 class ShiftTransferVarianceSerializer(serializers.Serializer):

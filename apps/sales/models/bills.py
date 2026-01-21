@@ -1,6 +1,8 @@
 import re
+from decimal import Decimal
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.utils.translation import gettext_lazy as _
 from apps.base.models import BaseModel
 from apps.base.managers import TenantManager
@@ -157,6 +159,22 @@ class Bill(BaseModel):
         help_text="If Percentage, enter percent (0-100). If Amount, enter currency value."
     )
 
+    tax_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('13.00'),
+        validators=[MinValueValidator(Decimal('0.00')), MaxValueValidator(Decimal('100.00'))],
+        help_text='Tax percentage (GST/VAT)'
+    )
+
+    tax_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text='Tax amount'
+    )
+
     payment_method = models.CharField(
         max_length=20,
         choices=PAYMENT_METHOD_CHOICES,
@@ -184,6 +202,25 @@ class Bill(BaseModel):
         help_text='Branch issuing this bill'
     )
     
+    # Relationships to Invoice and SalesOrder (for online orders)
+    invoice = models.OneToOneField(
+        'sales.Invoice',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bill',
+        help_text='Related invoice (auto-created from paid invoice for online orders)'
+    )
+    
+    sales_order = models.ForeignKey(
+        'sales.SalesOrder',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bills',
+        help_text='Related sales order (for online orders)'
+    )
+    
     class Meta:
         db_table = 'bill'
         verbose_name = 'Bill'
@@ -198,6 +235,8 @@ class Bill(BaseModel):
             models.Index(fields=['payment_method']),
             models.Index(fields=['tenant']),
             models.Index(fields=['branch']),
+            models.Index(fields=['invoice']),
+            models.Index(fields=['sales_order']),
         ]
     
     def __str__(self):
@@ -303,6 +342,16 @@ class Bill(BaseModel):
             ):
                 errors['discount_value'] = 'Discount amount cannot exceed the price.'
 
+        if self.tax_percentage is None:
+            self.tax_percentage = Decimal('13.00')
+        elif self.tax_percentage < 0:
+            errors['tax_percentage'] = 'Tax percentage cannot be negative.'
+        elif self.tax_percentage > Decimal('100.00'):
+            errors['tax_percentage'] = 'Tax percentage cannot exceed 100%.'
+
+        if self.tax_amount is not None and self.tax_amount < 0:
+            errors['tax_amount'] = 'Tax amount cannot be negative.'
+
         # Payment fields
         if not self.payment_method:
             errors['payment_method'] = 'Payment method is required.'
@@ -322,10 +371,26 @@ class Bill(BaseModel):
     # Removed the previous inventory product relationship
     # Updated methods to handle purchase items instead
     def calculate_total(self):
-        total = self.price or 0
-        for item in self.purchase_items.all():
-            total += item.total_price()  # Calculate total based on purchase items
-        return total
+        total_before_tax = self.total_after_discount
+        tax_value = self.calculate_tax_amount()
+        return total_before_tax + tax_value
+
+    def calculate_tax_amount(self):
+        base_amount = self.total_after_discount
+        percentage = self.tax_percentage if self.tax_percentage is not None else Decimal('13.00')
+        tax_value = (base_amount * percentage) / Decimal('100.00')
+        return tax_value.quantize(Decimal('0.01'))
+
+    def save(self, *args, **kwargs):
+        # Ensure a default 13% tax is applied when not explicitly set
+        if self.tax_percentage is None:
+            self.tax_percentage = Decimal('13.00')
+        
+        # Skip tax calculation if explicitly disabled (e.g., when creating from invoice)
+        if not getattr(self, '_skip_tax_calculation', False):
+            self.tax_amount = self.calculate_tax_amount()
+        
+        super().save(*args, **kwargs)
 
     def update_bill(self, **kwargs):
         for key, value in kwargs.items():

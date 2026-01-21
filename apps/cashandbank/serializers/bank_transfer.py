@@ -1,9 +1,10 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 
 from apps.cashandbank.models import BankTransfer
 
 
-class BankTransferSerializer(serializers.ModelSerializer):
+class BankTransferSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     bank_name = serializers.CharField(source='bank_account.bank_name', read_only=True)
 
     class Meta:

@@ -12,19 +12,15 @@ class ShiftTransaction(BaseModel):
     Represents individual transactions within a cashier shift.
     
     Types:
-    - opening: Initial float when shift opens
     - cash_in: Manual cash addition (e.g., customer payment, refund)
     - cash_out: Manual cash removal (e.g., reimbursement)
     - sale: Auto-posted from bill creation (payment method = cash)
-    - closing: Final count when shift closes
     """
 
     TYPE_CHOICES = [
-        ('opening', 'Opening'),
         ('cash_in', 'Cash In'),
         ('cash_out', 'Cash Out'),
         ('sale', 'Sale'),
-        ('closing', 'Closing'),
     ]
 
     # Shift reference

@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.carts.models import Favorite
 from apps.stock_management.models import Inventory
 
@@ -40,7 +41,7 @@ class InventoryBasicFavoriteSerializer(serializers.ModelSerializer):
         return None
 
 
-class FavoriteSerializer(serializers.ModelSerializer):
+class FavoriteSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """Serializer for favorite products"""
     inventory = InventoryBasicFavoriteSerializer(read_only=True)
     inventory_id = serializers.IntegerField(write_only=True, required=False)

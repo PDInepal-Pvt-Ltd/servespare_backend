@@ -9,7 +9,7 @@ from apps.cashandbank.ledger_service import LedgerService
 from apps.stock_management.models import PurchaseOrder, PurchaseOrderItem
 
 logger = logging.getLogger(__name__)
-
+# hello 
 
 @receiver(post_save, sender=PurchaseOrder)
 def sync_purchase_order_to_purchase_ledger(sender, instance, created, **kwargs):
