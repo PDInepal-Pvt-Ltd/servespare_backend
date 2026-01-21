@@ -159,32 +159,129 @@ def sync_bill_status_to_invoice(sender, instance, created, **kwargs):
     return
 
 
-@receiver(post_save, sender='sales.Bill')
-def decrease_inventory_on_bill_creation(sender, instance, created, **kwargs):
+@receiver(post_save, sender='sales.SalesOrder')
+def auto_generate_invoice_from_sales_order(sender, instance, created, **kwargs):
     """
-    Automatically decrease inventory when a bill is created
-    Inventory is decreased when bill is created (regardless of status)
+    Automatically generate invoice when sales order is created
+    Only for confirmed orders
     """
-    if created:
-        # Bill was just created, decrease inventory for all purchase items
-        instance.decrease_inventory()
+    if created and instance.order_status == 'confirmed':
+        # Check if invoice doesn't already exist
+        if not hasattr(instance, 'invoice') or not instance.invoice:
+            from apps.sales.models import Invoice, InvoiceItem
+            
+            # Create invoice
+            invoice = Invoice.objects.create(
+                tenant=instance.tenant,
+                customer=instance.customer,
+                branch=instance.branch,
+                sales_order=instance,
+                subtotal=instance.subtotal,
+                discount_percentage=instance.discount_percentage,
+                discount_amount=instance.discount_amount,
+                tax_percentage=instance.tax_percentage,
+                tax_amount=instance.tax_amount,
+                shipping_charges=instance.shipping_charges,
+                total_amount=instance.total_amount,
+                payment_status='pending',
+                created_by=instance.created_by
+            )
+            
+            # Create invoice items from sales order items
+            for order_item in instance.items.all():
+                InvoiceItem.objects.create(
+                    tenant=instance.tenant,
+                    invoice=invoice,
+                    inventory=order_item.inventory,
+                    item_name=order_item.item_name,
+                    part_number=order_item.part_number,
+                    quantity=order_item.quantity,
+                    unit_price=order_item.unit_price,
+                    discount_percentage=order_item.discount_percentage,
+                    discount_amount=order_item.discount_amount,
+                    tax_percentage=order_item.tax_percentage,
+                    tax_amount=order_item.tax_amount,
+                    line_total=order_item.line_total
+                )
 
 
-@receiver(post_save, sender='sales.PurchaseItem')
-def decrease_inventory_on_purchase_item_creation(sender, instance, created, **kwargs):
+@receiver(post_save, sender='sales.Invoice')
+def auto_create_bill_from_paid_invoice(sender, instance, created, **kwargs):
     """
-    Automatically decrease inventory when a purchase item is added to a bill
+    Automatically create bill when invoice is marked as paid
+    Only for paid invoices without existing bills
     """
-    if created and instance.inventory and instance.quantity > 0:
-        from decimal import Decimal
-        # Decrease inventory immediately when purchase item is created
-        # Convert quantity to Decimal to avoid type mismatch
-        quantity_to_decrease = Decimal(str(instance.quantity))
-        instance.inventory.quantity = max(
-            Decimal('0.00'),
-            instance.inventory.quantity - quantity_to_decrease
+    # Only process if invoice is paid
+    if instance.payment_status != 'paid':
+        return
+    
+    # Check if bill already exists by querying Bill model directly
+    # This avoids the OneToOne relationship issue
+    from apps.sales.models import Bill, PurchaseItem
+    
+    # Query to check if a bill with this invoice already exists
+    if Bill.objects.filter(invoice=instance).exists():
+        # Bill already exists, do nothing
+        return
+    
+    # Create bill from invoice (without invoice field first)
+    bill = Bill(
+        tenant=instance.tenant,
+        branch=instance.branch,
+        created_by=instance.created_by,
+        sales_order=instance.sales_order,
+        customer_name=instance.customer.full_name or instance.customer.username if instance.customer else 'Online Customer',
+        address=instance.sales_order.delivery_address if instance.sales_order else '',
+        phone_numbers=getattr(instance.customer, 'phone', '') if instance.customer else '',
+        customer_type='retail',
+        discount_method='amount',
+        discount_value=instance.discount_amount,
+        tax_percentage=instance.tax_percentage,
+        tax_amount=instance.tax_amount,  # Use the already calculated tax_amount from invoice
+        payment_method=instance.payment_method or 'online',
+        status='paid'
+    )
+    
+    # Temporarily disable auto-calculation of tax in save method
+    bill._skip_tax_calculation = True
+    # Save the bill first to get a primary key
+    bill.save()
+    
+    # Now set the invoice relationship
+    bill.invoice = instance
+    bill.save(update_fields=['invoice'])
+    
+    # Create purchase items from invoice items
+    for invoice_item in instance.items.all():
+        PurchaseItem.objects.create(
+            bill=bill,
+            inventory=invoice_item.inventory,
+            quantity=invoice_item.quantity,
+            price=invoice_item.unit_price
         )
-        instance.inventory.save(update_fields=['quantity', 'modified'])
+    
+    # Update sales order status if exists
+    if instance.sales_order:
+        instance.sales_order.order_status = 'ready_to_pack'
+        instance.sales_order.save(update_fields=['order_status', 'modified'])
+
+
+@receiver(post_save, sender='sales.Bill')
+def decrease_inventory_on_bill_paid(sender, instance, created, **kwargs):
+    """
+    Automatically decrease inventory when bill is paid
+    - For new bills created as 'paid' (walk-in): decrease immediately
+    - For bills updated to 'paid': decrease when status changes
+    """
+    # Skip if inventory already decreased
+    if hasattr(instance, '_inventory_decreased') and instance._inventory_decreased:
+        return
+    
+    # Decrease inventory only when bill is paid
+    if instance.status == 'paid':
+        instance.decrease_inventory()
+        # Mark as processed to avoid duplicate decreases
+        instance._inventory_decreased = True
 
 
 def ready():

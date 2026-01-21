@@ -60,6 +60,10 @@ class BillSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     branch_name = serializers.CharField(source='branch.name', read_only=True)
     created_by_username = serializers.CharField(source='created_by.username', read_only=True, required=False, allow_null=True)
     
+    # Relationship fields
+    invoice_number = serializers.CharField(source='invoice.invoice_number', read_only=True)
+    sales_order_number = serializers.CharField(source='sales_order.order_number', read_only=True)
+    
     # Writable field for adding purchase items during creation
     purchase_items_data = serializers.ListField(
         child=serializers.DictField(),
@@ -78,6 +82,10 @@ class BillSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
             'branch_name',
             'created_by',
             'created_by_username',
+            'invoice',
+            'invoice_number',
+            'sales_order',
+            'sales_order_number',
             'customer_name',
             'address',
             'phone_numbers',
