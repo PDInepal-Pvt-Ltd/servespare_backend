@@ -661,3 +661,39 @@ class TwoFactorAuthResponseSerializer(serializers.Serializer):
     message = serializers.CharField(read_only=True)
     user = serializers.DictField(read_only=True, help_text='User details')
     tokens = serializers.DictField(read_only=True, help_text='Access and refresh tokens')
+
+
+class TwoFactorAuthToggleSerializer(serializers.Serializer):
+    """Serializer for enabling/disabling Two-Factor Authentication for a user."""
+    
+    two_factor_enabled = serializers.BooleanField(
+        required=True,
+        help_text='Set to true to enable 2FA, false to disable 2FA'
+    )
+    
+    def validate(self, attrs):
+        """Additional validation if needed."""
+        user = self.context.get('user')
+        
+        if not user:
+            raise serializers.ValidationError({
+                'detail': 'User not found in context.'
+            })
+        
+        # Optionally, we could add validation to ensure email is present for 2FA
+        if attrs['two_factor_enabled'] and not user.email:
+            raise serializers.ValidationError({
+                'two_factor_enabled': 'Cannot enable Two-Factor Authentication. User must have a valid email address.'
+            })
+        
+        return attrs
+    
+    def save(self, **kwargs):
+        """Update the two_factor_enabled field for the user."""
+        user = self.context.get('user')
+        two_factor_enabled = self.validated_data['two_factor_enabled']
+        
+        user.two_factor_enabled = two_factor_enabled
+        user.save(update_fields=['two_factor_enabled', 'modified'])
+        
+        return user

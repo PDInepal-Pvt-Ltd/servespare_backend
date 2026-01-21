@@ -48,6 +48,7 @@ from apps.users.serializers import (
     TwoFactorAuthLoginSerializer,
     OTPVerificationSerializer,
     TwoFactorAuthResponseSerializer,
+    TwoFactorAuthToggleSerializer,
 )
 from apps.users.utils import send_welcome_credentials_email, send_two_factor_otp_email
 
@@ -172,6 +173,8 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             return UserRoleUpdateSerializer
         elif self.action == 'bulk_action':
             return BulkUserActionSerializer
+        elif self.action == 'toggle_two_factor':
+            return TwoFactorAuthToggleSerializer
         return UserDetailSerializer
     
     def get_permissions(self):
@@ -733,6 +736,50 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             message = f'{count} user(s) deleted successfully.'
         
         return Response({'message': message}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def toggle_two_factor(self, request, pk=None):
+        """
+        Enable or disable Two-Factor Authentication for a user.
+        
+        Permissions:
+        - Users can toggle 2FA for their own account
+        - Admins/Super Admins can toggle 2FA for any user in their tenant
+        
+        POST /api/users/{id}/toggle_two_factor/
+        Body: {two_factor_enabled: true|false}
+        
+        Returns:
+        - 200 OK: {message, user: {id, username, email, two_factor_enabled}}
+        - 400 Bad Request: Validation errors
+        - 403 Forbidden: Permission denied
+        - 404 Not Found: User not found
+        """
+        user = self.get_object()
+        
+        # Check permissions: user can update their own 2FA or admin can update any user in their tenant
+        if not (request.user.id == user.id or can_manage_user(request.user, user)):
+            raise PermissionDenied('You do not have permission to modify this user\'s Two-Factor Authentication settings.')
+        
+        serializer = self.get_serializer(data=request.data, context={'user': user})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        
+        # Refresh user from database to get updated value
+        user.refresh_from_db()
+        
+        status_text = 'enabled' if user.two_factor_enabled else 'disabled'
+        
+        return Response({
+            'message': f'Two-Factor Authentication {status_text} successfully for user {user.username}.',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'full_name': user.full_name,
+                'two_factor_enabled': user.two_factor_enabled,
+            }
+        }, status=status.HTTP_200_OK)
 
     @action(
         detail=False,
