@@ -238,7 +238,7 @@ class SalesOrderCreateSerializer(ModelCleanValidationMixin, serializers.ModelSer
         fields = [
             'customer', 'order_status', 'branch',
             'discount_percentage', 'tax_percentage', 'shipping_charges',
-            'delivery_address', 'delivery_city', 'delivery_state', 'delivery_pincode',
+            'delivery_address', 'delivery_city', 'delivery_province', 'delivery_pincode',
             'expected_delivery_date', 'tracking_number', 'courier_partner',
             'notes', 'internal_notes', 'items'
         ]
@@ -326,7 +326,7 @@ class SalesOrderUpdateSerializer(ModelCleanValidationMixin, serializers.ModelSer
         model = SalesOrder
         fields = [
             'order_status', 'discount_percentage', 'tax_percentage', 'shipping_charges',
-            'delivery_address', 'delivery_city', 'delivery_state', 'delivery_pincode',
+            'delivery_address', 'delivery_city', 'delivery_province', 'delivery_pincode',
             'expected_delivery_date', 'actual_delivery_date',
             'tracking_number', 'courier_partner',
             'notes', 'internal_notes', 'is_active'
