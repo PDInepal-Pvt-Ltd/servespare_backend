@@ -1,6 +1,6 @@
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, FileExtensionValidator
 from decimal import Decimal
 from apps.base.models import BaseModel
 from apps.base.managers import TenantManager
@@ -72,6 +72,14 @@ class PurchaseOrder(BaseModel):
         blank=True,
         null=True,
         help_text='Upload purchase invoice document'
+    )
+
+    invoice_pdf = models.FileField(
+        upload_to='purchase_invoices/pdfs/',
+        validators=[FileExtensionValidator(['pdf'])],
+        blank=True,
+        null=True,
+        help_text='Upload supplier invoice in PDF format'
     )
     
     # Additional Information
