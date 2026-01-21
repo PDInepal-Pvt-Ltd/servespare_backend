@@ -106,6 +106,7 @@ class PurchaseOrderSerializer(ModelCleanValidationMixin, serializers.ModelSerial
             'order_date',
             'expected_delivery_date',
             'purchase_invoice',
+            'invoice_pdf',
             'notes',
             'terms_and_condition',
             'branch',

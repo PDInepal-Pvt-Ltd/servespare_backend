@@ -34,7 +34,7 @@ class Invoice(BaseModel):
         help_text='Date and time when invoice was created'
     )
 
-    # Reference to Sales Order and Bill
+    # Reference to Sales Order
     sales_order = models.OneToOneField(
         'sales.SalesOrder',
         on_delete=models.PROTECT,
@@ -42,14 +42,6 @@ class Invoice(BaseModel):
         null=True,
         blank=True,
         help_text='Associated sales order'
-    )
-    bill = models.OneToOneField(
-        'sales.Bill',
-        on_delete=models.SET_NULL,
-        related_name='invoice',
-        null=True,
-        blank=True,
-        help_text='Associated bill/invoice'
     )
 
     # Customer Information
@@ -134,7 +126,6 @@ class Invoice(BaseModel):
         choices=[
             ('paid', 'Paid'),
             ('pending', 'Pending'),
-            ('partial', 'Partial'),
             ('on_hold', 'On Hold'),
             ('credit_sale', 'Credit Sale'),
             ('cancelled', 'Cancelled'),
@@ -192,7 +183,6 @@ class Invoice(BaseModel):
             models.Index(fields=['tenant']),
             models.Index(fields=['branch']),
             models.Index(fields=['sales_order']),
-            models.Index(fields=['bill']),
         ]
 
     objects = TenantManager()

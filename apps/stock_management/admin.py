@@ -161,7 +161,7 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
             'fields': ('order_date', 'expected_delivery_date')
         }),
         ('Documents', {
-            'fields': ('purchase_invoice',)
+            'fields': ('purchase_invoice', 'invoice_pdf')
         }),
         ('Additional Information', {
             'fields': ('notes', 'terms_and_condition')

@@ -47,6 +47,11 @@ class InvoiceListSerializer(serializers.Serializer):
     tenant_name = serializers.SerializerMethodField()
     branch = serializers.IntegerField(required=False)
     branch_name = serializers.SerializerMethodField()
+    bill_id = serializers.SerializerMethodField()
+    
+    def get_bill_id(self, obj):
+        """Get related bill ID if exists"""
+        return obj.bill.id if hasattr(obj, 'bill') and obj.bill else None
     
     def get_tenant_name(self, obj):
         """Get tenant name"""
@@ -88,6 +93,8 @@ class InvoiceDetailSerializer(serializers.Serializer):
     customer_email = serializers.SerializerMethodField()
     customer_phone = serializers.SerializerMethodField()
     sales_order_number = serializers.SerializerMethodField()
+    bill_id = serializers.SerializerMethodField()
+    bill_created = serializers.SerializerMethodField()
     tenant = serializers.IntegerField(required=False)
     tenant_name = serializers.SerializerMethodField()
     branch = serializers.IntegerField(required=False)
@@ -123,6 +130,14 @@ class InvoiceDetailSerializer(serializers.Serializer):
     def get_sales_order_number(self, obj):
         """Get associated sales order number"""
         return obj.sales_order.order_number if obj.sales_order else None
+    
+    def get_bill_id(self, obj):
+        """Get related bill ID if exists"""
+        return obj.bill.id if hasattr(obj, 'bill') and obj.bill else None
+    
+    def get_bill_created(self, obj):
+        """Get bill creation status"""
+        return hasattr(obj, 'bill') and obj.bill is not None
     
     def get_tenant_name(self, obj):
         """Get tenant name"""
