@@ -33,7 +33,9 @@ class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         from apps.users.models import User
         
-        queryset = Bill.objects.filter(is_removed=False).prefetch_related('purchase_items', 'purchase_items__inventory')
+        queryset = Bill.objects.filter(is_removed=False).select_related(
+            'invoice', 'sales_order', 'branch', 'tenant', 'created_by'
+        ).prefetch_related('purchase_items', 'purchase_items__inventory')
         
         # Cashiers can only see bills in their branch
         if self.request.user.role == User.Role.CASHIER:

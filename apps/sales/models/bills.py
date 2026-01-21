@@ -202,6 +202,25 @@ class Bill(BaseModel):
         help_text='Branch issuing this bill'
     )
     
+    # Relationships to Invoice and SalesOrder (for online orders)
+    invoice = models.OneToOneField(
+        'sales.Invoice',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bill',
+        help_text='Related invoice (auto-created from paid invoice for online orders)'
+    )
+    
+    sales_order = models.ForeignKey(
+        'sales.SalesOrder',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bills',
+        help_text='Related sales order (for online orders)'
+    )
+    
     class Meta:
         db_table = 'bill'
         verbose_name = 'Bill'
@@ -216,6 +235,8 @@ class Bill(BaseModel):
             models.Index(fields=['payment_method']),
             models.Index(fields=['tenant']),
             models.Index(fields=['branch']),
+            models.Index(fields=['invoice']),
+            models.Index(fields=['sales_order']),
         ]
     
     def __str__(self):
@@ -364,7 +385,11 @@ class Bill(BaseModel):
         # Ensure a default 13% tax is applied when not explicitly set
         if self.tax_percentage is None:
             self.tax_percentage = Decimal('13.00')
-        self.tax_amount = self.calculate_tax_amount()
+        
+        # Skip tax calculation if explicitly disabled (e.g., when creating from invoice)
+        if not getattr(self, '_skip_tax_calculation', False):
+            self.tax_amount = self.calculate_tax_amount()
+        
         super().save(*args, **kwargs)
 
     def update_bill(self, **kwargs):

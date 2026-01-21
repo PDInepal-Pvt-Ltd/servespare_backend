@@ -41,10 +41,10 @@ class SalesOrderItemInline(admin.TabularInline):
     model = SalesOrderItem
     extra = 1
     fields = [
-        'inventory', 'quantity', 'unit_price', 
+        'inventory', 'item_name', 'quantity', 'unit_price', 
         'discount_percentage', 'tax_percentage', 'line_total'
     ]
-    readonly_fields = ['line_total']
+    readonly_fields = ['item_name', 'line_total']
 
 
 @admin.register(SalesOrder)
@@ -212,7 +212,7 @@ class InvoiceAdmin(admin.ModelAdmin):
             'fields': ('invoice_number', 'invoice_date', 'due_date', 'customer', 'is_active')
         }),
         ('Related Documents', {
-            'fields': ('sales_order', 'bill', 'branch', 'tenant')
+            'fields': ('sales_order', 'branch', 'tenant')
         }),
         ('Financial Summary', {
             'fields': (
@@ -353,9 +353,9 @@ class BillAdmin(admin.ModelAdmin):
     """Admin interface for Bill model with purchase items inline and ledger integration"""
     
     list_display = [
-        'id', 'tenant', 'branch', 'customer_name', 'customer_type', 'subtotal',
-        'discount_amount', 'total_after_discount', 'payment_method', 'status', 
-        'get_purchase_count', 'created_by', 'created'
+        'id', 'tenant', 'branch', 'customer_name', 'customer_type', 'get_invoice',
+        'get_sales_order', 'subtotal', 'discount_amount', 'total_after_discount', 
+        'payment_method', 'status', 'get_purchase_count', 'created_by', 'created'
     ]
     list_filter = [
         'status', 'payment_method', 'customer_type', 'created'
@@ -364,13 +364,18 @@ class BillAdmin(admin.ModelAdmin):
         'customer_name', 'pan_vat_number', 'phone_numbers'
     ]
     readonly_fields = [
-        'created', 'modified', 'subtotal', 'discount_amount', 'total_after_discount', 'created_by'
+        'created', 'modified', 'subtotal', 'discount_amount', 'total_after_discount', 
+        'created_by', 'invoice', 'sales_order'
     ]
     inlines = [PurchaseItemInline]
     
     fieldsets = (
         ('Tenant & Branch', {
             'fields': ('tenant', 'branch', 'created_by')
+        }),
+        ('Related Documents (Online Orders)', {
+            'fields': ('invoice', 'sales_order'),
+            'description': 'These fields are automatically populated for online orders only.'
         }),
         ('Customer Information', {
             'fields': ('customer_name', 'customer_type', 'address', 'phone_numbers', 'pan_vat_number')
@@ -387,6 +392,22 @@ class BillAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def get_invoice(self, obj):
+        """Display related invoice number"""
+        if obj.invoice:
+            return obj.invoice.invoice_number
+        return '-'
+    get_invoice.short_description = 'Invoice'
+    get_invoice.admin_order_field = 'invoice__invoice_number'
+    
+    def get_sales_order(self, obj):
+        """Display related sales order number"""
+        if obj.sales_order:
+            return obj.sales_order.order_number
+        return '-'
+    get_sales_order.short_description = 'Sales Order'
+    get_sales_order.admin_order_field = 'sales_order__order_number'
     
     def get_purchase_count(self, obj):
         """Display the number of items purchased in this bill"""

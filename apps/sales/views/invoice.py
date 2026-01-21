@@ -65,7 +65,7 @@ class InvoiceViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             return get_invoice_model().objects.none()
 
         queryset = Invoice.objects.filter(is_removed=False).select_related(
-            'customer', 'sales_order', 'bill', 'branch', 'created_by'
+            'customer', 'sales_order', 'branch', 'created_by'
         ).prefetch_related('items')
         
         user = self.request.user
