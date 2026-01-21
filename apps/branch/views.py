@@ -41,11 +41,34 @@ class BranchViewSet(viewsets.ModelViewSet):
 		return qs.filter(tenant=user_tenant)
 
 	def perform_create(self, serializer):
+		from apps.users.utils import send_subscription_limit_exceeded_email
+		from rest_framework.exceptions import ValidationError
+		
 		user = self.request.user
 		
 		# Tenant Admin can only create in their tenant
 		if is_tenant_admin(user):
-			serializer.save(tenant=user.tenant)
+			tenant = user.tenant
+			
+			# Check branch subscription limit
+			if not tenant.can_add_branch():
+				# Send limit exceeded email to tenant admin
+				send_subscription_limit_exceeded_email(
+					tenant,
+					'branches',
+					tenant.get_branch_count(),
+					tenant.get_allowed_branches()
+				)
+				raise ValidationError({
+					'detail': (
+						f'Cannot create branch. Your subscription plan allows {tenant.get_allowed_branches()} branches, '
+						f'but you already have {tenant.get_branch_count()} active branches. '
+						f'Please upgrade your subscription or delete existing unused branches. '
+						f'A notification email has been sent to your admin.'
+					)
+				})
+			
+			serializer.save(tenant=tenant)
 		else:
 			# Super Admin and all other authenticated users can create
 			serializer.save()

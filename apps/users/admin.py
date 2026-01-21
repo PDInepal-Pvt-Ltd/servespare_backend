@@ -132,3 +132,28 @@ class UserAdmin(TenantAdminMixin, BaseUserAdmin):
             if not request.user.is_superuser:
                 readonly.append('tenant')
         return readonly
+    
+    def save_model(self, request, obj, form, change):
+        """Override save_model to check subscription limits before adding new users."""
+        from apps.users.utils import send_subscription_limit_exceeded_email
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        
+        # Check subscription limit only when creating new users
+        if not change:  # change=False means we're adding a new user
+            tenant = obj.tenant
+            if tenant and not tenant.can_add_user():
+                # Send limit exceeded email to tenant admin
+                send_subscription_limit_exceeded_email(
+                    tenant,
+                    'users',
+                    tenant.get_user_count(),
+                    tenant.get_allowed_users()
+                )
+                raise DjangoValidationError(
+                    f'Cannot create user. Tenant "{tenant.business_name}" subscription plan allows '
+                    f'{tenant.get_allowed_users()} users, but already has {tenant.get_user_count()} '
+                    f'active users. Please upgrade subscription or deactivate existing users. '
+                    f'Notification email sent to tenant admin.'
+                )
+        
+        super().save_model(request, obj, form, change)

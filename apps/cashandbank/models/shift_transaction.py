@@ -12,9 +12,9 @@ class ShiftTransaction(BaseModel):
     Represents individual transactions within a cashier shift.
     
     Types:
-        - cash_in: Manual cash addition (e.g., customer payment, refund)
-        - cash_out: Manual cash removal (e.g., reimbursement)
-        - sale: Auto-posted from bill creation (payment method = cash)
+    - cash_in: Manual cash addition (e.g., customer payment, refund)
+    - cash_out: Manual cash removal (e.g., reimbursement)
+    - sale: Auto-posted from bill creation (payment method = cash)
     """
 
     TYPE_CHOICES = [
