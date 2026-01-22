@@ -168,6 +168,14 @@ class Inventory(BaseModel):
         help_text='Barcode for scanning (alphanumeric only, max 50 characters)'
     )
     
+    # Primary Image for Inventory List
+    image = models.ImageField(
+        upload_to='inventory_images/',
+        blank=True,
+        null=True,
+        help_text='Primary image for inventory item (shown in inventory list)'
+    )
+    
     # Vehicle Details Section
     vehicle_bike_details = models.TextField(
         blank=True,
@@ -357,10 +365,6 @@ class InventoryImage(BaseModel):
         null=True,
         help_text='Optional description for the image'
     )
-    is_primary = models.BooleanField(
-        default=False,
-        help_text='Mark as primary image'
-    )
 
     branch = models.ForeignKey(
         'branch.Branch',
@@ -375,7 +379,7 @@ class InventoryImage(BaseModel):
         db_table = 'inventory_image'
         verbose_name = 'Inventory Image'
         verbose_name_plural = 'Inventory Images'
-        ordering = ['-is_primary', 'created']
+        ordering = ['created']
 
     objects = TenantManager()
     
@@ -406,12 +410,6 @@ class InventoryImage(BaseModel):
     
     def save(self, *args, **kwargs):
         self.full_clean()
-        # If this is set as primary, unset other primary images
-        if self.is_primary and self.inventory_id:
-            InventoryImage.objects.filter(
-                inventory_id=self.inventory_id,
-                is_primary=True
-            ).exclude(pk=self.pk).update(is_primary=False)
         super().save(*args, **kwargs)
     
     def __str__(self):
