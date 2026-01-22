@@ -62,11 +62,15 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
 
     def _create_images_from_request(self, inventory, request):
         """Attach uploaded images from the same request to the inventory item."""
-        files = request.FILES.getlist('images') or []
-
+        # Handle primary image for inventory
         single_image = request.FILES.get('image')
-        if single_image and single_image not in files:
-            files.insert(0, single_image)
+        if single_image:
+            # Save to the primary image field
+            inventory.image = single_image
+            inventory.save(update_fields=['image'])
+
+        # Handle additional images for InventoryImage model
+        files = request.FILES.getlist('images') or []
 
         if not files:
             return

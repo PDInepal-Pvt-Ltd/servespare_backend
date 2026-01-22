@@ -6,7 +6,7 @@ from apps.stock_management.serializers.party import PartySerializer
 
 class InventoryImageSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     """
-    Serializer for InventoryImage model
+    Serializer for InventoryImage model (Gallery Images)
     """
     
     class Meta:
@@ -16,7 +16,6 @@ class InventoryImageSerializer(ModelCleanValidationMixin, serializers.ModelSeria
             'inventory',
             'image',
             'description',
-            'is_primary',
             'tenant',
             'branch',
             'is_active',
@@ -66,6 +65,7 @@ class InventorySerializer(ModelCleanValidationMixin, serializers.ModelSerializer
             'storage_location',
             'warranty_period',
             'barcode',
+            'image',
             'vehicle_bike_details',
             'model',
             'type',

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation - ServeSpare</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .email-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        .email-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .email-body {
+            padding: 40px 30px;
+        }
+
+        .greeting {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 20px;
+            color: #333333;
+        }
+
+        .message {
+            font-size: 16px;
+            color: #666666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        /* --- ORDER INFO SECTION --- */
+        .order-info {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px 20px;
+            margin-bottom: 30px;
+            border: 1px solid #e9ecef;
+        }
+
+        .order-info-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .order-info-td {
+            width: 50%;
+            vertical-align: top;
+        }
+
+        .info-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #6c757d;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* --- ITEMS TABLE STYLES --- */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        .items-table th {
+            background-color: #f1f3f5;
+            color: #495057;
+            font-weight: 600;
+            text-align: left;
+            padding: 12px;
+            font-size: 14px;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .items-table td {
+            padding: 15px 12px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: top;
+            font-size: 14px;
+        }
+
+        .item-meta {
+            font-size: 12px;
+            color: #868e96;
+            margin-top: 4px;
+            display: block;
+        }
+
+        .align-right {
+            text-align: right;
+        }
+
+        /* --- TOTALS SECTION --- */
+        .totals-container {
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .totals-table {
+            width: 100%;
+            max-width: 250px;
+            margin-left: auto;
+            /* Aligns table to right */
+            border-collapse: collapse;
+        }
+
+        .totals-table td {
+            padding: 8px 0;
+            text-align: right;
+            font-size: 14px;
+        }
+
+        .total-label {
+            color: #6c757d;
+            padding-right: 15px !important;
+        }
+
+        .total-value {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .grand-total {
+            font-size: 18px;
+            font-weight: 700;
+            color: #764ba2;
+            border-top: 2px solid #e9ecef;
+            padding-top: 15px !important;
+        }
+
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+
+        /* --- MOBILE RESPONSIVENESS --- */
+        @media only screen and (max-width: 600px) {
+            .email-body {
+                padding: 20px 15px;
+            }
+
+            .order-info-td {
+                display: block;
+                width: 100%;
+                margin-bottom: 15px;
+            }
+
+            .order-info-td:last-child {
+                margin-bottom: 0;
+            }
+
+            /* Hide Part Number on very small screens if needed, or allow wrap */
+            .items-table th,
+            .items-table td {
+                padding: 10px 5px;
+                font-size: 13px;
+            }
+
+            .grand-total {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <h1>Order Confirmed</h1>
+        </div>
+
+        <div class="email-body">
+            <div class="greeting">Hi {{ customer_name }},</div>
+
+            <div class="message">
+                <p>Thank you for your order! We have received it and are currently processing the items listed below.
+                </p>
+            </div>
+
+            <div class="order-info">
+                <table class="order-info-table">
+                    <tr>
+                        <td class="order-info-td">
+                            <div class="info-label">Order Reference</div>
+                            <div class="info-value">#{{ order_number }}</div>
+                        </td>
+                        <td class="order-info-td">
+                            <div class="info-label">Order Date</div>
+                            <div class="info-value">{{ order_date }}</div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th width="45%">Item Details</th>
+                        <th width="15%" class="align-right">Qty</th>
+                        <th width="20%" class="align-right">Unit Price</th>
+                        <th width="20%" class="align-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <strong>{{ item_name }}</strong>
+                            <span class="item-meta">PN: {{ part_number }}</span>
+                        </td>
+                        <td class="align-right">{{ quantity }}</td>
+                        <td class="align-right">{{ unit_price }}</td>
+                        <td class="align-right">{{ line_total }}</td>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            <strong>Standard Maintenance Kit</strong>
+                            <span class="item-meta">PN: SMK-2025-X</span>
+                        </td>
+                        <td class="align-right">1</td>
+                        <td class="align-right">$120.00</td>
+                        <td class="align-right">$120.00</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="totals-container">
+                <table class="totals-table">
+                    <tr>
+                        <td class="total-label">Subtotal</td>
+                        <td class="total-value">{{ sub_total }}</td>
+                    </tr>
+                    <tr>
+                        <td class="total-label">Discount</td>
+                        <td class="total-value" style="color: #28a745;">- {{ discount_amount }}</td>
+                    </tr>
+                    <tr>
+                        <td class="total-label">Tax ({{ tax_percentage }}%)</td>
+                        <td class="total-value">{{ tax_amount }}</td>
+                    </tr>
+                    <tr>
+                        <td class="total-label grand-total">Grand Total</td>
+                        <td class="total-value grand-total">{{ grand_total }}</td>
+                    </tr>
+                </table>
+            </div>
+
+            
+
+            <div class="message" style="margin-top: 30px; font-size: 14px;">
+                <p>If you have any questions about this order, please contact support with your
+                    order number.</p>
+            </div>
+        </div>
+
+
+        <div class="footer">
+            <p><strong>ServeSpare</strong></p>
+            <p>This is an automated message. Please do not reply to this email.</p>
+            <p style="font-size: 12px; margin-top: 10px;">© 2025 ServeSpare. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+
+</html>
