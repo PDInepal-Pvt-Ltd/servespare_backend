@@ -1,3 +1,6 @@
+import pymysql
+pymysql.install_as_MySQLdb()
+
 from pathlib import Path
 from decouple import config
 import os
@@ -110,24 +113,24 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
 # DATABASES = {
 #     'default': {
-#     'ENGINE': 'django.db.backends.mysql',
-#     'NAME': 'servesp1_servespare',
-#     'HOST': 'localhost',
-#     'PORT': '3306',
-#     'USER': 'servesp1_admin',
-#     'PASSWORD' :'github.com'
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+DATABASES = {
+    'default': {
+    'ENGINE': 'django.db.backends.mysql',
+    'NAME': 'servesp1_servespare',
+    'HOST': 'localhost',
+    'PORT': '3306',
+    'USER': 'servesp1_admin',
+    'PASSWORD' :'github.com'
 
-# }
+}
     
-# }
+}
 
 
 # Password validation
