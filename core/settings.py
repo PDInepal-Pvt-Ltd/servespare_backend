@@ -1,9 +1,15 @@
-import pymysql
-pymysql.install_as_MySQLdb()
-
 from pathlib import Path
 from decouple import config
 import os
+
+# Check DEV_MODE first to conditionally import pymysql
+DEV_MODE = config('DEV_MODE', default=False, cast=bool)
+
+# Only import pymysql for MySQL (when not in dev mode)
+if not DEV_MODE:
+    import pymysql
+    pymysql.install_as_MySQLdb()
+
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -113,24 +119,27 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-DATABASES = {
-    'default': {
-    'ENGINE': 'django.db.backends.mysql',
-    'NAME': 'servesp1_servespare',
-    'HOST': 'localhost',
-    'PORT': '3306',
-    'USER': 'servesp1_admin',
-    'PASSWORD' :'github.com'
-
-}
-    
-}
+# Database configuration based on DEV_MODE
+if DEV_MODE:
+    # SQLite for development
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+else:
+    # MySQL for production
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': 'servesp1_servespare',
+            'HOST': 'localhost',
+            'PORT': '3306',
+            'USER': 'servesp1_adminnn',
+            'PASSWORD': 'github.com'
+        }
+    }
 
 
 # Password validation
