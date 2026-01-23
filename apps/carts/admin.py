@@ -72,7 +72,7 @@ class CartItemAdmin(admin.ModelAdmin):
         'inventory__item_name',
         'inventory__part_number'
     ]
-    readonly_fields = ['created', 'modified', 'price', 'total_price']
+    readonly_fields = ['created', 'modified', 'total_price']
     date_hierarchy = 'created'
     
     fieldsets = (

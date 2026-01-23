@@ -7,23 +7,19 @@ class BranchSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
     class Meta:
         model = Branch
         fields = '__all__'
-        extra_kwargs = {
-            'tenant': {'read_only': True},
-        }
     
     def validate(self, attrs):
         """Validate subscription branch limits."""
         # Get tenant from context or from attrs
-        tenant = None
-        if self.context.get('request') and self.context['request'].user:
+        tenant = attrs.get('tenant')  # From request data
+        
+        if not tenant and self.context.get('request') and self.context['request'].user:
             user = self.context['request'].user
             from apps.base.permission_utils import is_tenant_admin, is_super_admin
             
             if is_tenant_admin(user):
                 tenant = user.tenant
-            elif is_super_admin(user):
-                # Super admin - check if tenant is in validated data
-                tenant = attrs.get('tenant') if hasattr(self, 'initial_data') else None
+                attrs['tenant'] = tenant
         
         if tenant:
             # Check if tenant has a subscription package

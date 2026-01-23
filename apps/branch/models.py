@@ -123,7 +123,7 @@ class Branch(BaseModel):
     def clean(self):
         errors = {}
 
-        if not self.tenant_id and not self.tenant:
+        if not self.tenant_id:
             errors['tenant'] = 'Tenant is required.'
 
         if not self.branch_name or not self.branch_name.strip():
