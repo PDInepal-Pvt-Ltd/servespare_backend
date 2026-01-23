@@ -19,6 +19,7 @@ from .user_serializers import (
     TwoFactorAuthLoginSerializer,
     OTPVerificationSerializer,
     TwoFactorAuthResponseSerializer,
+    TwoFactorAuthToggleSerializer,
 )
 
 __all__ = [
@@ -41,4 +42,5 @@ __all__ = [
     'TwoFactorAuthLoginSerializer',
     'OTPVerificationSerializer',
     'TwoFactorAuthResponseSerializer',
+    'TwoFactorAuthToggleSerializer',
 ]

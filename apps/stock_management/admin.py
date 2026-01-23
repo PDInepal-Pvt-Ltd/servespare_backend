@@ -327,11 +327,13 @@ class PurchaseOrderItemAdmin(admin.ModelAdmin):
 
 
 class InventoryImageInline(admin.TabularInline):
-    """Inline admin for Inventory Images"""
+    """Inline admin for Inventory Gallery Images (separate from primary image)"""
     model = InventoryImage
     extra = 1
-    fields = ['image', 'description', 'is_primary', 'is_active']
+    fields = ['image', 'description', 'is_active']
     readonly_fields = []
+    verbose_name = 'Gallery Image'
+    verbose_name_plural = 'Gallery Images'
 
 
 @admin.register(Inventory)
@@ -372,7 +374,7 @@ class InventoryAdmin(admin.ModelAdmin):
     ]
     readonly_fields = ['created', 'modified', 'is_low_stock']
     raw_id_fields = ['party', 'tenant', 'branch']
-    inlines = [InventoryImageInline]
+    # Removed inlines to show only single primary image, not multiple gallery images
     
     fieldsets = (
         ('Context', {
@@ -380,6 +382,10 @@ class InventoryAdmin(admin.ModelAdmin):
         }),
         ('Basic Information', {
             'fields': ('item_name', 'category', 'vehicle_type', 'party', 'is_active')
+        }),
+        ('Primary Image', {
+            'fields': ('image',),
+            'description': 'Upload the primary image for this inventory item (shown in inventory list)'
         }),
         ('Part Information', {
             'fields': ('part_number', 'hsn_code', 'barcode')
@@ -701,13 +707,12 @@ class InventoryImageAdmin(admin.ModelAdmin):
     list_display = [
         'inventory',
         'image',
-        'is_primary',
+        'description',
         'is_active',
         'created',
         'modified'
     ]
     list_filter = [
-        'is_primary',
         'is_active',
         'created',
         'modified'
@@ -721,7 +726,7 @@ class InventoryImageAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Image Information', {
-            'fields': ('inventory', 'image', 'description', 'is_primary', 'is_active')
+            'fields': ('inventory', 'image', 'description', 'is_active')
         }),
         ('Timestamps', {
             'fields': ('created', 'modified'),

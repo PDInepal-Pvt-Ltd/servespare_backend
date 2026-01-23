@@ -129,11 +129,23 @@ class UserCreateSerializer(ModelCleanValidationMixin, serializers.ModelSerialize
         # Check subscription limit for user creation
         tenant = attrs.get('tenant')
         if tenant:
-            if not tenant.can_add_user():
+            # Check if tenant has a subscription package
+            if not tenant.package:
                 raise serializers.ValidationError({
                     'tenant': (
-                        f'Cannot create user. Your subscription plan allows {tenant.get_allowed_users()} users, '
-                        f'but you already have {tenant.get_user_count()} active users. '
+                        f'Cannot create user. Your account does not have an active subscription plan. '
+                        f'Please contact support to activate a subscription.'
+                    )
+                })
+            
+            # Check if tenant has reached their user limit
+            if not tenant.can_add_user():
+                allowed = tenant.get_allowed_users()
+                current = tenant.get_user_count()
+                raise serializers.ValidationError({
+                    'tenant': (
+                        f'Cannot create user. Your subscription plan \'{tenant.package.plan_name}\' allows {allowed} user(s), '
+                        f'but you already have {current} active user(s). '
                         f'Please upgrade your subscription or deactivate existing users.'
                     )
                 })
@@ -661,3 +673,39 @@ class TwoFactorAuthResponseSerializer(serializers.Serializer):
     message = serializers.CharField(read_only=True)
     user = serializers.DictField(read_only=True, help_text='User details')
     tokens = serializers.DictField(read_only=True, help_text='Access and refresh tokens')
+
+
+class TwoFactorAuthToggleSerializer(serializers.Serializer):
+    """Serializer for enabling/disabling Two-Factor Authentication for a user."""
+    
+    two_factor_enabled = serializers.BooleanField(
+        required=True,
+        help_text='Set to true to enable 2FA, false to disable 2FA'
+    )
+    
+    def validate(self, attrs):
+        """Additional validation if needed."""
+        user = self.context.get('user')
+        
+        if not user:
+            raise serializers.ValidationError({
+                'detail': 'User not found in context.'
+            })
+        
+        # Optionally, we could add validation to ensure email is present for 2FA
+        if attrs['two_factor_enabled'] and not user.email:
+            raise serializers.ValidationError({
+                'two_factor_enabled': 'Cannot enable Two-Factor Authentication. User must have a valid email address.'
+            })
+        
+        return attrs
+    
+    def save(self, **kwargs):
+        """Update the two_factor_enabled field for the user."""
+        user = self.context.get('user')
+        two_factor_enabled = self.validated_data['two_factor_enabled']
+        
+        user.two_factor_enabled = two_factor_enabled
+        user.save(update_fields=['two_factor_enabled', 'modified'])
+        
+        return user

@@ -249,21 +249,38 @@ class Tenant(BaseModel):
     
     def get_allowed_users(self):
         """Get the number of users allowed by the current subscription plan"""
-        if self.package:
-            return self.package.no_of_user
-        return 0
+        if not self.package:
+            return 0
+        
+        try:
+            no_of_user = self.package.no_of_user
+            # Handle "unlimited" string
+            if isinstance(no_of_user, str):
+                if no_of_user.lower() == 'unlimited':
+                    return float('inf')
+                return int(no_of_user)
+            return int(no_of_user)
+        except (ValueError, TypeError, AttributeError):
+            # Log error and return 0 as fallback
+            return 0
     
     def can_add_user(self):
         """Check if tenant can add more users based on subscription plan limit"""
         if not self.package:
             return False
-        return self.get_user_count() < self.get_allowed_users()
+        allowed = self.get_allowed_users()
+        if allowed == float('inf'):  # unlimited users
+            return True
+        return self.get_user_count() < allowed
     
     def get_remaining_user_slots(self):
         """Get the number of remaining user slots available"""
         if not self.package:
             return 0
-        remaining = self.get_allowed_users() - self.get_user_count()
+        allowed = self.get_allowed_users()
+        if allowed == float('inf'):  # unlimited users
+            return float('inf')
+        remaining = allowed - self.get_user_count()
         return max(0, remaining)
     
     def get_admins(self):
@@ -303,19 +320,34 @@ class Tenant(BaseModel):
     def get_allowed_branches(self):
         """Get the number of branches allowed by the current subscription plan"""
         if self.package:
-            return self.package.no_of_branch
+            try:
+                no_of_branch = self.package.no_of_branch
+                # Handle "unlimited" string
+                if isinstance(no_of_branch, str):
+                    if no_of_branch.lower() == 'unlimited':
+                        return float('inf')
+                    return int(no_of_branch)
+                return int(no_of_branch)
+            except (ValueError, TypeError):
+                return 0
         return 0
     
     def can_add_branch(self):
         """Check if tenant can add more branches based on subscription plan limit"""
         if not self.package:
             return False
-        return self.get_branch_count() < self.get_allowed_branches()
+        allowed = self.get_allowed_branches()
+        if allowed == float('inf'):  # unlimited branches
+            return True
+        return self.get_branch_count() < allowed
     
     def get_remaining_branch_slots(self):
         """Get the number of remaining branch slots available"""
         if not self.package:
             return 0
-        remaining = self.get_allowed_branches() - self.get_branch_count()
+        allowed = self.get_allowed_branches()
+        if allowed == float('inf'):  # unlimited branches
+            return float('inf')
+        remaining = allowed - self.get_branch_count()
         return max(0, remaining)
 

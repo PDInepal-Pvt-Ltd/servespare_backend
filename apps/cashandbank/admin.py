@@ -6,13 +6,15 @@ from apps.cashandbank.models import Cheque
 
 @admin.register(BankAccount)
 class BankAccountAdmin(admin.ModelAdmin):
+    """
+    Admin interface for BankAccount with multi-type support.
+    Displays type-specific fields based on account_type selection.
+    """
     list_display = [
         'account_name',
         'account_type',
         'balance',
-        'bank_name',
-        'account_number',
-        'account_holders_name',
+        'get_account_identifier',
         'is_active',
         'created',
         'modified'
@@ -27,22 +29,62 @@ class BankAccountAdmin(admin.ModelAdmin):
         'account_name',
         'bank_name',
         'account_number',
-        'account_holders_name'
+        'account_holder_name',
+        'wallet_id'
     ]
-    readonly_fields = ['created', 'modified']
+    readonly_fields = ['created', 'modified', 'get_account_display_info']
     
     fieldsets = (
-        ('Account Information', {
-            'fields': ('account_type', 'account_name', 'is_active')
+        ('Basic Information', {
+            'fields': ('tenant', 'branch', 'account_type', 'account_name', 'is_active')
         }),
-        ('Bank Details', {
-            'fields': ('bank_name', 'account_number', 'account_holders_name', 'balance')
+        ('Bank Account Details', {
+            'fields': ('bank_name', 'account_number', 'account_holder_name'),
+            'description': 'Required for Bank Account type',
+            'classes': ('collapse',)
+        }),
+        ('Digital Wallet Details', {
+            'fields': ('wallet_id',),
+            'description': 'Required for eSewa or FonePay account types',
+            'classes': ('collapse',)
+        }),
+        ('Account Status', {
+            'fields': ('balance', 'get_account_display_info')
         }),
         ('Timestamps', {
             'fields': ('created', 'modified'),
             'classes': ('collapse',)
         }),
     )
+    
+    raw_id_fields = ['tenant', 'branch']
+    
+    def get_account_identifier(self, obj):
+        """Display account identifier based on type"""
+        if obj.account_type == 'bank':
+            return obj.account_number or '-'
+        elif obj.account_type in ['esewa', 'fonepay']:
+            return obj.wallet_id or '-'
+        return '-'
+    get_account_identifier.short_description = 'Account Identifier'
+    
+    def get_account_display_info(self, obj):
+        """Display formatted account information"""
+        if not obj.pk:
+            return 'Save the account to view details'
+        
+        info = obj.get_account_display_info()
+        if info:
+            details = f"Type: {info['type']}\n"
+            if info['identifier']:
+                details += f"Identifier: {info['identifier']}\n"
+            if info['bank']:
+                details += f"Bank: {info['bank']}\n"
+            if info['holder']:
+                details += f"Holder: {info['holder']}\n"
+            return details
+        return 'N/A'
+    get_account_display_info.short_description = 'Account Information'
     
     def has_delete_permission(self, request, obj=None):
         """
