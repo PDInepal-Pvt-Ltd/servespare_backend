@@ -45,6 +45,42 @@ def validate_phone_number(value):
             code='invalid_phone_length'
         )
 
+
+NEPAL_PROVINCE_DISTRICTS = {
+    'Koshi': ['Bhojpur', 'Dhankuta', 'Ilam', 'Jhapa', 'Khotang', 'Morang', 'Okhaldhunga', 'Panchthar', 'Sankhuwasabha', 'Solukhumbu', 'Sunsari', 'Taplejung', 'Terhathum', 'Udayapur'],
+    'Madhesh': ['Bara', 'Dhanusha', 'Mahottari', 'Parsa', 'Rautahat', 'Saptari', 'Sarlahi', 'Siraha'],
+    'Bagmati': ['Bhaktapur', 'Chitwan', 'Dhading', 'Dolakha', 'Kathmandu', 'Kavrepalanchok', 'Lalitpur', 'Makwanpur', 'Nuwakot', 'Ramechhap', 'Rasuwa', 'Sindhuli', 'Sindhupalchok'],
+    'Gandaki': ['Baglung', 'Gorkha', 'Kaski', 'Lamjung', 'Manang', 'Mustang', 'Myagdi', 'Nawalpur', 'Parbat', 'Syangja', 'Tanahun'],
+    'Lumbini': ['Arghakhanchi', 'Banke', 'Bardiya', 'Dang', 'Gulmi', 'Kapilvastu', 'Palpa', 'Pyuthan', 'Rolpa', 'Rupandehi', 'Rukum East', 'Nawalparasi West'],
+    'Karnali': ['Dailekh', 'Dolpa', 'Humla', 'Jajarkot', 'Jumla', 'Kalikot', 'Mugu', 'Rukum West', 'Salyan', 'Surkhet'],
+    'Sudurpashchim': ['Achham', 'Baitadi', 'Bajhang', 'Bajura', 'Dadeldhura', 'Darchula', 'Doti', 'Kailali', 'Kanchanpur'],
+}
+
+
+def validate_province(value):
+    """Validate that province is in NEPAL_PROVINCE_DISTRICTS"""
+    if not value:
+        raise ValidationError(
+            _('Province is required.'),
+            code='province_required'
+        )
+    if value not in NEPAL_PROVINCE_DISTRICTS:
+        valid_provinces = ', '.join(NEPAL_PROVINCE_DISTRICTS.keys())
+        raise ValidationError(
+            _(f'Invalid province. Must be one of: {valid_provinces}'),
+            code='invalid_province'
+        )
+
+
+def validate_district(value):
+    """Validate that district is provided"""
+    if not value:
+        raise ValidationError(
+            _('District is required.'),
+            code='district_required'
+        )
+
+
 class Branch(BaseModel):
     """
     Model to store branch /business information
@@ -59,7 +95,20 @@ class Branch(BaseModel):
     branch_code = models.CharField(max_length=50, unique=True)
     Address = models.TextField(blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
-    state = models.CharField(max_length=100, blank=True, null=True)
+    province = models.CharField(
+        max_length=100,
+        null=False,
+        blank=False,
+        validators=[validate_province],
+        help_text='Province/Region in Nepal'
+    )
+    district = models.CharField(
+        max_length=100,
+        null=False,
+        blank=False,
+        validators=[validate_district],
+        help_text='District in the selected province'
+    )
     phone = models.CharField(max_length=20, blank=True, null=True)
     Email = models.EmailField(unique=True)
     
@@ -101,8 +150,20 @@ class Branch(BaseModel):
         if self.city and len(self.city.strip()) > 100:
             errors['city'] = 'City cannot exceed 100 characters.'
 
-        if self.state and len(self.state.strip()) > 100:
-            errors['state'] = 'State cannot exceed 100 characters.'
+        # Validate province
+        if not self.province or not self.province.strip():
+            errors['province'] = 'Province is required.'
+        elif self.province not in NEPAL_PROVINCE_DISTRICTS:
+            valid_provinces = ', '.join(NEPAL_PROVINCE_DISTRICTS.keys())
+            errors['province'] = f'Invalid province. Must be one of: {valid_provinces}'
+
+        # Validate district
+        if not self.district or not self.district.strip():
+            errors['district'] = 'District is required.'
+        elif self.province in NEPAL_PROVINCE_DISTRICTS:
+            if self.district not in NEPAL_PROVINCE_DISTRICTS[self.province]:
+                valid_districts = ', '.join(NEPAL_PROVINCE_DISTRICTS[self.province])
+                errors['district'] = f'Invalid district for {self.province}. Must be one of: {valid_districts}'
 
         if self.phone:
             try:
@@ -135,7 +196,3 @@ class Branch(BaseModel):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
-
-   
-   
-   

@@ -99,7 +99,8 @@ class Command(BaseCommand):
                 'branch_code': 'MAIN001',
                 'Address': '123 Main Street, New York, NY',
                 'city': 'New York',
-                'state': 'NY',
+                'province': 'Bagmati',
+                'district': 'Kathmandu',
                 'phone': '+1234567890',
                 'Email': 'main@serveiqdemo.com'
             },
@@ -109,7 +110,8 @@ class Command(BaseCommand):
                 'branch_code': 'WH001',
                 'Address': '456 Warehouse Road, Newark, NJ',
                 'city': 'Newark',
-                'state': 'NJ',
+                'province': 'Madhesh',
+                'district': 'Bara',
                 'phone': '+1231231234',
                 'Email': 'warehouse@serveiqdemo.com'
             }
@@ -122,7 +124,8 @@ class Command(BaseCommand):
                 'branch_code': 'PC001',
                 'Address': '789 Parts Ave, Los Angeles, CA',
                 'city': 'Los Angeles',
-                'state': 'CA',
+                'province': 'Gandaki',
+                'district': 'Kaski',
                 'phone': '+1987654321',
                 'Email': 'branch@partscenter.com'
             })
