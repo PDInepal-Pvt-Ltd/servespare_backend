@@ -25,11 +25,22 @@ class BranchSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
                 # Super admin - check if tenant is in validated data
                 tenant = attrs.get('tenant') if hasattr(self, 'initial_data') else None
         
-        if tenant and not tenant.can_add_branch():
-            raise serializers.ValidationError(
-                f'Cannot create branch. Your subscription plan allows {tenant.get_allowed_branches()} branches, '
-                f'but you already have {tenant.get_branch_count()} active branches. '
-                f'Please upgrade your subscription or delete existing unused branches.'
-            )
+        if tenant:
+            # Check if tenant has a subscription package
+            if not tenant.package:
+                raise serializers.ValidationError(
+                    f'Cannot create branch. Your account does not have an active subscription plan. '
+                    f'Please contact support to activate a subscription.'
+                )
+            
+            # Check if tenant has reached their branch limit
+            if not tenant.can_add_branch():
+                allowed = tenant.get_allowed_branches()
+                current = tenant.get_branch_count()
+                raise serializers.ValidationError(
+                    f'Cannot create branch. Your subscription plan \'{tenant.package.plan_name}\' allows {allowed} branch(es), '
+                    f'but you already have {current} active branch(es). '
+                    f'Please upgrade your subscription or delete existing unused branches.'
+                )
         
         return super().validate(attrs)
