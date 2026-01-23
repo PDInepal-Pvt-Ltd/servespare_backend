@@ -113,6 +113,22 @@ class Branch(BaseModel):
         if not self.Email or not self.Email.strip():
             errors['Email'] = 'Email is required.'
 
+        # Check subscription limit for new branches only
+        if not self.pk and self.tenant:  # not self.pk means this is a new instance
+            if not self.tenant.package:
+                errors['tenant'] = (
+                    f'Cannot create branch. Tenant does not have an active subscription plan. '
+                    f'Please assign a subscription plan first.'
+                )
+            elif not self.tenant.can_add_branch():
+                allowed = self.tenant.get_allowed_branches()
+                current = self.tenant.get_branch_count()
+                errors['tenant'] = (
+                    f'Cannot create branch. Tenant subscription plan allows {allowed} branch(es), '
+                    f'but already has {current} active branch(es). '
+                    f'Please upgrade subscription or delete existing unused branches.'
+                )
+
         if errors:
             raise ValidationError(errors)
 

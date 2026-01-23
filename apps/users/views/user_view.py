@@ -290,22 +290,35 @@ class UserViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             raise PermissionDenied("Selected branch does not belong to the chosen tenant.")
         
         # Verify subscription limit one more time before saving
-        if target_tenant and not target_tenant.can_add_user():
-            # Send limit exceeded email to tenant admin
-            send_subscription_limit_exceeded_email(
-                target_tenant,
-                'users',
-                target_tenant.get_user_count(),
-                target_tenant.get_allowed_users()
-            )
-            raise ValidationError({
-                'detail': (
-                    f'Cannot create user. Your subscription plan allows {target_tenant.get_allowed_users()} users, '
-                    f'but you already have {target_tenant.get_user_count()} active users. '
-                    f'Please upgrade your subscription or deactivate existing users. '
-                    f'A notification email has been sent to your admin.'
+        if target_tenant:
+            # Check if tenant has a subscription package
+            if not target_tenant.package:
+                raise ValidationError({
+                    'detail': (
+                        f'Cannot create user. Your account does not have an active subscription plan. '
+                        f'Please contact support to activate a subscription.'
+                    )
+                })
+            
+            # Check if tenant has reached their user limit
+            if not target_tenant.can_add_user():
+                allowed = target_tenant.get_allowed_users()
+                current = target_tenant.get_user_count()
+                # Send limit exceeded email to tenant admin
+                send_subscription_limit_exceeded_email(
+                    target_tenant,
+                    'users',
+                    current,
+                    allowed
                 )
-            })
+                raise ValidationError({
+                    'detail': (
+                        f'Cannot create user. Your subscription plan \'{target_tenant.package.plan_name}\' allows {allowed} user(s), '
+                        f'but you already have {current} active user(s). '
+                        f'Please upgrade your subscription or deactivate existing users. '
+                        f'A notification email has been sent to your admin.'
+                    )
+                })
         
         serializer.save(created_by=user)
     

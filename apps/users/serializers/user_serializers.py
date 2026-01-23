@@ -129,11 +129,23 @@ class UserCreateSerializer(ModelCleanValidationMixin, serializers.ModelSerialize
         # Check subscription limit for user creation
         tenant = attrs.get('tenant')
         if tenant:
-            if not tenant.can_add_user():
+            # Check if tenant has a subscription package
+            if not tenant.package:
                 raise serializers.ValidationError({
                     'tenant': (
-                        f'Cannot create user. Your subscription plan allows {tenant.get_allowed_users()} users, '
-                        f'but you already have {tenant.get_user_count()} active users. '
+                        f'Cannot create user. Your account does not have an active subscription plan. '
+                        f'Please contact support to activate a subscription.'
+                    )
+                })
+            
+            # Check if tenant has reached their user limit
+            if not tenant.can_add_user():
+                allowed = tenant.get_allowed_users()
+                current = tenant.get_user_count()
+                raise serializers.ValidationError({
+                    'tenant': (
+                        f'Cannot create user. Your subscription plan \'{tenant.package.plan_name}\' allows {allowed} user(s), '
+                        f'but you already have {current} active user(s). '
                         f'Please upgrade your subscription or deactivate existing users.'
                     )
                 })

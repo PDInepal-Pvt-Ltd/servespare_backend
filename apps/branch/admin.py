@@ -20,20 +20,31 @@ class BranchAdmin(TenantAdminMixin, admin.ModelAdmin):
         # Check subscription limit only when creating new branches
         if not change:  # change=False means we're adding a new branch
             tenant = obj.tenant
-            if tenant and not tenant.can_add_branch():
-                # Send limit exceeded email to tenant admin
-                send_subscription_limit_exceeded_email(
-                    tenant,
-                    'branches',
-                    tenant.get_branch_count(),
-                    tenant.get_allowed_branches()
-                )
-                raise DjangoValidationError(
-                    f'Cannot create branch. Tenant "{tenant.business_name}" subscription plan allows '
-                    f'{tenant.get_allowed_branches()} branches, but already has {tenant.get_branch_count()} '
-                    f'active branches. Please upgrade subscription or delete existing unused branches. '
-                    f'Notification email sent to tenant admin.'
-                )
+            if tenant:
+                # Check if tenant has a subscription package
+                if not tenant.package:
+                    raise DjangoValidationError(
+                        f'Cannot create branch. Tenant "{tenant.business_name}" does not have an active subscription plan. '
+                        f'Please assign a subscription plan first.'
+                    )
+                
+                # Check if tenant has reached their branch limit
+                if not tenant.can_add_branch():
+                    allowed = tenant.get_allowed_branches()
+                    current = tenant.get_branch_count()
+                    # Send limit exceeded email to tenant admin
+                    send_subscription_limit_exceeded_email(
+                        tenant,
+                        'branches',
+                        current,
+                        allowed
+                    )
+                    raise DjangoValidationError(
+                        f'Cannot create branch. Tenant "{tenant.business_name}" subscription plan (\'{tenant.package.plan_name}\') '
+                        f'allows {allowed} branch(es), but already has {current} active branch(es). '
+                        f'Please upgrade subscription or delete existing unused branches. '
+                        f'Notification email sent to tenant admin.'
+                    )
         
         super().save_model(request, obj, form, change) 
 

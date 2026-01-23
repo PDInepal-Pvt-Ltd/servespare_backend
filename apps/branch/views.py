@@ -50,19 +50,30 @@ class BranchViewSet(viewsets.ModelViewSet):
 		if is_tenant_admin(user):
 			tenant = user.tenant
 			
+			# Check if tenant has a subscription package
+			if not tenant.package:
+				raise ValidationError({
+					'detail': (
+						f'Cannot create branch. Your account does not have an active subscription plan. '
+						f'Please contact support to activate a subscription.'
+					)
+				})
+			
 			# Check branch subscription limit
 			if not tenant.can_add_branch():
+				allowed = tenant.get_allowed_branches()
+				current = tenant.get_branch_count()
 				# Send limit exceeded email to tenant admin
 				send_subscription_limit_exceeded_email(
 					tenant,
 					'branches',
-					tenant.get_branch_count(),
-					tenant.get_allowed_branches()
+					current,
+					allowed
 				)
 				raise ValidationError({
 					'detail': (
-						f'Cannot create branch. Your subscription plan allows {tenant.get_allowed_branches()} branches, '
-						f'but you already have {tenant.get_branch_count()} active branches. '
+						f'Cannot create branch. Your subscription plan \'{tenant.package.plan_name}\' allows {allowed} branch(es), '
+						f'but you already have {current} active branch(es). '
 						f'Please upgrade your subscription or delete existing unused branches. '
 						f'A notification email has been sent to your admin.'
 					)

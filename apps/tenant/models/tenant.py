@@ -249,18 +249,20 @@ class Tenant(BaseModel):
     
     def get_allowed_users(self):
         """Get the number of users allowed by the current subscription plan"""
-        if self.package:
-            try:
-                no_of_user = self.package.no_of_user
-                # Handle "unlimited" string
-                if isinstance(no_of_user, str):
-                    if no_of_user.lower() == 'unlimited':
-                        return float('inf')
-                    return int(no_of_user)
+        if not self.package:
+            return 0
+        
+        try:
+            no_of_user = self.package.no_of_user
+            # Handle "unlimited" string
+            if isinstance(no_of_user, str):
+                if no_of_user.lower() == 'unlimited':
+                    return float('inf')
                 return int(no_of_user)
-            except (ValueError, TypeError):
-                return 0
-        return 0
+            return int(no_of_user)
+        except (ValueError, TypeError, AttributeError):
+            # Log error and return 0 as fallback
+            return 0
     
     def can_add_user(self):
         """Check if tenant can add more users based on subscription plan limit"""
