@@ -76,19 +76,5 @@ for app in settings.LOCAL_APPS:
 
 print("✅ Migrations cleaned")
 
-# ---------------------------
-# DJANGO COMMANDS
-# ---------------------------
-apps_str = " ".join(settings.LOCAL_APPS)
+print("✅ DATABASE AND MIGRATIONS SUCCESSFULLY DELETED")
 
-print("⚙️ Making migrations...")
-os.system(f"python manage.py makemigrations {apps_str}")
-
-print("📦 Applying migrations...")
-os.system("python manage.py migrate")
-
-print("🌱 Seeding data...")
-os.system("python manage.py runscript seed")
-
-print("✅ COLD START COMPLETE")
-print("🚀 You can now run: python manage.py runserver")
