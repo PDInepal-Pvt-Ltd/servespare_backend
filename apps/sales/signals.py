@@ -1,10 +1,131 @@
 """
-Signals for Sales App - Handles bidirectional synchronization of payment statuses
-between Sales Orders, Invoices, and Bills, and syncs bills to sales ledger
+Signals for Sales App - Handles:
+1. Bidirectional synchronization of payment statuses
+2. Invoice generation from sales orders
+3. Bill creation from invoices
+4. Inventory updates
+5. Sales ledger synchronization
 """
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.exceptions import ValidationError
+
+
+@receiver(post_save, sender='sales.SalesOrderItem')
+def auto_create_or_update_invoice_on_item_add(sender, instance, created, **kwargs):
+    """
+    Auto-create invoice with items when first item is added to order,
+    or update existing invoice when items change
+    """
+    order = instance.order
+    
+    # Check if invoice exists
+    try:
+        invoice = order.invoice
+        # Invoice exists - update it with the new/updated item
+        update_invoice_item(order, instance)
+    except:
+        # Invoice doesn't exist yet, create it with all current items
+        if order.items.exists():
+            order.generate_invoice()
+
+
+def update_invoice_item(order, order_item):
+    """Helper to update an invoice item when order item changes"""
+    from apps.sales.models import InvoiceItem
+    
+    if not hasattr(order, 'invoice'):
+        return
+    
+    invoice = order.invoice
+    
+    # Find or create corresponding invoice item
+    invoice_item, created = InvoiceItem.objects.get_or_create(
+        invoice=invoice,
+        sales_order_item=order_item,
+        defaults={
+            'tenant': order.tenant,
+            'inventory': order_item.inventory,
+            'item_name': order_item.item_name,
+            'part_number': order_item.part_number,
+            'quantity': order_item.quantity,
+            'unit_price': order_item.unit_price,
+            'discount_percentage': order_item.discount_percentage,
+            'discount_amount': order_item.discount_amount,
+            'tax_percentage': order_item.tax_percentage,
+            'tax_amount': order_item.tax_amount,
+            'line_total': order_item.line_total,
+            'notes': order_item.notes,
+        }
+    )
+    
+    # Update if item changed
+    if not created:
+        invoice_item.item_name = order_item.item_name
+        invoice_item.part_number = order_item.part_number
+        invoice_item.quantity = order_item.quantity
+        invoice_item.unit_price = order_item.unit_price
+        invoice_item.discount_percentage = order_item.discount_percentage
+        invoice_item.discount_amount = order_item.discount_amount
+        invoice_item.tax_percentage = order_item.tax_percentage
+        invoice_item.tax_amount = order_item.tax_amount
+        invoice_item.line_total = order_item.line_total
+        invoice_item.notes = order_item.notes
+        invoice_item.save()
+
+
+@receiver(post_save, sender='sales.SalesOrderItem')
+def recalculate_sales_order_on_item_change(sender, instance, created, **kwargs):
+    """
+    Recalculate sales order totals when any sales order item changes
+    """
+    if instance.order:
+        instance.order.calculate_totals()
+
+
+@receiver(post_delete, sender='sales.SalesOrderItem')
+def recalculate_sales_order_on_item_delete(sender, instance, **kwargs):
+    """
+    Recalculate sales order totals when a sales order item is deleted
+    """
+    if instance.order:
+        instance.order.calculate_totals()
+
+
+@receiver(post_save, sender='sales.InvoiceItem')
+def recalculate_invoice_on_item_change(sender, instance, created, **kwargs):
+    """
+    Recalculate invoice totals when any invoice item changes
+    """
+    if instance.invoice:
+        instance.invoice.calculate_totals()
+
+
+@receiver(post_delete, sender='sales.InvoiceItem')
+def recalculate_invoice_on_item_delete(sender, instance, **kwargs):
+    """
+    Recalculate invoice totals when an invoice item is deleted
+    """
+    if instance.invoice:
+        instance.invoice.calculate_totals()
+
+
+@receiver(post_save, sender='sales.PurchaseItem')
+def recalculate_bill_on_item_change(sender, instance, created, **kwargs):
+    """
+    Recalculate bill amounts when any purchase item changes
+    """
+    if instance.bill:
+        instance.bill.calculate_all_amounts()
+
+
+@receiver(post_delete, sender='sales.PurchaseItem')
+def recalculate_bill_on_item_delete(sender, instance, **kwargs):
+    """
+    Recalculate bill amounts when a purchase item is deleted
+    """
+    if instance.bill:
+        instance.bill.calculate_all_amounts()
 
 
 @receiver(post_save, sender='sales.Bill')
@@ -162,108 +283,52 @@ def sync_bill_status_to_invoice(sender, instance, created, **kwargs):
 @receiver(post_save, sender='sales.SalesOrder')
 def auto_generate_invoice_from_sales_order(sender, instance, created, **kwargs):
     """
-    Automatically generate invoice when sales order is created
-    Only for confirmed orders
+    Automatically generate invoice when sales order is created (confirmed)
+    Then sync all data and items from the sales order
     """
     if created and instance.order_status == 'confirmed':
         # Check if invoice doesn't already exist
         if not hasattr(instance, 'invoice') or not instance.invoice:
-            from apps.sales.models import Invoice, InvoiceItem
+            from apps.sales.models import Invoice
             
-            # Create invoice
+            # Create empty invoice
             invoice = Invoice.objects.create(
                 tenant=instance.tenant,
                 customer=instance.customer,
                 branch=instance.branch,
                 sales_order=instance,
-                subtotal=instance.subtotal,
-                discount_percentage=instance.discount_percentage,
-                discount_amount=instance.discount_amount,
-                tax_percentage=instance.tax_percentage,
-                tax_amount=instance.tax_amount,
-                shipping_charges=instance.shipping_charges,
-                total_amount=instance.total_amount,
                 payment_status='pending',
                 created_by=instance.created_by
             )
             
-            # Create invoice items from sales order items
-            for order_item in instance.items.all():
-                InvoiceItem.objects.create(
-                    tenant=instance.tenant,
-                    invoice=invoice,
-                    inventory=order_item.inventory,
-                    item_name=order_item.item_name,
-                    part_number=order_item.part_number,
-                    quantity=order_item.quantity,
-                    unit_price=order_item.unit_price,
-                    discount_percentage=order_item.discount_percentage,
-                    discount_amount=order_item.discount_amount,
-                    tax_percentage=order_item.tax_percentage,
-                    tax_amount=order_item.tax_amount,
-                    line_total=order_item.line_total
-                )
+            # Sync data and items from sales order
+            invoice.sync_from_sales_order()
 
 
 @receiver(post_save, sender='sales.Invoice')
 def auto_create_bill_from_paid_invoice(sender, instance, created, **kwargs):
     """
-    Automatically create bill when invoice is marked as paid
-    Only for paid invoices without existing bills
+    Automatically create bill when invoice is marked as paid.
+    Creates a Bill with PurchaseItems transferred from InvoiceItems.
     """
     # Only process if invoice is paid
     if instance.payment_status != 'paid':
         return
     
-    # Check if bill already exists by querying Bill model directly
-    # This avoids the OneToOne relationship issue
-    from apps.sales.models import Bill, PurchaseItem
+    # Check if bill already exists
+    try:
+        if instance.bill:
+            return
+    except:
+        pass
     
-    # Query to check if a bill with this invoice already exists
-    if Bill.objects.filter(invoice=instance).exists():
-        # Bill already exists, do nothing
-        return
-    
-    # Create bill from invoice (without invoice field first)
-    bill = Bill(
-        tenant=instance.tenant,
-        branch=instance.branch,
-        created_by=instance.created_by,
-        sales_order=instance.sales_order,
-        customer_name=instance.customer.full_name or instance.customer.username if instance.customer else 'Online Customer',
-        address=instance.sales_order.delivery_address if instance.sales_order else '',
-        phone_numbers=getattr(instance.customer, 'phone', '') if instance.customer else '',
-        customer_type='retail',
-        discount_method='amount',
-        discount_value=instance.discount_amount,
-        tax_percentage=instance.tax_percentage,
-        tax_amount=instance.tax_amount,  # Use the already calculated tax_amount from invoice
-        payment_method=instance.payment_method or 'online',
-        status='paid'
-    )
-    
-    # Temporarily disable auto-calculation of tax in save method
-    bill._skip_tax_calculation = True
-    # Save the bill first to get a primary key
-    bill.save()
-    
-    # Now set the invoice relationship
-    bill.invoice = instance
-    bill.save(update_fields=['invoice'])
-    
-    # Create purchase items from invoice items
-    for invoice_item in instance.items.all():
-        PurchaseItem.objects.create(
-            bill=bill,
-            inventory=invoice_item.inventory,
-            quantity=invoice_item.quantity,
-            price=invoice_item.unit_price
-        )
-    
-    # Update sales order status if exists
-    if instance.sales_order:
-        instance.sales_order.order_status = 'ready_to_pack'
-        instance.sales_order.save(update_fields=['order_status', 'modified'])
+    try:
+        instance.convert_to_bill()
+    except Exception as e:
+        # Log but don't fail - bill can be created manually if needed
+        print(f"Error creating bill for invoice {instance.invoice_number}: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 
 @receiver(post_save, sender='sales.Bill')
@@ -272,6 +337,8 @@ def decrease_inventory_on_bill_paid(sender, instance, created, **kwargs):
     Automatically decrease inventory when bill is paid
     - For new bills created as 'paid' (walk-in): decrease immediately
     - For bills updated to 'paid': decrease when status changes
+    
+    Checks if inventory was already decreased to avoid duplicates.
     """
     # Skip if inventory already decreased
     if hasattr(instance, '_inventory_decreased') and instance._inventory_decreased:
@@ -279,9 +346,57 @@ def decrease_inventory_on_bill_paid(sender, instance, created, **kwargs):
     
     # Decrease inventory only when bill is paid
     if instance.status == 'paid':
-        instance.decrease_inventory()
+        instance.update_inventory(reduce_quantity=True)
         # Mark as processed to avoid duplicate decreases
         instance._inventory_decreased = True
+
+
+@receiver(post_save, sender='sales.Invoice')
+def decrease_inventory_on_invoice_paid(sender, instance, created, **kwargs):
+    """
+    Automatically decrease inventory when invoice is marked as paid
+    This ensures inventory is updated when payment is received.
+    
+    Checks if inventory was already decreased to avoid duplicates.
+    """
+    # Skip if inventory already decreased
+    if hasattr(instance, '_inventory_decreased') and instance._inventory_decreased:
+        return
+    
+    # Only process if invoice is paid
+    if instance.payment_status == 'paid':
+        instance.update_inventory(reduce_quantity=True)
+        # Mark as processed to avoid duplicate decreases
+        instance._inventory_decreased = True
+
+
+@receiver(post_save, sender='sales.Invoice')
+def restore_inventory_on_invoice_refund(sender, instance, created, **kwargs):
+    """
+    Automatically restore inventory when invoice is marked as refunded
+    This reverses the inventory deduction when payment is refunded.
+    """
+    # Skip if inventory was never decreased
+    if hasattr(instance, '_inventory_restored') and instance._inventory_restored:
+        return
+    
+    # Only process if invoice is refunded
+    if instance.payment_status == 'refunded':
+        instance.update_inventory(reduce_quantity=False)
+        # Mark as processed to avoid duplicate restores
+        instance._inventory_restored = True
+
+
+# Disabled: Email is sent from serializer after items are created
+# @receiver(post_save, sender='sales.SalesOrder')
+# def send_order_confirmation_on_create(sender, instance, created, **kwargs):
+#     """
+#     Send confirmation email when a new SalesOrder is created (confirmed).
+#     NOTE: Email sending is handled in the serializer after items are created.
+#     """
+#     if created and instance.order_status == 'confirmed':
+#         from apps.sales.emails import send_order_confirmation_email
+#         send_order_confirmation_email(instance)
 
 
 def ready():

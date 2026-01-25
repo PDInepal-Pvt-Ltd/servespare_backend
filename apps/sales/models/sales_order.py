@@ -242,12 +242,24 @@ class SalesOrder(BaseModel):
         """Calculate order totals from items"""
         items = self.items.all()
         
-        # Calculate subtotal from items
-        self.subtotal = sum((item.line_total for item in items), start=Decimal('0.00'))
-        
-        # Calculate discount
-        if self.discount_percentage > 0:
-            self.discount_amount = (self.subtotal * self.discount_percentage) / Decimal('100.00')
+        # Subtotal should be pre-tax: sum of (qty * unit_price - item-level discount)
+        pretax_subtotal = Decimal('0.00')
+        for item in items:
+            quantity = item.quantity or Decimal('0.00')
+            unit_price = item.unit_price or Decimal('0.00')
+            item_discount = item.discount_amount or Decimal('0.00')
+            line_pretax = (quantity * unit_price) - item_discount
+            if line_pretax < 0:
+                line_pretax = Decimal('0.00')
+            pretax_subtotal += line_pretax
+
+        self.subtotal = pretax_subtotal.quantize(Decimal('0.01'))
+
+        # Calculate discount based on order-level percentage
+        if self.discount_percentage and self.discount_percentage > 0:
+            self.discount_amount = ((self.subtotal * self.discount_percentage) / Decimal('100.00')).quantize(Decimal('0.01'))
+        else:
+            self.discount_amount = Decimal('0.00')
         
         # Calculate amount after discount
         amount_after_discount = self.subtotal - self.discount_amount
@@ -263,7 +275,8 @@ class SalesOrder(BaseModel):
             self.tax_amount = Decimal('0.00')
         
         # Calculate total
-        self.total_amount = amount_after_discount + self.tax_amount + self.shipping_charges
+        shipping = self.shipping_charges or Decimal('0.00')
+        self.total_amount = (amount_after_discount + self.tax_amount + shipping).quantize(Decimal('0.01'))
         
         self.save(update_fields=[
             'subtotal', 'discount_amount', 'tax_amount', 'total_amount', 
@@ -406,46 +419,70 @@ class SalesOrder(BaseModel):
         return status_descriptions.get(self.order_status, '')
     
     def generate_invoice(self):
-        """Generate invoice from this sales order"""
+        """Generate invoice from this sales order with all current items"""
         from apps.sales.models import Invoice, InvoiceItem
         
         # Check if invoice already exists
         if hasattr(self, 'invoice'):
-            return self.invoice
+            invoice = self.invoice
+        else:
+            # Create invoice
+            invoice = Invoice.objects.create(
+                tenant=self.tenant,
+                customer=self.customer,
+                branch=self.branch,
+                sales_order=self,
+                subtotal=self.subtotal,
+                discount_percentage=self.discount_percentage,
+                discount_amount=self.discount_amount,
+                tax_percentage=self.tax_percentage,
+                tax_amount=self.tax_amount,
+                shipping_charges=self.shipping_charges,
+                total_amount=self.total_amount,
+                created_by=self.created_by,
+            )
         
-        # Create invoice
-        invoice = Invoice.objects.create(
-            tenant=self.tenant,
-            customer=self.customer,
-            branch=self.branch,
-            sales_order=self,
-            subtotal=self.subtotal,
-            discount_percentage=self.discount_percentage,
-            discount_amount=self.discount_amount,
-            tax_percentage=self.tax_percentage,
-            tax_amount=self.tax_amount,
-            shipping_charges=self.shipping_charges,
-            total_amount=self.total_amount,
-            created_by=self.created_by,
+        # Create or update invoice items from order items
+        # First, get existing invoice item IDs for order items
+        existing_invoice_items = set(
+            InvoiceItem.objects.filter(
+                invoice=invoice,
+                sales_order_item__isnull=False
+            ).values_list('sales_order_item_id', flat=True)
         )
         
-        # Create invoice items from order items
+        # Create items for order items that don't have invoice items yet
         for order_item in self.items.all():
-            InvoiceItem.objects.create(
-                tenant=self.tenant,
-                invoice=invoice,
-                inventory=order_item.inventory,
-                item_name=order_item.item_name,
-                part_number=order_item.part_number,
-                quantity=order_item.quantity,
-                unit_price=order_item.unit_price,
-                discount_percentage=order_item.discount_percentage,
-                discount_amount=order_item.discount_amount,
-                tax_percentage=order_item.tax_percentage,
-                tax_amount=order_item.tax_amount,
-                line_total=order_item.line_total,
-                notes=order_item.notes,
-            )
+            if order_item.id not in existing_invoice_items:
+                InvoiceItem.objects.create(
+                    tenant=self.tenant,
+                    invoice=invoice,
+                    sales_order_item=order_item,
+                    inventory=order_item.inventory,
+                    item_name=order_item.item_name,
+                    part_number=order_item.part_number,
+                    quantity=order_item.quantity,
+                    unit_price=order_item.unit_price,
+                    discount_percentage=order_item.discount_percentage,
+                    discount_amount=order_item.discount_amount,
+                    tax_percentage=order_item.tax_percentage,
+                    tax_amount=order_item.tax_amount,
+                    line_total=order_item.line_total,
+                    notes=order_item.notes,
+                )
+        
+        # Update invoice totals from order
+        invoice.subtotal = self.subtotal
+        invoice.discount_percentage = self.discount_percentage
+        invoice.discount_amount = self.discount_amount
+        invoice.tax_percentage = self.tax_percentage
+        invoice.tax_amount = self.tax_amount
+        invoice.shipping_charges = self.shipping_charges
+        invoice.total_amount = self.total_amount
+        invoice.save(update_fields=[
+            'subtotal', 'discount_percentage', 'discount_amount',
+            'tax_percentage', 'tax_amount', 'shipping_charges', 'total_amount'
+        ])
         
         return invoice
     
@@ -679,6 +716,14 @@ class SalesOrderItem(BaseModel):
 
         if self.line_total is not None and self.line_total < 0:
             errors['line_total'] = 'Line total cannot be negative.'
+
+        # Validate inventory quantity availability
+        if self.inventory_id and self.inventory:
+            if self.quantity and self.quantity > self.inventory.quantity:
+                errors['quantity'] = (
+                    f'Insufficient inventory for {self.item_name}. '
+                    f'Available: {self.inventory.quantity}, Requested: {self.quantity}'
+                )
 
         if errors:
             raise ValidationError(errors)

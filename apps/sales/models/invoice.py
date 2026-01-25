@@ -202,25 +202,55 @@ class Invoice(BaseModel):
         return f"INV-{date_str}-{unique_id}"
 
     def calculate_totals(self):
-        """Calculate invoice totals from items"""
+        """
+        Calculate invoice totals from items.
+        Formula:
+        subtotal = SUM(item.quantity * item.unit_price - item.discount_amount) for all items
+        discount_amount = subtotal * (discount_percentage / 100)
+        amount_after_discount = subtotal - discount_amount
+        tax_amount = amount_after_discount * (tax_percentage / 100)
+        total_amount = amount_after_discount + tax_amount + shipping_charges
+        """
         items = self.items.all()
 
-        # Calculate subtotal from items
-        self.subtotal = sum(item.line_total for item in items)
+        # Calculate subtotal from items (pre-tax, post-item-discount)
+        # Each item's contribution: (quantity * unit_price - item_discount)
+        pretax_subtotal = Decimal('0.00')
+        for item in items:
+            quantity = item.quantity or Decimal('0.00')
+            unit_price = item.unit_price or Decimal('0.00')
+            item_discount = item.discount_amount or Decimal('0.00')
+            line_pretax = (quantity * unit_price) - item_discount
+            if line_pretax < 0:
+                line_pretax = Decimal('0.00')
+            pretax_subtotal += line_pretax
 
-        # Calculate discount
-        if self.discount_percentage > 0:
-            self.discount_amount = (self.subtotal * self.discount_percentage) / Decimal('100.00')
+        self.subtotal = pretax_subtotal.quantize(Decimal('0.01'))
+
+        # Calculate invoice-level discount
+        if self.discount_percentage and self.discount_percentage > 0:
+            self.discount_amount = ((self.subtotal * self.discount_percentage) / Decimal('100.00')).quantize(Decimal('0.01'))
+        else:
+            self.discount_amount = Decimal('0.00')
 
         # Calculate amount after discount
         amount_after_discount = self.subtotal - self.discount_amount
 
+        # Ensure tax percentage defaults to 0% for invoices (unlike sales orders)
+        # or use existing if set
+        if not self.tax_percentage:
+            self.tax_percentage = Decimal('0.00')
+
         # Calculate tax
         if self.tax_percentage > 0:
-            self.tax_amount = (amount_after_discount * self.tax_percentage) / Decimal('100.00')
+            tax_value = (amount_after_discount * self.tax_percentage) / Decimal('100.00')
+            self.tax_amount = tax_value.quantize(Decimal('0.01'))
+        else:
+            self.tax_amount = Decimal('0.00')
 
         # Calculate total
-        self.total_amount = amount_after_discount + self.tax_amount + self.shipping_charges
+        shipping = self.shipping_charges or Decimal('0.00')
+        self.total_amount = (amount_after_discount + self.tax_amount + shipping).quantize(Decimal('0.01'))
 
         self.save(update_fields=[
             'subtotal', 'discount_amount', 'tax_amount', 'total_amount', 'modified'
@@ -272,6 +302,113 @@ class Invoice(BaseModel):
         if errors:
             raise ValidationError(errors)
 
+    def update_inventory(self, reduce_quantity=True):
+        """
+        Update inventory quantities based on invoice items.
+        
+        Args:
+            reduce_quantity (bool): If True, reduce inventory. If False, restore inventory.
+        
+        This is useful when:
+        - reduce_quantity=True: When invoice is confirmed/finalized
+        - reduce_quantity=False: When invoice is cancelled/returned
+        """
+        for item in self.items.all():
+            if item.inventory and item.quantity > 0:
+                quantity_change = item.quantity if reduce_quantity else -item.quantity
+                current_qty = item.inventory.quantity
+                new_qty = max(Decimal('0.00'), current_qty - quantity_change)
+                
+                if new_qty != current_qty:
+                    item.inventory.quantity = new_qty
+                    item.inventory.save(update_fields=['quantity', 'modified'])
+
+    def sync_from_sales_order(self):
+        """
+        Sync invoice data and items from linked sales order.
+        Creates invoice items matching sales order items.
+        """
+        if not self.sales_order:
+            return
+        
+        # Sync financial data from sales order
+        self.customer = self.sales_order.customer
+        self.branch = self.sales_order.branch
+        self.discount_percentage = self.sales_order.discount_percentage
+        self.tax_percentage = self.sales_order.tax_percentage
+        self.shipping_charges = self.sales_order.shipping_charges
+        self.save()
+        
+        # Sync items from sales order
+        for so_item in self.sales_order.items.all():
+            # Check if invoice item already exists
+            InvoiceItem.objects.get_or_create(
+                invoice=self,
+                inventory=so_item.inventory,
+                defaults={
+                    'quantity': so_item.quantity,
+                    'unit_price': so_item.unit_price,
+                    'discount_percentage': so_item.discount_percentage,
+                    'discount_amount': so_item.discount_amount,
+                    'tax_percentage': so_item.tax_percentage,
+                    'tax_amount': so_item.tax_amount,
+                    'item_name': so_item.item_name,
+                    'part_number': so_item.part_number,
+                }
+            )
+        
+        # Recalculate totals
+        self.calculate_totals()
+
+    def convert_to_bill(self):
+        """
+        Convert this invoice to a bill when it's paid.
+        Creates a Bill with PurchaseItems from InvoiceItems.
+        Bill status is automatically set to 'paid' to match the invoice.
+        """
+        from apps.sales.models import Bill, PurchaseItem
+        
+        # Check if bill already exists
+        if hasattr(self, 'bill') and self.bill:
+            return self.bill
+        
+        # Create bill with status = 'paid' (since invoice is paid)
+        # Use _skip_tax_calculation to avoid accessing purchase_items before they exist
+        bill = Bill(
+            tenant=self.tenant,
+            branch=self.branch,
+            created_by=self.created_by,
+            customer_name=self.customer.get_full_name() or self.customer.username if self.customer else 'Customer',
+            customer_type='retail',
+            status='paid',  # Always 'paid' since invoice is paid
+            payment_method=self.payment_method or 'cash',
+            address=self.sales_order.delivery_address if self.sales_order else '',
+            phone_numbers=getattr(self.customer, 'phone', '') if self.customer else '',
+            discount_method='percentage',
+            discount_value=self.discount_percentage or Decimal('0.00'),
+            tax_percentage=self.tax_percentage or Decimal('13.00'),
+            invoice=self
+        )
+        
+        # Set flag to skip tax calculation during initial save
+        bill._skip_tax_calculation = True
+        bill.save()
+        
+        # Now create purchase items from invoice items
+        for invoice_item in self.items.all():
+            PurchaseItem.objects.create(
+                bill=bill,
+                inventory=invoice_item.inventory,
+                quantity=invoice_item.quantity,
+                price=invoice_item.unit_price
+            )
+        
+        # Clear the skip flag and recalculate bill totals now that items exist
+        bill._skip_tax_calculation = False
+        bill.save()
+        
+        return bill
+
     @property
     def balance_amount(self):
         return self.total_amount - Decimal('0.00')
@@ -309,6 +446,16 @@ class InvoiceItem(BaseModel):
         on_delete=models.CASCADE,
         related_name='items',
         help_text='Invoice this item belongs to'
+    )
+
+    # Sales Order Item Reference (Optional - tracks the source order item)
+    sales_order_item = models.ForeignKey(
+        'sales.SalesOrderItem',
+        on_delete=models.SET_NULL,
+        related_name='invoice_items',
+        null=True,
+        blank=True,
+        help_text='Sales order item this invoice item originated from'
     )
 
     # Product Information

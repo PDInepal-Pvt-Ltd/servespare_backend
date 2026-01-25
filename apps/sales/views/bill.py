@@ -8,9 +8,10 @@ from apps.sales.serializers import BillSerializer, PurchaseItemSerializer
 from apps.base.drf import TenantViewSetMixin
 from apps.base.pagination import StandardResultsSetPagination
 from apps.base.permissions import CanViewOwnOrders
+from apps.sales.views.pdf_views import BillPDFMixin
 
 
-class BillViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
+class BillViewSet(BillPDFMixin, TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing bills with RBAC
     
