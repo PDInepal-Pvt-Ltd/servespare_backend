@@ -137,7 +137,7 @@ else:
             'HOST': 'localhost',
             'PORT': '3306',
             'USER': 'servesp1_adminnn',
-            'PASSWORD': 'github.com'
+            'PASSWORD': 'DB2026@sp'
         }
     }
 
