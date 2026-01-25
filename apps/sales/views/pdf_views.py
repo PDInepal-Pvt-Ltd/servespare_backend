@@ -81,7 +81,7 @@ class BillPDFMixin:
 class InvoicePDFMixin:
     """Mixin to add PDF download and preview functionality to Invoice ViewSet"""
     
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], url_path='download-pdf')
     def download_pdf(self, request, pk=None):
         """
         Download invoice as PDF
@@ -111,7 +111,7 @@ class InvoicePDFMixin:
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], url_path='preview-pdf')
     def preview_pdf(self, request, pk=None):
         """
         Preview invoice as PDF in browser

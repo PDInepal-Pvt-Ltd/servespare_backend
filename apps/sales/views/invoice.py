@@ -213,15 +213,5 @@ class InvoiceViewSet(InvoicePDFMixin, TenantViewSetMixin, viewsets.ModelViewSet)
             status=status.HTTP_200_OK
         )
     
-    @action(detail=True, methods=['get'], url_path='download-pdf')
-    def download_pdf(self, request, pk=None):
-        """
-        Download invoice as PDF
-        (This is a placeholder - implement actual PDF generation)
-        """
-        invoice = self.get_object()
-        
-        return Response(
-            {'message': 'PDF download not yet implemented'},
-            status=status.HTTP_501_NOT_IMPLEMENTED
-        )
+    # Note: download_pdf and preview_pdf are inherited from InvoicePDFMixin
+    # and work for invoices of any payment status
