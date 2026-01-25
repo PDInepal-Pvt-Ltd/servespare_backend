@@ -35,6 +35,11 @@ def send_order_confirmation_email(order):
         logger.info("Skipping confirmation email; no customer email for order %s", getattr(order, "order_number", ""))
         return False
 
+    # Check if order has items before sending email
+    if not order.items.exists():
+        logger.info("Skipping confirmation email; no items in order %s", getattr(order, "order_number", ""))
+        return False
+
     try:
         order_date = timezone.localtime(order.order_date) if timezone.is_aware(order.order_date) else order.order_date
     except Exception:
@@ -69,11 +74,11 @@ def send_order_confirmation_email(order):
         "tax_amount": _format_money(order.tax_amount),
         "shipping_charges": _format_money(order.shipping_charges),
         "total_amount": _format_money(order.total_amount),
-        "delivery_address": order.delivery_address,
-        "delivery_city": order.delivery_city,
-        "delivery_province": order.delivery_province,
-        "delivery_district": order.delivery_district,
-        "delivery_pincode": order.delivery_pincode,
+        "delivery_address": getattr(order, 'delivery_address', ''),
+        "delivery_city": getattr(order, 'delivery_city', ''),
+        "delivery_province": getattr(order, 'delivery_province', ''),
+        "delivery_district": getattr(order, 'delivery_district', ''),
+        "delivery_pincode": getattr(order, 'delivery_pincode', ''),
     }
 
     subject = f"Order {order.order_number} confirmed"
@@ -95,7 +100,10 @@ def send_order_confirmation_email(order):
         )
         email.attach_alternative(html_message, "text/html")
         email.send(fail_silently=False)
+        logger.info("Order confirmation email sent successfully for order %s to %s", order.order_number, order.customer.email)
         return True
     except Exception as exc:
         logger.exception("Failed to send confirmation email for order %s: %s", order.order_number, exc)
+        import traceback
+        logger.error("Traceback: %s", traceback.format_exc())
         return False

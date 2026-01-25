@@ -284,14 +284,16 @@ def decrease_inventory_on_bill_paid(sender, instance, created, **kwargs):
         instance._inventory_decreased = True
 
 
-@receiver(post_save, sender='sales.SalesOrder')
-def send_order_confirmation_on_create(sender, instance, created, **kwargs):
-    """
-    Send confirmation email when a new SalesOrder is created (confirmed).
-    """
-    if created and instance.order_status == 'confirmed':
-        from apps.sales.emails import send_order_confirmation_email
-        send_order_confirmation_email(instance)
+# Disabled: Email is sent from serializer after items are created
+# @receiver(post_save, sender='sales.SalesOrder')
+# def send_order_confirmation_on_create(sender, instance, created, **kwargs):
+#     """
+#     Send confirmation email when a new SalesOrder is created (confirmed).
+#     NOTE: Email sending is handled in the serializer after items are created.
+#     """
+#     if created and instance.order_status == 'confirmed':
+#         from apps.sales.emails import send_order_confirmation_email
+#         send_order_confirmation_email(instance)
 
 
 def ready():
