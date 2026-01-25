@@ -129,17 +129,27 @@ if DEV_MODE:
         }
     }
 else:
-    # MySQL for production
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.mysql',
-            'NAME': 'servesp1_servespare',
-            'HOST': 'localhost',
-            'PORT': '3306',
-            'USER': 'servesp1_admin',
-            'PASSWORD': 'DB2026@sp'
-        }
+    'default': {
+        'ENGINE': config('DB_ENGINE'),
+        'NAME': config('DB_NAME'),
+        'HOST': config('DB_HOST'),
+        'PORT': config('DB_PORT', cast=int),
+        'USER': config('DB_USER'),
+        'PASSWORD': config('DB_PASSWORD'),
     }
+}
+    # MySQL for production
+    # DATABASES = {
+    #     'default': {
+    #         'ENGINE': 'django.db.backends.mysql',
+    #         'NAME': 'servesp1_servespare',
+    #         'HOST': 'localhost',
+    #         'PORT': '3306',
+    #         'USER': 'servesp1_admin',
+    #         'PASSWORD': 'DB2026@sp'
+    #     }
+    # }
 
 
 # Password validation
