@@ -41,13 +41,21 @@ def send_order_confirmation_email(order):
         order_date = order.order_date
 
     items = []
+    gross_subtotal = Decimal("0")
     for item in order.items.select_related("inventory"):
+        try:
+            line_total = (item.quantity or Decimal("0")) * (item.unit_price or Decimal("0"))
+        except Exception:
+            line_total = Decimal("0")
+
+        gross_subtotal += line_total
+
         items.append({
             "item_name": item.item_name,
             "part_number": item.part_number or "N/A",
             "quantity": _format_quantity(item.quantity),
             "unit_price": _format_money(item.unit_price),
-            "line_total": _format_money(item.line_total),
+            "line_total": _format_money(line_total),
         })
 
     context = {
@@ -55,7 +63,7 @@ def send_order_confirmation_email(order):
         "order_number": order.order_number,
         "order_date": order_date.strftime("%B %d, %Y") if order_date else "",
         "items": items,
-        "subtotal": _format_money(order.subtotal),
+        "subtotal": _format_money(gross_subtotal),
         "discount_amount": _format_money(order.discount_amount),
         "tax_percentage": f"{Decimal(order.tax_percentage or 0):.0f}",
         "tax_amount": _format_money(order.tax_amount),

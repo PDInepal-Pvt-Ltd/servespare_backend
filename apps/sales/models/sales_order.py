@@ -242,12 +242,24 @@ class SalesOrder(BaseModel):
         """Calculate order totals from items"""
         items = self.items.all()
         
-        # Calculate subtotal from items
-        self.subtotal = sum((item.line_total for item in items), start=Decimal('0.00'))
-        
-        # Calculate discount
-        if self.discount_percentage > 0:
-            self.discount_amount = (self.subtotal * self.discount_percentage) / Decimal('100.00')
+        # Subtotal should be pre-tax: sum of (qty * unit_price - item-level discount)
+        pretax_subtotal = Decimal('0.00')
+        for item in items:
+            quantity = item.quantity or Decimal('0.00')
+            unit_price = item.unit_price or Decimal('0.00')
+            item_discount = item.discount_amount or Decimal('0.00')
+            line_pretax = (quantity * unit_price) - item_discount
+            if line_pretax < 0:
+                line_pretax = Decimal('0.00')
+            pretax_subtotal += line_pretax
+
+        self.subtotal = pretax_subtotal.quantize(Decimal('0.01'))
+
+        # Calculate discount based on order-level percentage
+        if self.discount_percentage and self.discount_percentage > 0:
+            self.discount_amount = ((self.subtotal * self.discount_percentage) / Decimal('100.00')).quantize(Decimal('0.01'))
+        else:
+            self.discount_amount = Decimal('0.00')
         
         # Calculate amount after discount
         amount_after_discount = self.subtotal - self.discount_amount
@@ -263,7 +275,8 @@ class SalesOrder(BaseModel):
             self.tax_amount = Decimal('0.00')
         
         # Calculate total
-        self.total_amount = amount_after_discount + self.tax_amount + self.shipping_charges
+        shipping = self.shipping_charges or Decimal('0.00')
+        self.total_amount = (amount_after_discount + self.tax_amount + shipping).quantize(Decimal('0.01'))
         
         self.save(update_fields=[
             'subtotal', 'discount_amount', 'tax_amount', 'total_amount', 
