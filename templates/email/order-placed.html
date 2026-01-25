@@ -236,6 +236,16 @@
                             <div class="info-value">{{ order_date }}</div>
                         </td>
                     </tr>
+                    <tr>
+                        <td class="order-info-td" colspan="2">
+                            <div class="info-label">Delivery To</div>
+                            <div class="info-value" style="line-height: 1.4;">
+                                {{ delivery_address }}<br />
+                                {{ delivery_city }}{% if delivery_province %}, {{ delivery_province }}{% endif %}{% if delivery_district %}, {{ delivery_district }}{% endif %}
+                                {% if delivery_pincode %}<br />Pincode: {{ delivery_pincode }}{% endif %}
+                            </div>
+                        </td>
+                    </tr>
                 </table>
             </div>
 
@@ -249,25 +259,21 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% for item in items %}
                     <tr>
                         <td>
-                            <strong>{{ item_name }}</strong>
-                            <span class="item-meta">PN: {{ part_number }}</span>
+                            <strong>{{ item.item_name }}</strong>
+                            <span class="item-meta">PN: {{ item.part_number }}</span>
                         </td>
-                        <td class="align-right">{{ quantity }}</td>
-                        <td class="align-right">{{ unit_price }}</td>
-                        <td class="align-right">{{ line_total }}</td>
+                        <td class="align-right">{{ item.quantity }}</td>
+                        <td class="align-right">{{ item.unit_price }}</td>
+                        <td class="align-right">{{ item.line_total }}</td>
                     </tr>
-
+                    {% empty %}
                     <tr>
-                        <td>
-                            <strong>Standard Maintenance Kit</strong>
-                            <span class="item-meta">PN: SMK-2025-X</span>
-                        </td>
-                        <td class="align-right">1</td>
-                        <td class="align-right">$120.00</td>
-                        <td class="align-right">$120.00</td>
+                        <td colspan="4" style="text-align: center; color: #868e96;">No items found for this order.</td>
                     </tr>
+                    {% endfor %}
                 </tbody>
             </table>
 
@@ -275,7 +281,7 @@
                 <table class="totals-table">
                     <tr>
                         <td class="total-label">Subtotal</td>
-                        <td class="total-value">{{ sub_total }}</td>
+                        <td class="total-value">{{ subtotal }}</td>
                     </tr>
                     <tr>
                         <td class="total-label">Discount</td>
@@ -286,8 +292,12 @@
                         <td class="total-value">{{ tax_amount }}</td>
                     </tr>
                     <tr>
+                        <td class="total-label">Shipping</td>
+                        <td class="total-value">{{ shipping_charges }}</td>
+                    </tr>
+                    <tr>
                         <td class="total-label grand-total">Grand Total</td>
-                        <td class="total-value grand-total">{{ grand_total }}</td>
+                        <td class="total-value grand-total">{{ total_amount }}</td>
                     </tr>
                 </table>
             </div>

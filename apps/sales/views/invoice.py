@@ -17,6 +17,7 @@ from apps.sales.serializers import (
 from apps.base.drf import TenantViewSetMixin
 from apps.base.permissions import IsSuperAdminOrTenantAdminOrBranchManager, CanViewOwnOrders
 from apps.base.permission_utils import get_tenant_queryset_for_user
+from apps.sales.views.pdf_views import InvoicePDFMixin
 
 
 def get_invoice_model():
@@ -29,7 +30,7 @@ def get_sales_order_model():
     return apps.get_model('sales', 'SalesOrder')
 
 
-class InvoiceViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
+class InvoiceViewSet(InvoicePDFMixin, TenantViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for Invoice CRUD operations.
     

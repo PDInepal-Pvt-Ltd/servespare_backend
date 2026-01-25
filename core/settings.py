@@ -105,6 +105,7 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -137,7 +138,7 @@ else:
             'HOST': 'localhost',
             'PORT': '3306',
             'USER': 'servesp1_adminnn',
-            'PASSWORD': 'github.com'
+            'PASSWORD': 'DB2026@sp'
         }
     }
 
@@ -177,12 +178,40 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Media files (user uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# ==========================================
+# PDF GENERATION SETTINGS
+# ==========================================
+
+# Company Information for PDF Headers
+COMPANY_NAME = "Servespare"
+COMPANY_LOGO_URL = "/static/images/logo.png"
+COMPANY_ADDRESS = "Srijana Chowk"
+COMPANY_PHONE = "9800000000"
+COMPANY_EMAIL = "servespare@gmail.com"
+
+# Tax Label (VAT, GST, TAX, etc.)
+TAX_LABEL = "VAT"
+
+# PDF Generation Settings
+PDF_SETTINGS = {
+    'DEFAULT_PAGE_SIZE': 'A4',
+    'MARGIN_TOP': '20mm',
+    'MARGIN_BOTTOM': '20mm',
+    'MARGIN_LEFT': '20mm',
+    'MARGIN_RIGHT': '20mm',
+}
+
+# Currency Settings
+CURRENCY_SYMBOL = "Rs."
+CURRENCY_CODE = "NPR"  # Nepalese Rupee
 
 # Default primary key type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

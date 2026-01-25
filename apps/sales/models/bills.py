@@ -371,15 +371,53 @@ class Bill(BaseModel):
     # Removed the previous inventory product relationship
     # Updated methods to handle purchase items instead
     def calculate_total(self):
+        """Calculate bill total with all items and amounts"""
         total_before_tax = self.total_after_discount
         tax_value = self.calculate_tax_amount()
         return total_before_tax + tax_value
 
     def calculate_tax_amount(self):
+        """Calculate tax amount based on total after discount"""
         base_amount = self.total_after_discount
         percentage = self.tax_percentage if self.tax_percentage is not None else Decimal('13.00')
         tax_value = (base_amount * percentage) / Decimal('100.00')
         return tax_value.quantize(Decimal('0.01'))
+
+    def calculate_all_amounts(self):
+        """
+        Calculate all bill amounts from purchase items.
+        This is the main method to recalculate everything.
+        
+        Formula:
+        subtotal = SUM(item.quantity * item.price) for all items
+        discount_amount = (subtotal * discount_value / 100) if percentage, else discount_value
+        amount_after_discount = subtotal - discount_amount
+        tax_amount = amount_after_discount * (tax_percentage / 100)
+        total = amount_after_discount + tax_amount
+        
+        Updates the model fields but does NOT save.
+        Call save() after this to persist changes.
+        """
+        # Calculate subtotal from purchase items
+        subtotal = Decimal('0.00')
+        for item in self.purchase_items.all():
+            quantity = item.quantity or Decimal('0.00')
+            price = item.price or Decimal('0.00')
+            subtotal += (quantity * price)
+        
+        self.price = subtotal.quantize(Decimal('0.01'))
+        
+        # Calculate discount
+        if self.discount_method == 'percentage':
+            self.tax_amount = (subtotal * (self.discount_value or 0) / Decimal('100.00')).quantize(Decimal('0.01'))
+        else:
+            self.tax_amount = (self.discount_value or Decimal('0.00')).quantize(Decimal('0.01'))
+        
+        # Note: tax_amount field is repurposed to store calculated discount for now
+        # This is to maintain backward compatibility
+        # Better approach: rename field or add separate discount_amount field
+        
+        return self.calculate_total()
 
     def save(self, *args, **kwargs):
         # Ensure a default 13% tax is applied when not explicitly set
@@ -397,29 +435,58 @@ class Bill(BaseModel):
             setattr(self, key, value)
         self.save()
 
-    @classmethod
-    def get_bill(cls, bill_id):
-        return cls.objects.get(id=bill_id)
-
-    @classmethod
-    def delete_bill(cls, bill_id):
-        cls.objects.filter(id=bill_id).delete()
-
-    def decrease_inventory(self):
+    def update_inventory(self, reduce_quantity=True):
         """
-        Decrease inventory quantities for all purchase items in this bill
-        Note: This is now primarily handled via signals on bill creation and purchase item addition.
-        This method can still be called explicitly if needed.
+        Update inventory quantities based on purchase items in this bill.
+        
+        Args:
+            reduce_quantity (bool): If True, reduce inventory. If False, restore inventory.
+        
+        This is useful when:
+        - reduce_quantity=True: When bill is finalized/paid
+        - reduce_quantity=False: When bill is cancelled/returned
         """
-        from decimal import Decimal
         for item in self.purchase_items.all():
             if item.inventory and item.quantity > 0:
+                quantity_change = item.quantity if reduce_quantity else -item.quantity
                 current_qty = item.inventory.quantity
-                new_qty = max(Decimal('0.00'), current_qty - item.quantity)
-                # Only update if quantity actually needs to decrease
-                if new_qty < current_qty:
+                new_qty = max(Decimal('0.00'), current_qty - quantity_change)
+                
+                if new_qty != current_qty:
                     item.inventory.quantity = new_qty
                     item.inventory.save(update_fields=['quantity', 'modified'])
+
+    def sync_from_invoice(self):
+        """
+        Sync bill data and items from linked invoice.
+        Creates purchase items matching invoice items.
+        """
+        if not self.invoice:
+            return
+        
+        # Sync basic info
+        self.customer_name = self.invoice.customer.get_full_name() or self.invoice.customer.username
+        self.sales_order = self.invoice.sales_order
+        self.branch = self.invoice.branch
+        self.discount_method = 'percentage' if self.invoice.discount_percentage else 'amount'
+        self.discount_value = self.invoice.discount_percentage or self.invoice.discount_amount
+        self.tax_percentage = self.invoice.tax_percentage or Decimal('13.00')
+        self.save()
+        
+        # Sync items from invoice
+        for inv_item in self.invoice.items.all():
+            # Create purchase item from invoice item
+            PurchaseItem.objects.get_or_create(
+                bill=self,
+                inventory=inv_item.inventory,
+                defaults={
+                    'quantity': inv_item.quantity,
+                    'price': inv_item.unit_price,
+                }
+            )
+        
+        # Recalculate all amounts
+        self.calculate_all_amounts()
 
 
 class PurchaseItem(models.Model):

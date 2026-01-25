@@ -4,6 +4,7 @@ from django.db import transaction
 from django.utils import timezone
 from apps.base.serializer_mixins import ModelCleanValidationMixin
 from apps.sales.models import SalesOrder, SalesOrderItem, NEPAL_PROVINCE_DISTRICTS
+from apps.sales.emails import send_order_confirmation_email
 
 
 class SalesOrderItemSerializer(ModelCleanValidationMixin, serializers.ModelSerializer):
@@ -315,6 +316,10 @@ class SalesOrderCreateSerializer(ModelCleanValidationMixin, serializers.ModelSer
         
         # Calculate totals
         order.calculate_totals()
+
+        # Send confirmation email on initial confirmed orders
+        if order.order_status == 'confirmed':
+            send_order_confirmation_email(order)
         
         return order
 
@@ -373,6 +378,7 @@ class SalesOrderStatusUpdateSerializer(serializers.Serializer):
     
     def update(self, instance, validated_data):
         """Update order status"""
+        old_status = instance.order_status
         order_status = validated_data.get('order_status')
         tracking_number = validated_data.get('tracking_number')
         courier_partner = validated_data.get('courier_partner')
@@ -388,6 +394,10 @@ class SalesOrderStatusUpdateSerializer(serializers.Serializer):
         
         # Update status
         instance.update_order_status(order_status)
+
+        # Send confirmation email when moving into confirmed
+        if order_status == 'confirmed' and old_status != 'confirmed':
+            send_order_confirmation_email(instance)
         
         return instance
 
