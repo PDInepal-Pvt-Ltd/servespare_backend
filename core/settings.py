@@ -136,7 +136,7 @@ else:
             'NAME': 'servesp1_servespare',
             'HOST': 'localhost',
             'PORT': '3306',
-            'USER': 'servesp1_adminnn',
+            'USER': 'servesp1_admin',
             'PASSWORD': 'DB2026@sp'
         }
     }
