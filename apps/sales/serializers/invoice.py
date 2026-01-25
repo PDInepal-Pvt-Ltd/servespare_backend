@@ -35,17 +35,17 @@ class InvoiceListSerializer(serializers.Serializer):
     invoice_number = serializers.CharField(max_length=50, read_only=True)
     invoice_date = serializers.DateTimeField(read_only=True)
     payment_date = serializers.DateField(read_only=True, allow_null=True)
-    customer = serializers.IntegerField()
+    customer = serializers.IntegerField(source='customer_id', read_only=True)
     customer_name = serializers.SerializerMethodField()
     customer_email = serializers.SerializerMethodField()
-    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     paid_amount = serializers.SerializerMethodField()
     balance_amount = serializers.SerializerMethodField()
     payment_status = serializers.CharField(read_only=True)
     payment_method = serializers.CharField(read_only=True, allow_null=True)
-    tenant = serializers.IntegerField(required=False)
+    tenant = serializers.IntegerField(source='tenant_id', required=False, read_only=True)
     tenant_name = serializers.SerializerMethodField()
-    branch = serializers.IntegerField(required=False)
+    branch = serializers.IntegerField(source='branch_id', required=False, read_only=True)
     branch_name = serializers.SerializerMethodField()
     bill_id = serializers.SerializerMethodField()
     
@@ -55,11 +55,11 @@ class InvoiceListSerializer(serializers.Serializer):
     
     def get_tenant_name(self, obj):
         """Get tenant name"""
-        return obj.tenant.name if obj.tenant else None
+        return obj.tenant.business_name if obj.tenant else None
     
     def get_branch_name(self, obj):
         """Get branch name"""
-        return obj.branch.name if obj.branch else None
+        return obj.branch.branch_name if obj.branch else None
     
     def get_customer_name(self, obj):
         """Get customer full name"""
@@ -70,10 +70,14 @@ class InvoiceListSerializer(serializers.Serializer):
         return obj.customer.email
     
     def get_paid_amount(self, obj):
-        """Calculate total paid amount from payments"""
-        from django.db.models import Sum
-        total_paid = obj.payments.aggregate(Sum('paid_amount'))['paid_amount__sum']
-        return total_paid or Decimal('0.00')
+        """Calculate total paid amount based on payment status"""
+        # If payment status is 'paid', return total amount as paid
+        if obj.payment_status == 'paid':
+            return obj.total_amount
+        # If partial, estimate based on status
+        elif obj.payment_status == 'partial':
+            return Decimal('0.00')
+        return Decimal('0.00')
     
     def get_balance_amount(self, obj):
         """Calculate balance amount"""
@@ -88,16 +92,16 @@ class InvoiceDetailSerializer(serializers.Serializer):
     invoice_date = serializers.DateTimeField(read_only=True)
     payment_date = serializers.DateField(read_only=True, allow_null=True)
     due_date = serializers.DateField(required=False, allow_null=True)
-    customer = serializers.IntegerField()
+    customer = serializers.IntegerField(source='customer_id', read_only=True)
     customer_name = serializers.SerializerMethodField()
     customer_email = serializers.SerializerMethodField()
     customer_phone = serializers.SerializerMethodField()
     sales_order_number = serializers.SerializerMethodField()
     bill_id = serializers.SerializerMethodField()
     bill_created = serializers.SerializerMethodField()
-    tenant = serializers.IntegerField(required=False)
+    tenant = serializers.IntegerField(source='tenant_id', required=False, read_only=True)
     tenant_name = serializers.SerializerMethodField()
-    branch = serializers.IntegerField(required=False)
+    branch = serializers.IntegerField(source='branch_id', required=False, read_only=True)
     branch_name = serializers.SerializerMethodField()
     subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     discount_percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
@@ -141,17 +145,21 @@ class InvoiceDetailSerializer(serializers.Serializer):
     
     def get_tenant_name(self, obj):
         """Get tenant name"""
-        return obj.tenant.name if obj.tenant else None
+        return obj.tenant.business_name if obj.tenant else None
     
     def get_branch_name(self, obj):
         """Get branch name"""
-        return obj.branch.name if obj.branch else None
+        return obj.branch.branch_name if obj.branch else None
     
     def get_paid_amount(self, obj):
-        """Calculate total paid amount from payments"""
-        from django.db.models import Sum
-        total_paid = obj.payments.aggregate(Sum('paid_amount'))['paid_amount__sum']
-        return total_paid or Decimal('0.00')
+        """Calculate total paid amount based on payment status"""
+        # If payment status is 'paid', return total amount as paid
+        if obj.payment_status == 'paid':
+            return obj.total_amount
+        # If partial, estimate based on status
+        elif obj.payment_status == 'partial':
+            return Decimal('0.00')
+        return Decimal('0.00')
     
     def get_balance_amount(self, obj):
         """Calculate balance amount"""
@@ -163,21 +171,15 @@ class InvoiceDetailSerializer(serializers.Serializer):
         return obj.payment_status == 'paid'
     
     def get_payments(self, obj):
-        """Get all payments for this invoice"""
-        # Return empty list if no payments relation exists
-        if not hasattr(obj, 'payments'):
-            return []
-        payments = obj.payments.all().order_by('-created')
-        # Return payment data as dictionaries instead of using PaymentSerializer
-        return [
-            {
-                'id': p.id,
-                'paid_amount': float(p.paid_amount),
-                'payment_date': p.payment_date,
-                'payment_method': p.payment_method,
-            }
-            for p in payments
-        ] if payments.exists() else []
+        """Get payment info for this invoice"""
+        # Return payment info from invoice itself
+        if obj.payment_status == 'paid' and obj.payment_date:
+            return [{
+                'payment_date': obj.payment_date,
+                'payment_method': obj.payment_method or 'Unknown',
+                'amount': float(obj.total_amount),
+            }]
+        return []
 
 
 class InvoiceCreateSerializer(serializers.Serializer):
