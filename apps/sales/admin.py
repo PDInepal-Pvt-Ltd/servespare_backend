@@ -110,6 +110,7 @@ class SalesOrderAdmin(admin.ModelAdmin):
         'tax_amount', 'total_amount', 'created', 'modified'
     ]
     inlines = [SalesOrderItemInline]
+    actions = ['generate_or_refresh_invoice']
     
     fieldsets = (
         ('Order Information', {
@@ -156,6 +157,20 @@ class SalesOrderAdmin(admin.ModelAdmin):
         if not change:  # Only set on creation
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
+    
+    def generate_or_refresh_invoice(self, request, queryset):
+        """Admin action to generate or refresh invoice for selected orders"""
+        count = 0
+        for order in queryset:
+            try:
+                order.generate_invoice()
+                count += 1
+            except Exception as e:
+                self.message_user(request, f"Error generating invoice for {order.order_number}: {str(e)}", level='error')
+        
+        self.message_user(request, f"Successfully generated/refreshed invoice for {count} order(s).")
+    
+    generate_or_refresh_invoice.short_description = "Generate or refresh invoice with items"
 
 
 @admin.register(SalesOrderItem)
@@ -286,6 +301,7 @@ class InvoiceAdmin(admin.ModelAdmin):
         'tax_amount', 'total_amount', 'created', 'modified'
     ]
     inlines = [InvoiceItemInline]
+    actions = ['refresh_invoice_items', 'convert_to_bill']
     
     fieldsets = (
         ('Invoice Information', {
@@ -320,10 +336,61 @@ class InvoiceAdmin(admin.ModelAdmin):
     )
     
     def save_model(self, request, obj, form, change):
-        """Set created_by when saving"""
+        """Set created_by when saving and handle bill creation when marked as paid"""
         if not change:  # Only set on creation
             obj.created_by = request.user
+        
+        # Check if payment_status changed to 'paid'
+        should_create_bill = False
+        if change:  # Only for updates
+            try:
+                old_invoice = Invoice.objects.get(pk=obj.pk)
+                if old_invoice.payment_status != 'paid' and obj.payment_status == 'paid':
+                    should_create_bill = True
+            except Invoice.DoesNotExist:
+                pass
+        
         super().save_model(request, obj, form, change)
+        
+        # Manually trigger bill creation if payment_status changed to 'paid'
+        if should_create_bill:
+            try:
+                obj.convert_to_bill()
+                self.message_user(request, f"Bill automatically created for invoice {obj.invoice_number}.", level='success')
+            except Exception as e:
+                self.message_user(request, f"Error creating bill: {str(e)}", level='error')
+    
+    def refresh_invoice_items(self, request, queryset):
+        """Admin action to refresh invoice items from associated sales order"""
+        count = 0
+        for invoice in queryset:
+            if invoice.sales_order:
+                try:
+                    invoice.sales_order.generate_invoice()
+                    count += 1
+                except Exception as e:
+                    self.message_user(request, f"Error refreshing items for invoice {invoice.invoice_number}: {str(e)}", level='error')
+        
+        self.message_user(request, f"Successfully refreshed items for {count} invoice(s).")
+    
+    refresh_invoice_items.short_description = "Refresh invoice items from sales order"
+    
+    def convert_to_bill(self, request, queryset):
+        """Admin action to convert paid invoices to bills"""
+        count = 0
+        for invoice in queryset:
+            if invoice.payment_status == 'paid':
+                try:
+                    invoice.convert_to_bill()
+                    count += 1
+                except Exception as e:
+                    self.message_user(request, f"Error converting invoice {invoice.invoice_number} to bill: {str(e)}", level='error')
+            else:
+                self.message_user(request, f"Invoice {invoice.invoice_number} is not marked as paid. Mark it as paid before converting to bill.", level='warning')
+        
+        self.message_user(request, f"Successfully converted {count} invoice(s) to bill(s).")
+    
+    convert_to_bill.short_description = "Convert paid invoices to bills"
 
 
 @admin.register(InvoiceItem)
