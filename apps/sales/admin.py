@@ -36,9 +36,51 @@ class SalesOrderForm(forms.ModelForm):
             )
 
 
+class SalesOrderItemForm(forms.ModelForm):
+    """Custom form for SalesOrderItem to handle auto-populated fields"""
+    
+    class Meta:
+        model = SalesOrderItem
+        fields = '__all__'
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # unit_price will always come from inventory - make it readonly
+        if 'unit_price' in self.fields:
+            self.fields['unit_price'].widget.attrs['readonly'] = True
+            self.fields['unit_price'].required = False
+    
+    def clean(self):
+        """Auto-populate fields from inventory before validation"""
+        cleaned_data = super().clean()
+        inventory = cleaned_data.get('inventory')
+        
+        # Auto-populate fields from inventory if available
+        if inventory:
+            # Populate item_name if not provided
+            if not cleaned_data.get('item_name'):
+                self.instance.item_name = inventory.item_name
+                cleaned_data['item_name'] = inventory.item_name
+            
+            # Populate part_number if not provided
+            if not cleaned_data.get('part_number'):
+                self.instance.part_number = inventory.part_number
+            
+            # Populate warranty_period if not provided
+            if not cleaned_data.get('warranty_period'):
+                self.instance.warranty_period = inventory.warranty_period
+            
+            # Always get unit_price from inventory
+            self.instance.unit_price = inventory.retail_pricing or inventory.price
+            cleaned_data['unit_price'] = inventory.retail_pricing or inventory.price
+        
+        return cleaned_data
+
+
 class SalesOrderItemInline(admin.TabularInline):
     """Inline admin for SalesOrderItem"""
     model = SalesOrderItem
+    form = SalesOrderItemForm
     extra = 1
     fields = [
         'inventory', 'item_name', 'quantity', 'unit_price', 
@@ -175,12 +217,50 @@ class SalesOrderItemAdmin(admin.ModelAdmin):
         return request.user.role in allowed_roles
 
 
+class InvoiceItemForm(forms.ModelForm):
+    """Custom form for InvoiceItem to handle auto-populated fields"""
+    
+    class Meta:
+        model = InvoiceItem
+        fields = '__all__'
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # unit_price will always come from inventory - make it readonly
+        if 'unit_price' in self.fields:
+            self.fields['unit_price'].widget.attrs['readonly'] = True
+            self.fields['unit_price'].required = False
+    
+    def clean(self):
+        """Auto-populate fields from inventory before validation"""
+        cleaned_data = super().clean()
+        inventory = cleaned_data.get('inventory')
+        
+        # Auto-populate fields from inventory if available
+        if inventory:
+            # Populate item_name if not provided
+            if not cleaned_data.get('item_name'):
+                self.instance.item_name = inventory.item_name
+                cleaned_data['item_name'] = inventory.item_name
+            
+            # Populate part_number if not provided
+            if not cleaned_data.get('part_number'):
+                self.instance.part_number = inventory.part_number
+            
+            # Always get unit_price from inventory
+            self.instance.unit_price = inventory.retail_pricing or inventory.price
+            cleaned_data['unit_price'] = inventory.retail_pricing or inventory.price
+        
+        return cleaned_data
+
+
 class InvoiceItemInline(admin.TabularInline):
     """Inline admin for InvoiceItem"""
     model = InvoiceItem
+    form = InvoiceItemForm
     extra = 1
     fields = [
-        'inventory', 'quantity', 'unit_price', 
+        'inventory', 'item_name', 'quantity', 'unit_price', 
         'discount_percentage', 'tax_percentage', 'line_total'
     ]
     readonly_fields = ['item_name', 'line_total']
