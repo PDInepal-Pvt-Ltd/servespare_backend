@@ -69,81 +69,103 @@ class CartViewSet(viewsets.ViewSet):
             "quantity": 2.00
         }
         """
-        serializer = AddToCartSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(
-                serializer.errors,
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        inventory_id = serializer.validated_data['inventory_id']
-        # Normalize quantity to 2 decimal places
-        quantity = serializer.validated_data['quantity']
-        quantity = (quantity or Decimal('0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        
-        # Get inventory item
-        inventory = get_object_or_404(
-            Inventory,
-            id=inventory_id,
-            is_active=True
-        )
-        
-        # Check stock availability
-        if inventory.quantity < quantity:
-            return Response(
-                {
-                    'error': 'Insufficient stock',
-                    'available_quantity': float(inventory.quantity)
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Get or create cart
-        cart = self.get_or_create_cart(request.user)
-        
-        # Check if item already exists in cart
-        cart_item, created = CartItem.objects.get_or_create(
-            cart=cart,
-            inventory=inventory,
-            defaults={
-                'quantity': quantity,
-                'price': inventory.get_default_selling_price(),
-                'is_active': True
-            }
-        )
-        
-        if not created:
-            # Update quantity if item already exists
-            new_quantity = (cart_item.quantity or Decimal('0.00')) + quantity
-            new_quantity = new_quantity.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        try:
+            serializer = AddToCartSerializer(data=request.data)
+            if not serializer.is_valid():
+                return Response(
+                    serializer.errors,
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
-            # Check if new quantity exceeds available stock
-            if new_quantity > inventory.quantity:
+            inventory_id = serializer.validated_data['inventory_id']
+            # Normalize quantity to 2 decimal places
+            quantity = serializer.validated_data['quantity']
+            quantity = (quantity or Decimal('0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            
+            # Get inventory item
+            try:
+                inventory = Inventory.objects.get(id=inventory_id, is_active=True, is_removed=False)
+            except Inventory.DoesNotExist:
+                return Response(
+                    {'error': 'Inventory item not found or inactive'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Check stock availability
+            if inventory.quantity < quantity:
                 return Response(
                     {
-                        'error': 'Insufficient stock for requested quantity',
-                        'current_cart_quantity': float(cart_item.quantity),
-                        'requested_additional': float(quantity),
+                        'error': 'Insufficient stock',
                         'available_quantity': float(inventory.quantity)
                     },
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            cart_item.quantity = new_quantity
-            cart_item.save()
-            message = 'Item quantity updated in cart'
-        else:
-            message = 'Item added to cart successfully'
-        
-        # Return updated cart
-        cart_serializer = CartSerializer(cart, context={'request': request})
-        return Response(
-            {
-                'message': message,
-                'cart': cart_serializer.data
-            },
-            status=status.HTTP_200_OK
-        )
+            # Get or create cart
+            cart = self.get_or_create_cart(request.user)
+            
+            # Get default price safely
+            try:
+                default_price = inventory.get_default_selling_price()
+            except Exception as e:
+                default_price = inventory.price if inventory.price else Decimal('0.00')
+            
+            # Check if item already exists in cart
+            cart_item, created = CartItem.objects.get_or_create(
+                cart=cart,
+                inventory=inventory,
+                defaults={
+                    'quantity': quantity,
+                    'price': default_price,
+                    'is_active': True
+                }
+            )
+            
+            if not created:
+                # Update quantity if item already exists
+                new_quantity = (cart_item.quantity or Decimal('0.00')) + quantity
+                new_quantity = new_quantity.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                
+                # Check if new quantity exceeds available stock
+                if new_quantity > inventory.quantity:
+                    return Response(
+                        {
+                            'error': 'Insufficient stock for requested quantity',
+                            'current_cart_quantity': float(cart_item.quantity),
+                            'requested_additional': float(quantity),
+                            'available_quantity': float(inventory.quantity)
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                cart_item.quantity = new_quantity
+                cart_item.save()
+                message = 'Item quantity updated in cart'
+            else:
+                message = 'Item added to cart successfully'
+            
+            # Return updated cart
+            cart_serializer = CartSerializer(cart, context={'request': request})
+            return Response(
+                {
+                    'message': message,
+                    'cart': cart_serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            # Log the error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error adding item to cart: {str(e)}", exc_info=True)
+            
+            return Response(
+                {
+                    'error': 'An error occurred while adding item to cart',
+                    'detail': str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=True, methods=['patch'], url_path='update')
     def update_item(self, request, pk=None):
