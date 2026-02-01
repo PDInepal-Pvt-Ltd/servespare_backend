@@ -77,7 +77,7 @@ class BankAccount(BaseModel):
 
     branch = models.ForeignKey(
         'branch.Branch',
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name='bank_accounts',

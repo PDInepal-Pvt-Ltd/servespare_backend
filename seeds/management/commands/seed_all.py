@@ -1039,14 +1039,13 @@ class Command(BaseCommand):
             
             for idx, image_url in enumerate(image_urls):
                 try:
-                    # Check if image already exists
-                    existing_image = InventoryImage.objects.filter(
-                        inventory=inventory,
-                        is_primary=(idx == 0)
-                    ).exists()
+                    # Check if image already exists for this inventory
+                    existing_images_count = InventoryImage.objects.filter(
+                        inventory=inventory
+                    ).count()
                     
-                    if existing_image:
-                        self.stdout.write(f"  - Image already exists for: {part_number}")
+                    if existing_images_count >= len(image_urls):
+                        self.stdout.write(f"  - Images already exist for: {part_number}")
                         continue
                     
                     # Download image from URL
@@ -1062,12 +1061,11 @@ class Command(BaseCommand):
                         inventory=inventory,
                         image=image_content,
                         description=f"Image {idx + 1} for {inventory.item_name}",
-                        is_primary=(idx == 0),
                         branch=inventory.branch,
                         tenant=getattr(inventory, 'tenant', None)
                     )
                     
-                    status = "PRIMARY" if inventory_image.is_primary else "secondary"
+                    status = "PRIMARY" if idx == 0 else "secondary"
                     self.stdout.write(f"  ✓ Added {status} image for: {inventory.item_name}")
                     
                 except requests.RequestException as e:
