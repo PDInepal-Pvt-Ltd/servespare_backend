@@ -66,8 +66,13 @@ class InvoiceViewSet(InvoicePDFMixin, TenantViewSetMixin, viewsets.ModelViewSet)
             return get_invoice_model().objects.none()
 
         queryset = Invoice.objects.filter(is_removed=False).select_related(
-            'customer', 'sales_order', 'branch', 'created_by'
-        ).prefetch_related('items')
+            'customer', 'sales_order', 'branch', 'tenant', 'created_by'
+        ).prefetch_related(
+            'items',
+            'items__tenant',
+            'items__inventory',
+            'items__inventory__branch',
+        )
         
         user = self.request.user
         # If there's no authenticated user, return empty queryset to avoid filtering by AnonymousUser
@@ -90,6 +95,11 @@ class InvoiceViewSet(InvoicePDFMixin, TenantViewSetMixin, viewsets.ModelViewSet)
         else:
             # Customers can only see their own invoices
             queryset = queryset.filter(customer=user)
+        
+        # Filter by branch (allows explicit branch filter)
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
         
         return queryset
     

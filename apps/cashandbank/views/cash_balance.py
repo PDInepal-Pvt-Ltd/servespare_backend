@@ -16,5 +16,11 @@ class CashBalanceViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = CashBalance.objects.select_related('tenant', 'branch').all()
+        
+        # Filter by branch
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id is not None:
+            qs = qs.filter(branch_id=branch_id)
+        
         # tenant/branch filtering applied by TenantViewSetMixin if available
         return self.filter_queryset(qs)

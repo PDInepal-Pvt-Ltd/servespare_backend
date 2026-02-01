@@ -31,6 +31,11 @@ class BankAccountViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         if account_type is not None:
             queryset = queryset.filter(account_type=account_type)
         
+        # Filter by branch
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
         # Filter by is_active
         is_active = self.request.query_params.get('is_active', None)
         if is_active is not None:
@@ -60,10 +65,17 @@ class BankAccountViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        accounts = self.filter_queryset(BankAccount.objects.filter(
+        queryset = BankAccount.objects.filter(
             account_type=account_type,
             is_active=True
-        ))
+        )
+        
+        # Filter by branch
+        branch_id = request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
+        accounts = self.filter_queryset(queryset)
 
         serializer = self.get_serializer(accounts, many=True)
         return Response(serializer.data)

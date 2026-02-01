@@ -21,6 +21,12 @@ class Invoice(BaseModel):
         related_name='invoices',
         help_text='Tenant that owns this invoice'
     )
+    tenants = models.ManyToManyField(
+        'tenant.Tenant',
+        blank=True,
+        related_name='invoices_involved',
+        help_text='Tenants involved in this invoice (derived from invoice items)'
+    )
 
     # Invoice Information
     invoice_number = models.CharField(
@@ -59,6 +65,12 @@ class Invoice(BaseModel):
         blank=True,
         related_name='invoices',
         help_text='Branch issuing this invoice'
+    )
+    branches = models.ManyToManyField(
+        'branch.Branch',
+        blank=True,
+        related_name='invoices_involved',
+        help_text='Branches involved in this invoice (derived from invoice items)'
     )
 
     # Financial Information
@@ -568,8 +580,8 @@ class InvoiceItem(BaseModel):
         if self.tax_percentage > 0:
             self.tax_amount = (amount_after_discount * self.tax_percentage) / Decimal('100.00')
 
-        # Calculate line total
-        self.line_total = amount_after_discount + self.tax_amount
+        # Calculate line total (quantize to 2 decimal places for DB field)
+        self.line_total = (amount_after_discount + self.tax_amount).quantize(Decimal('0.01'))
         self.full_clean()
 
         super().save(*args, **kwargs)

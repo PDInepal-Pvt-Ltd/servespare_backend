@@ -1,4 +1,5 @@
 from typing import Iterable
+from django.db.models import Q
 from rest_framework.filters import BaseFilterBackend
 
 
@@ -52,8 +53,16 @@ class TenantViewSetMixin:
             return qs
 
         field_names = [f.name for f in model._meta.fields]
+        m2m_names = {f.name for f in getattr(model._meta, 'many_to_many', [])}
+
+        has_tenants_m2m = 'tenants' in m2m_names
         if 'tenant' in field_names:
+            # Support models that can involve multiple tenants via M2M `tenants`
+            if has_tenants_m2m:
+                return qs.filter(Q(tenant=tenant) | Q(tenants=tenant)).distinct()
             return qs.filter(tenant=tenant)
+        if has_tenants_m2m:
+            return qs.filter(tenants=tenant).distinct()
 
         # Some models (e.g. Parties) don't have a direct `tenant` field but
         # are associated to a tenant via the `created_by` user. In that case
@@ -103,14 +112,21 @@ class TenantFilterBackend(BaseFilterBackend):
             except Exception:
                 return queryset
 
-        # If model has a tenant field, filter by it
+        # If model has a tenant field, filter by it (or by M2M `tenants` if present)
         model = getattr(queryset, 'model', None)
         if model is None:
             return queryset
 
         field_names = [f.name for f in model._meta.fields]
+        m2m_names = {f.name for f in getattr(model._meta, 'many_to_many', [])}
+
+        has_tenants_m2m = 'tenants' in m2m_names
         if 'tenant' in field_names:
+            if has_tenants_m2m:
+                return queryset.filter(Q(tenant=tenant) | Q(tenants=tenant)).distinct()
             return queryset.filter(tenant=tenant)
+        if has_tenants_m2m:
+            return queryset.filter(tenants=tenant).distinct()
 
         # Support models without direct `tenant` field but with `created_by`
         # referencing a User whose `tenant` should be used for scoping.
