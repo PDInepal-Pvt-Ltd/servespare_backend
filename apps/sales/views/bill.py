@@ -44,7 +44,7 @@ class BillViewSet(BillPDFMixin, TenantViewSetMixin, viewsets.ModelViewSet):
         )
         
         # Cashiers can only see bills in their branch
-        if self.request.user.role == User.Role.CASHIER:
+        if hasattr(self.request.user, 'role') and self.request.user.role == User.Role.CASHIER:
             if self.request.user.branch:
                 queryset = queryset.filter(branch=self.request.user.branch)
             else:
@@ -53,7 +53,7 @@ class BillViewSet(BillPDFMixin, TenantViewSetMixin, viewsets.ModelViewSet):
         
         # Customers can only see bills matching their information
         # Since bills don't have a direct FK to User, we filter by customer_name, phone, email
-        elif self.request.user.role == User.Role.CUSTOMER:
+        elif hasattr(self.request.user, 'role') and self.request.user.role == User.Role.CUSTOMER:
             user = self.request.user
             queryset = queryset.filter(
                 Q(customer_name__icontains=user.full_name or user.username) |
