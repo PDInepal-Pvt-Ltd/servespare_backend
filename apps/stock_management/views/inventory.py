@@ -76,20 +76,12 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             return
 
         description = request.data.get('description', '')
-        is_primary_param = request.data.get('is_primary')
 
         for idx, image_file in enumerate(files):
-            is_primary = False
-            if is_primary_param is not None:
-                is_primary = str(is_primary_param).lower() == 'true'
-            elif idx == 0 and not inventory.images.filter(is_primary=True, is_removed=False).exists():
-                is_primary = True
-
             payload = {
                 'inventory': inventory.id,
                 'image': image_file,
                 'description': description or f'Image {idx + 1}',
-                'is_primary': is_primary,
             }
 
             serializer = InventoryImageSerializer(data=payload, context={'request': request})
@@ -704,12 +696,6 @@ class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         if branch_id is not None:
             queryset = queryset.filter(inventory__branch_id=branch_id)
         
-        # Filter by is_primary
-        is_primary = self.request.query_params.get('is_primary', None)
-        if is_primary is not None:
-            is_primary_bool = is_primary.lower() == 'true'
-            queryset = queryset.filter(is_primary=is_primary_bool)
-        
         # Filter by is_active
         is_active = self.request.query_params.get('is_active', None)
         if is_active is not None:
@@ -729,7 +715,6 @@ class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - inventory_id: ID of the inventory item
         - images: Multiple image files
         - description: (optional) Description for all images
-        - is_primary: (optional) Set one as primary (default: first image)
         
         Returns: List of created image objects with full details
         """
@@ -757,29 +742,16 @@ class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             )
         
         description = request.data.get('description', '')
-        is_primary_param = request.data.get('is_primary')
         
         created_images = []
         errors = []
         
         for idx, image_file in enumerate(images):
             try:
-                # Determine if this should be primary
-                is_primary = False
-                if is_primary_param:
-                    # If is_primary provided, make first image primary
-                    is_primary = (idx == 0)
-                elif idx == 0 and not InventoryImage.objects.filter(
-                    inventory=inventory, is_primary=True
-                ).exists():
-                    # If no primary image exists, make first image primary
-                    is_primary = True
-                
                 image_data = {
                     'inventory': inventory.id,
                     'image': image_file,
                     'description': description if description else f'Image {idx + 1}',
-                    'is_primary': is_primary,
                 }
                 
                 serializer = InventoryImageSerializer(
@@ -824,7 +796,6 @@ class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         Form data:
         - image: New image file
         - description: (optional) New description
-        - is_primary: (optional) Boolean to set as primary
         
         Returns: Updated image object
         """
@@ -845,10 +816,6 @@ class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         
         if 'description' in request.data:
             image_obj.description = request.data.get('description')
-        
-        if 'is_primary' in request.data:
-            is_primary = request.data.get('is_primary').lower() == 'true'
-            image_obj.is_primary = is_primary
         
         image_obj.save()
         
