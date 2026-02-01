@@ -328,20 +328,44 @@ class CanViewOwnOrders(permissions.BasePermission):
         if request.user.role == User.Role.SUPER_ADMIN:
             return True
         
-        # Tenant Admin can access their tenant's orders
+        # Tenant Admin can access their tenant's orders (or multi-tenant orders via M2M `tenants`)
         if request.user.role == User.Role.ADMIN:
-            if hasattr(obj, 'tenant'):
-                return obj.tenant == request.user.tenant
+            user_tenant = getattr(request.user, 'tenant', None)
+            if user_tenant is None:
+                return False
+            if hasattr(obj, 'tenant') and getattr(obj, 'tenant', None) == user_tenant:
+                return True
+            if hasattr(obj, 'tenants'):
+                try:
+                    return obj.tenants.filter(pk=user_tenant.pk).exists()
+                except Exception:
+                    return False
         
-        # Sub Admin can access their branch's orders
+        # Sub Admin can access their branch's orders (or multi-branch orders via M2M `branches`)
         if request.user.role == User.Role.SUB_ADMIN:
-            if hasattr(obj, 'branch'):
-                return obj.branch == request.user.branch
+            user_branch = getattr(request.user, 'branch', None)
+            if user_branch is None:
+                return False
+            if hasattr(obj, 'branch') and getattr(obj, 'branch', None) == user_branch:
+                return True
+            if hasattr(obj, 'branches'):
+                try:
+                    return obj.branches.filter(pk=user_branch.pk).exists()
+                except Exception:
+                    return False
         
-        # Cashier can access bills in their branch
+        # Cashier can access bills in their branch (or multi-branch bills via M2M `branches`)
         if request.user.role == User.Role.CASHIER:
-            if hasattr(obj, 'branch'):
-                return obj.branch == request.user.branch
+            user_branch = getattr(request.user, 'branch', None)
+            if user_branch is None:
+                return False
+            if hasattr(obj, 'branch') and getattr(obj, 'branch', None) == user_branch:
+                return True
+            if hasattr(obj, 'branches'):
+                try:
+                    return obj.branches.filter(pk=user_branch.pk).exists()
+                except Exception:
+                    return False
         
         # Customers can manage their own orders
         if request.user.role == User.Role.CUSTOMER:

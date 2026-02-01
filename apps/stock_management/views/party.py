@@ -29,6 +29,11 @@ class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         if party_type is not None:
             queryset = queryset.filter(party_type=party_type)
         
+        # Filter by branch
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
         # Filter by customer_type
         customer_type = self.request.query_params.get('customer_type', None)
         if customer_type is not None:
@@ -58,7 +63,14 @@ class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         if request.user.role not in [User.Role.SUPER_ADMIN, User.Role.ADMIN, User.Role.INVENTORY_MANAGER]:
             return Response({'detail': 'You do not have permission to perform this action.'}, status=status.HTTP_403_FORBIDDEN)
 
-        suppliers = self.filter_queryset(Party.objects.filter(party_type='supplier', is_active=True))
+        queryset = Party.objects.filter(party_type='supplier', is_active=True)
+        
+        # Filter by branch
+        branch_id = request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
+        suppliers = self.filter_queryset(queryset)
         serializer = self.get_serializer(suppliers, many=True)
         return Response(serializer.data)
     
@@ -73,7 +85,14 @@ class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         if request.user.role not in [User.Role.SUPER_ADMIN, User.Role.ADMIN, User.Role.INVENTORY_MANAGER]:
             return Response({'detail': 'You do not have permission to perform this action.'}, status=status.HTTP_403_FORBIDDEN)
 
-        customers = self.filter_queryset(Party.objects.filter(party_type='customer', is_active=True))
+        queryset = Party.objects.filter(party_type='customer', is_active=True)
+        
+        # Filter by branch
+        branch_id = request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
+        customers = self.filter_queryset(queryset)
         serializer = self.get_serializer(customers, many=True)
         return Response(serializer.data)
 

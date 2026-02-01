@@ -43,6 +43,12 @@ class SalesOrder(BaseModel):
         related_name='sales_orders',
         help_text='Tenant that owns this sales order'
     )
+    tenants = models.ManyToManyField(
+        'tenant.Tenant',
+        blank=True,
+        related_name='sales_orders_involved',
+        help_text='Tenants involved in this sales order (derived from line items)'
+    )
 
     # Order Information
     order_number = models.CharField(
@@ -71,6 +77,12 @@ class SalesOrder(BaseModel):
         blank=True,
         related_name='sales_orders',
         help_text='Branch handling this order'
+    )
+    branches = models.ManyToManyField(
+        'branch.Branch',
+        blank=True,
+        related_name='sales_orders_involved',
+        help_text='Branches involved in this sales order (derived from line items)'
     )
     
     # Order Status
@@ -640,6 +652,12 @@ class SalesOrderItem(BaseModel):
     
     def save(self, *args, **kwargs):
         """Calculate line totals and snapshot item details"""
+        # Set tenant and branch from inventory so each line reflects source tenant/branch (allows multi-tenant/branch per order)
+        if self.inventory_id:
+            if self.inventory.tenant_id is not None:
+                self.tenant_id = self.inventory.tenant_id
+            if self.inventory.branch_id is not None:
+                self.branch_id = self.inventory.branch_id
         # Snapshot inventory details if new
         if not self.pk and self.inventory:
             self.item_name = self.inventory.item_name
@@ -663,8 +681,8 @@ class SalesOrderItem(BaseModel):
         if self.tax_percentage > 0:
             self.tax_amount = (amount_after_discount * self.tax_percentage) / Decimal('100.00')
         
-        # Calculate line total
-        self.line_total = amount_after_discount + self.tax_amount
+        # Calculate line total (quantize to 2 decimal places for DB field)
+        self.line_total = (amount_after_discount + self.tax_amount).quantize(Decimal('0.01'))
         
         self.full_clean()
 

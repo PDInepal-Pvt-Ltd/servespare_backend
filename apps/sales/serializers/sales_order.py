@@ -12,11 +12,13 @@ class SalesOrderItemSerializer(ModelCleanValidationMixin, serializers.ModelSeria
     
     inventory_name = serializers.CharField(source='inventory.item_name', read_only=True)
     available_stock = serializers.SerializerMethodField()
+    tenant_name = serializers.SerializerMethodField()
+    branch_name = serializers.SerializerMethodField()
     
     class Meta:
         model = SalesOrderItem
         fields = [
-            'id', 'tenant', 'branch', 'inventory', 'inventory_name', 'item_name', 'part_number',
+            'id', 'tenant', 'tenant_name', 'branch', 'branch_name', 'inventory', 'inventory_name', 'item_name', 'part_number',
             'quantity', 'unit_price', 'discount_percentage', 'discount_amount',
             'tax_percentage', 'tax_amount', 'line_total', 'warranty_period',
             'notes', 'available_stock'
@@ -25,6 +27,14 @@ class SalesOrderItemSerializer(ModelCleanValidationMixin, serializers.ModelSeria
             'id', 'tenant', 'item_name', 'part_number', 'discount_amount', 
             'tax_amount', 'line_total', 'warranty_period'
         ]
+    
+    def get_tenant_name(self, obj):
+        """Tenant display name for this item (source of product)"""
+        return obj.tenant.business_name if obj.tenant else None
+    
+    def get_branch_name(self, obj):
+        """Branch display name for this item (source of product)"""
+        return obj.branch.branch_name if obj.branch else None
     
     def get_available_stock(self, obj):
         """Get available stock for the inventory item"""

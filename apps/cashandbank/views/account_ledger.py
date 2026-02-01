@@ -152,6 +152,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
         request.query_params['ledger_type'] = 'general'
         request.query_params._mutable = False
         
+        # Branch filtering is handled in get_queryset() via branch_id parameter
         return self.list(request)
 
     @action(detail=False, methods=['get'])
@@ -161,6 +162,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
         request.query_params['ledger_type'] = 'sales'
         request.query_params._mutable = False
         
+        # Branch filtering is handled in get_queryset() via branch_id parameter
         return self.list(request)
 
     @action(detail=False, methods=['get'])
@@ -170,6 +172,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
         request.query_params['ledger_type'] = 'purchase'
         request.query_params._mutable = False
         
+        # Branch filtering is handled in get_queryset() via branch_id parameter
         return self.list(request)
 
     @action(detail=False, methods=['get'])
@@ -179,6 +182,7 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
         
         Query Parameters:
         - shift_id: Required - ID of the shift
+        - branch_id: Optional - Filter by branch
         - from_date: Optional - Filter from date
         - to_date: Optional - Filter to date
         """

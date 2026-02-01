@@ -36,7 +36,12 @@ class BillViewSet(BillPDFMixin, TenantViewSetMixin, viewsets.ModelViewSet):
         
         queryset = Bill.objects.filter(is_removed=False).select_related(
             'invoice', 'sales_order', 'branch', 'tenant', 'created_by'
-        ).prefetch_related('purchase_items', 'purchase_items__inventory')
+        ).prefetch_related(
+            'purchase_items',
+            'purchase_items__inventory',
+            'purchase_items__inventory__tenant',
+            'purchase_items__inventory__branch',
+        )
         
         # Cashiers can only see bills in their branch
         if self.request.user.role == User.Role.CASHIER:
@@ -60,6 +65,11 @@ class BillViewSet(BillPDFMixin, TenantViewSetMixin, viewsets.ModelViewSet):
         customer_type = self.request.query_params.get('customer_type', None)
         if customer_type is not None:
             queryset = queryset.filter(customer_type=customer_type)
+        
+        # Filter by branch
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
         
         # Filter by status
         status_param = self.request.query_params.get('status', None)

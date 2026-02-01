@@ -17,6 +17,10 @@ class InvoiceItemSerializer(serializers.Serializer):
     line_total = serializers.DecimalField(max_digits=10, decimal_places=2)
     notes = serializers.CharField(required=False, allow_blank=True)
     inventory_details = serializers.SerializerMethodField()
+    tenant = serializers.IntegerField(source='tenant_id', required=False, read_only=True, allow_null=True)
+    tenant_name = serializers.SerializerMethodField()
+    branch = serializers.SerializerMethodField()
+    branch_name = serializers.SerializerMethodField()
     
     def get_inventory_details(self, obj):
         """Get basic inventory details"""
@@ -27,6 +31,18 @@ class InvoiceItemSerializer(serializers.Serializer):
                 'part_number': obj.inventory.part_number,
             }
         return None
+    
+    def get_tenant_name(self, obj):
+        """Tenant display name for this item (source of product)"""
+        return obj.tenant.business_name if obj.tenant else None
+    
+    def get_branch(self, obj):
+        """Branch ID for this item (from inventory)"""
+        return obj.inventory.branch_id if obj.inventory and obj.inventory.branch_id else None
+    
+    def get_branch_name(self, obj):
+        """Branch display name for this item (from inventory)"""
+        return obj.inventory.branch.branch_name if obj.inventory and getattr(obj.inventory, 'branch', None) else None
 
 
 class InvoiceListSerializer(serializers.Serializer):

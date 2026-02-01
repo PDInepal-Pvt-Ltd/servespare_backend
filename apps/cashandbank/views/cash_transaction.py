@@ -44,6 +44,11 @@ class CashTransactionViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         ttype = self.request.query_params.get('transaction_type')
         if ttype:
             qs = qs.filter(transaction_type=ttype)
+        
+        # Filter by branch (explicit branch parameter)
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id is not None:
+            qs = qs.filter(branch_id=branch_id)
 
         # Date range filter: ?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
         date_from = self.request.query_params.get('date_from')
