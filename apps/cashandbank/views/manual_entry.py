@@ -16,6 +16,12 @@ class ManualEntryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = ManualEntry.objects.select_related('tenant', 'branch').all()
+        
+        # Filter by branch
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id is not None:
+            qs = qs.filter(branch_id=branch_id)
+        
         qs = self.filter_queryset(qs)
 
         # basic search by description

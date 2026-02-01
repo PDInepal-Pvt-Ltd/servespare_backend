@@ -47,6 +47,11 @@ class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         if status_filter is not None:
             queryset = queryset.filter(status=status_filter)
         
+        # Filter by branch
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
         # Filter by is_active
         is_active = self.request.query_params.get('is_active', None)
         if is_active is not None:
@@ -72,10 +77,17 @@ class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        purchase_orders = self.filter_queryset(PurchaseOrder.objects.filter(
+        queryset = PurchaseOrder.objects.filter(
             is_removed=False,
             status=status_filter
-        ).select_related('supplier').prefetch_related('items'))
+        ).select_related('supplier').prefetch_related('items')
+        
+        # Filter by branch
+        branch_id = request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
+        purchase_orders = self.filter_queryset(queryset)
 
         serializer = self.get_serializer(purchase_orders, many=True)
         return Response(serializer.data)
@@ -120,7 +132,14 @@ class PurchaseOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - Pending: count of draft and ordered POs
         - Received: count of received POs
         """
-        queryset = self.filter_queryset(PurchaseOrder.objects.filter(is_removed=False))
+        queryset = PurchaseOrder.objects.filter(is_removed=False)
+        
+        # Filter by branch
+        branch_id = request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
+        queryset = self.filter_queryset(queryset)
         
         # Total POs count
         total_pos = queryset.count()
@@ -179,6 +198,11 @@ class PurchaseOrderItemViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         if po_id is not None:
             queryset = queryset.filter(purchase_order_id=po_id)
         
+        # Filter by branch
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(purchase_order__branch_id=branch_id)
+        
         # Filter by is_active
         is_active = self.request.query_params.get('is_active', None)
         if is_active is not None:
@@ -196,6 +220,11 @@ class PurchaseOrderItemViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         queryset = PurchaseOrderItem.objects.filter(is_removed=False).select_related('purchase_order', 'purchase_order__supplier').filter(
             purchase_order__status='returned'
         )
+        
+        # Filter by branch
+        branch_id = request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(purchase_order__branch_id=branch_id)
 
         # Apply tenant/branch filters and any global filters
         queryset = self.filter_queryset(queryset)

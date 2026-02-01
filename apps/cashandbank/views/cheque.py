@@ -20,6 +20,11 @@ class ChequeViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         cheque_type = self.request.query_params.get('cheque_type')
         if cheque_type:
             qs = qs.filter(cheque_type=cheque_type)
+        
+        # Filter by branch
+        branch_id = self.request.query_params.get('branch')
+        if branch_id:
+            qs = qs.filter(branch_id=branch_id)
 
         search = self.request.query_params.get('search')
         if search:
