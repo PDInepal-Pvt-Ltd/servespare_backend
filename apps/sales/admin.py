@@ -107,7 +107,7 @@ class SalesOrderAdmin(admin.ModelAdmin):
     ]
     readonly_fields = [
         'order_number', 'order_date', 'subtotal', 'discount_amount',
-        'tax_amount', 'total_amount', 'created', 'modified'
+        'tax_amount', 'total_amount', 'tenants', 'branches', 'created', 'modified'
     ]
     inlines = [SalesOrderItemInline]
     actions = ['generate_or_refresh_invoice']
@@ -115,6 +115,10 @@ class SalesOrderAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Order Information', {
             'fields': ('order_number', 'order_date', 'customer', 'order_status', 'is_active')
+        }),
+        ('Multi-Tenant Context', {
+            'fields': ('tenant', 'tenants', 'branch', 'branches'),
+            'description': 'tenants and branches are automatically populated from order items.'
         }),
         ('Financial Summary', {
             'fields': (
@@ -298,7 +302,7 @@ class InvoiceAdmin(admin.ModelAdmin):
     ]
     readonly_fields = [
         'invoice_number', 'invoice_date', 'subtotal', 'discount_amount',
-        'tax_amount', 'total_amount', 'created', 'modified'
+        'tax_amount', 'total_amount', 'tenants', 'branches', 'created', 'modified'
     ]
     inlines = [InvoiceItemInline]
     actions = ['refresh_invoice_items', 'convert_to_bill']
@@ -309,6 +313,10 @@ class InvoiceAdmin(admin.ModelAdmin):
         }),
         ('Related Documents', {
             'fields': ('sales_order', 'branch', 'tenant')
+        }),
+        ('Multi-Tenant Context', {
+            'fields': ('tenants', 'branches'),
+            'description': 'tenants and branches are automatically populated from invoice items.'
         }),
         ('Financial Summary', {
             'fields': (
@@ -512,13 +520,17 @@ class BillAdmin(admin.ModelAdmin):
     ]
     readonly_fields = [
         'created', 'modified', 'subtotal', 'discount_amount', 'total_after_discount', 
-        'created_by', 'invoice', 'sales_order'
+        'created_by', 'invoice', 'sales_order', 'tenants', 'branches'
     ]
     inlines = [PurchaseItemInline]
     
     fieldsets = (
         ('Tenant & Branch', {
             'fields': ('tenant', 'branch', 'created_by')
+        }),
+        ('Multi-Tenant Context', {
+            'fields': ('tenants', 'branches'),
+            'description': 'tenants and branches are automatically populated from purchase items.'
         }),
         ('Related Documents (Online Orders)', {
             'fields': ('invoice', 'sales_order'),

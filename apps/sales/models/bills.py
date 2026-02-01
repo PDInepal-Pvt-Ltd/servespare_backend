@@ -90,6 +90,12 @@ class Bill(BaseModel):
         related_name='bills',
         help_text='Tenant that owns this bill'
     )
+    tenants = models.ManyToManyField(
+        'tenant.Tenant',
+        blank=True,
+        related_name='bills_involved',
+        help_text='Tenants involved in this bill (derived from purchase items)'
+    )
 
     created_by = models.ForeignKey(
         'users.User',
@@ -200,6 +206,12 @@ class Bill(BaseModel):
         blank=True,
         related_name='bills',
         help_text='Branch issuing this bill'
+    )
+    branches = models.ManyToManyField(
+        'branch.Branch',
+        blank=True,
+        related_name='bills_involved',
+        help_text='Branches involved in this bill (derived from purchase items)'
     )
     
     # Relationships to Invoice and SalesOrder (for online orders)

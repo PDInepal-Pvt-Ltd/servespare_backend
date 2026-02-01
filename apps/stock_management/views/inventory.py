@@ -127,6 +127,11 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             # Apply branch-level filtering based on user role for staff
             queryset = get_branch_queryset_for_user(self.request.user, queryset)
         
+        # Filter by branch
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
         # Filter by category
         category = self.request.query_params.get('category', None)
         if category is not None:
@@ -219,9 +224,16 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         Get the 3 most recently added products
         GET /api/inventory/recent/
         """
-        recent_items = self.filter_queryset(Inventory.objects.filter(
+        queryset = Inventory.objects.filter(
             is_active=True
-        ).select_related('party').prefetch_related('images').order_by('-created')[:3])
+        ).select_related('party').prefetch_related('images').order_by('-created')
+        
+        # Filter by branch
+        branch_id = request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
+        recent_items = self.filter_queryset(queryset)[:3]
 
         serializer = self.get_serializer(recent_items, many=True)
         return Response(serializer.data)
@@ -231,10 +243,17 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         """
         Get all items with low stock (quantity <= min_stock_level)
         """
-        low_stock_items = self.filter_queryset(Inventory.objects.filter(
+        queryset = Inventory.objects.filter(
             quantity__lte=F('min_stock_level'),
             is_active=True
-        ).select_related('party').prefetch_related('images'))
+        ).select_related('party').prefetch_related('images')
+        
+        # Filter by branch
+        branch_id = request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
+        low_stock_items = self.filter_queryset(queryset)
 
         serializer = self.get_serializer(low_stock_items, many=True)
         return Response(serializer.data)
@@ -248,7 +267,14 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - Total out of stock items (quantity = 0)
         - Total stock value (sum of quantity * price)
         """
-        all_inventory = self.filter_queryset(Inventory.objects.filter(is_active=True))
+        queryset = Inventory.objects.filter(is_active=True)
+        
+        # Filter by branch
+        branch_id = request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
+        all_inventory = self.filter_queryset(queryset)
         
         # Count low stock items (quantity <= min_stock_level and quantity > 0)
         low_stock_count = all_inventory.filter(
@@ -292,10 +318,17 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        items = self.filter_queryset(Inventory.objects.filter(
+        queryset = Inventory.objects.filter(
             category=category,
             is_active=True
-        ).select_related('party').prefetch_related('images'))
+        ).select_related('party').prefetch_related('images')
+        
+        # Filter by branch
+        branch_id = request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
+        items = self.filter_queryset(queryset)
 
         serializer = self.get_serializer(items, many=True)
         return Response(serializer.data)
@@ -312,10 +345,17 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        items = self.filter_queryset(Inventory.objects.filter(
+        queryset = Inventory.objects.filter(
             vehicle_type=vehicle_type,
             is_active=True
-        ).select_related('party').prefetch_related('images'))
+        ).select_related('party').prefetch_related('images')
+        
+        # Filter by branch
+        branch_id = request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
+        
+        items = self.filter_queryset(queryset)
 
         serializer = self.get_serializer(items, many=True)
         return Response(serializer.data)
@@ -658,6 +698,11 @@ class InventoryImageViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         inventory_id = self.request.query_params.get('inventory', None)
         if inventory_id is not None:
             queryset = queryset.filter(inventory_id=inventory_id)
+        
+        # Filter by branch
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(inventory__branch_id=branch_id)
         
         # Filter by is_primary
         is_primary = self.request.query_params.get('is_primary', None)

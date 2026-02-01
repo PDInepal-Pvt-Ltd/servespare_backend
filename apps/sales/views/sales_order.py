@@ -43,7 +43,9 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     - Customer: Full CRUD access to their own orders only
     """
     
-    queryset = SalesOrder.objects.filter(is_removed=False).select_related('customer', 'created_by')
+    queryset = SalesOrder.objects.filter(is_removed=False).select_related(
+        'customer', 'created_by', 'tenant', 'branch'
+    ).prefetch_related('items', 'items__tenant', 'items__branch', 'items__inventory')
     filterset_fields = ['customer', 'order_status', 'created_by']
     search_fields = ['order_number', 'customer__customer_name', 'customer__phone', 'tracking_number']
     ordering_fields = ['created', 'order_date', 'total_amount', 'order_number']
@@ -74,6 +76,11 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         # Customers can only see their own orders
         if self.request.user.role == User.Role.CUSTOMER:
             queryset = queryset.filter(customer=self.request.user)
+        
+        # Filter by branch
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id is not None:
+            queryset = queryset.filter(branch_id=branch_id)
         
         # Filter by date range if provided
         start_date = self.request.query_params.get('start_date')

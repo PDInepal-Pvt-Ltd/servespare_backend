@@ -45,6 +45,11 @@ class CashierShiftViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         if status_param:
             queryset = queryset.filter(status=status_param)
         
+        # Filter by branch
+        branch_id = self.request.query_params.get('branch', None)
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        
         # Filter by cashier
         cashier_id = self.request.query_params.get('cashier_id', None)
         if cashier_id:

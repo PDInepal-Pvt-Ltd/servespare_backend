@@ -6,9 +6,12 @@ Signals for Sales App - Handles:
 4. Inventory updates
 5. Sales ledger synchronization
 """
+import logging
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.exceptions import ValidationError
+
+logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender='sales.SalesOrderItem')
@@ -83,6 +86,35 @@ def recalculate_sales_order_on_item_change(sender, instance, created, **kwargs):
         instance.order.calculate_totals()
 
 
+@receiver(post_save, sender='sales.SalesOrderItem')
+def sync_sales_order_tenants_branches(sender, instance, created, **kwargs):
+    """
+    Keep SalesOrder.tenants and SalesOrder.branches in sync with line items.
+    Supports orders that include items from multiple tenants/branches.
+    """
+    order = getattr(instance, 'order', None)
+    order_id = getattr(order, 'id', None)
+    if not order_id:
+        return
+
+    try:
+        tenant_ids = (
+            order.items.filter(tenant_id__isnull=False)
+            .values_list('tenant_id', flat=True)
+            .distinct()
+        )
+        branch_ids = (
+            order.items.filter(branch_id__isnull=False)
+            .values_list('branch_id', flat=True)
+            .distinct()
+        )
+        order.tenants.set(list(tenant_ids))
+        order.branches.set(list(branch_ids))
+    except Exception:
+        # Don't break order save flow if sync fails
+        return
+
+
 @receiver(post_delete, sender='sales.SalesOrderItem')
 def recalculate_sales_order_on_item_delete(sender, instance, **kwargs):
     """
@@ -92,6 +124,34 @@ def recalculate_sales_order_on_item_delete(sender, instance, **kwargs):
         instance.order.calculate_totals()
 
 
+@receiver(post_delete, sender='sales.SalesOrderItem')
+def sync_sales_order_tenants_branches_on_delete(sender, instance, **kwargs):
+    """Re-sync SalesOrder.tenants and branches after item deletion."""
+    order = getattr(instance, 'order', None)
+    order_id = getattr(order, 'id', None)
+    if not order_id:
+        return
+    try:
+        tenant_ids = (
+            order.items.filter(tenant_id__isnull=False)
+            .values_list('tenant_id', flat=True)
+            .distinct()
+        )
+        branch_ids = (
+            order.items.filter(branch_id__isnull=False)
+            .values_list('branch_id', flat=True)
+            .distinct()
+        )
+        order.tenants.set(list(tenant_ids))
+        order.branches.set(list(branch_ids))
+    except Exception as exc:
+        logger.warning(
+            "Failed to sync tenants/branches on delete for order %s: %s",
+            order_id,
+            exc,
+        )
+
+
 @receiver(post_save, sender='sales.InvoiceItem')
 def recalculate_invoice_on_item_change(sender, instance, created, **kwargs):
     """
@@ -99,6 +159,31 @@ def recalculate_invoice_on_item_change(sender, instance, created, **kwargs):
     """
     if instance.invoice:
         instance.invoice.calculate_totals()
+
+
+@receiver(post_save, sender='sales.InvoiceItem')
+def sync_invoice_tenants_branches(sender, instance, created, **kwargs):
+    """
+    Keep Invoice.tenants and Invoice.branches in sync with invoice items.
+    """
+    invoice = getattr(instance, 'invoice', None)
+    if not getattr(invoice, 'id', None):
+        return
+    try:
+        tenant_ids = (
+            invoice.items.filter(tenant_id__isnull=False)
+            .values_list('tenant_id', flat=True)
+            .distinct()
+        )
+        branch_ids = (
+            invoice.items.filter(inventory__branch_id__isnull=False)
+            .values_list('inventory__branch_id', flat=True)
+            .distinct()
+        )
+        invoice.tenants.set(list(tenant_ids))
+        invoice.branches.set(list(branch_ids))
+    except Exception:
+        return
 
 
 @receiver(post_delete, sender='sales.InvoiceItem')
@@ -117,6 +202,31 @@ def recalculate_bill_on_item_change(sender, instance, created, **kwargs):
     """
     if instance.bill:
         instance.bill.calculate_all_amounts()
+
+
+@receiver(post_save, sender='sales.PurchaseItem')
+def sync_bill_tenants_branches(sender, instance, created, **kwargs):
+    """
+    Keep Bill.tenants and Bill.branches in sync with purchase items (via inventory).
+    """
+    bill = getattr(instance, 'bill', None)
+    if not getattr(bill, 'id', None):
+        return
+    try:
+        tenant_ids = (
+            bill.purchase_items.filter(inventory__tenant_id__isnull=False)
+            .values_list('inventory__tenant_id', flat=True)
+            .distinct()
+        )
+        branch_ids = (
+            bill.purchase_items.filter(inventory__branch_id__isnull=False)
+            .values_list('inventory__branch_id', flat=True)
+            .distinct()
+        )
+        bill.tenants.set(list(tenant_ids))
+        bill.branches.set(list(branch_ids))
+    except Exception:
+        return
 
 
 @receiver(post_delete, sender='sales.PurchaseItem')

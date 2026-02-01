@@ -12,6 +12,10 @@ class PurchaseItemSerializer(ModelCleanValidationMixin, serializers.ModelSeriali
     product_name = serializers.CharField(source='inventory.item_name', read_only=True)
     inventory_id = serializers.IntegerField(write_only=True, required=False)
     price = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    tenant_id = serializers.SerializerMethodField()
+    tenant_name = serializers.SerializerMethodField()
+    branch_id = serializers.SerializerMethodField()
+    branch_name = serializers.SerializerMethodField()
 
     class Meta:
         model = PurchaseItem
@@ -24,10 +28,30 @@ class PurchaseItemSerializer(ModelCleanValidationMixin, serializers.ModelSeriali
             'quantity',
             'price',
             'total_price',
+            'tenant_id',
+            'tenant_name',
+            'branch_id',
+            'branch_name',
             'created',
             'modified'
         ]
         read_only_fields = ['id', 'total_price', 'created', 'modified', 'product_name']
+
+    def get_tenant_id(self, obj):
+        """Tenant ID for this item (from inventory)"""
+        return obj.inventory.tenant_id if obj.inventory else None
+
+    def get_tenant_name(self, obj):
+        """Tenant display name for this item (from inventory)"""
+        return obj.inventory.tenant.business_name if obj.inventory and getattr(obj.inventory, 'tenant', None) else None
+
+    def get_branch_id(self, obj):
+        """Branch ID for this item (from inventory)"""
+        return obj.inventory.branch_id if obj.inventory else None
+
+    def get_branch_name(self, obj):
+        """Branch display name for this item (from inventory)"""
+        return obj.inventory.branch.branch_name if obj.inventory and getattr(obj.inventory, 'branch', None) else None
 
     def get_total_price(self, obj):
         return obj.total_price()
