@@ -54,7 +54,7 @@ CORS_ALLOWED_ORIGINS = [
     'https://servespare.xyz',
     'https://api-demo.servespare.xyz',
     'https://api.servespare.xyz',
-]
+] 
 
 CORS_ALLOW_CREDENTIALS = True
 
