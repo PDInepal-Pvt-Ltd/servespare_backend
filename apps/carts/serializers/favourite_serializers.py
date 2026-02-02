@@ -31,13 +31,13 @@ class InventoryBasicFavoriteSerializer(serializers.ModelSerializer):
         ]
     
     def get_primary_image(self, obj):
-        """Get the primary image URL"""
-        primary_image = obj.images.filter(is_primary=True, is_removed=False).first()
-        if primary_image and primary_image.image:
+        """Get the first active image URL"""
+        first_image = obj.images.filter(is_removed=False).first()
+        if first_image and first_image.image:
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(primary_image.image.url)
-            return primary_image.image.url
+                return request.build_absolute_uri(first_image.image.url)
+            return first_image.image.url
         return None
 
 

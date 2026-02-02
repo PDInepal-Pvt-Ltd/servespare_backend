@@ -74,7 +74,7 @@ class SalesOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         queryset = super().get_queryset()
         
         # Customers can only see their own orders
-        if self.request.user.role == User.Role.CUSTOMER:
+        if hasattr(self.request.user, 'role') and self.request.user.role == User.Role.CUSTOMER:
             queryset = queryset.filter(customer=self.request.user)
         
         # Filter by branch
