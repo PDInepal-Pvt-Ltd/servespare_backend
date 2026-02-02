@@ -205,6 +205,68 @@ def recalculate_bill_on_item_change(sender, instance, created, **kwargs):
 
 
 @receiver(post_save, sender='sales.PurchaseItem')
+def update_bill_ledger_on_item_change(sender, instance, created, **kwargs):
+    """
+    Update or create the bill's sales ledger entry when purchase items are added/changed.
+    This ensures the ledger is created/updated even if the bill was initially created without items.
+    """
+    from apps.cashandbank.models import AccountLedger
+    from decimal import Decimal
+    from django.utils import timezone
+    
+    bill = instance.bill
+    if not bill or not bill.tenant:
+        return
+    
+    # Calculate bill total
+    bill_total = bill.subtotal - bill.discount_amount
+    if bill_total < 0:
+        bill_total = Decimal('0.00')
+    
+    # Quantize to 2 decimal places to avoid validation errors
+    bill_total = bill_total.quantize(Decimal('0.01'))
+    
+    # Only proceed if bill has a positive total
+    if bill_total <= 0:
+        return
+    
+    reference_id = str(bill.id)
+    customer_name = bill.customer_name or 'Walk-in Customer'
+    
+    # Check if ledger entry already exists for this bill
+    existing_ledger = AccountLedger.objects.filter(
+        reference_type='bill',
+        reference_id=reference_id,
+        ledger_type='sale',
+        transaction_type='sale'
+    ).first()
+    
+    if existing_ledger:
+        # Update existing ledger entry with new total
+        existing_ledger.debit = bill_total
+        existing_ledger.description = f"Bill {bill.id} - {customer_name}"
+        existing_ledger.save(update_fields=['debit', 'description'])
+    else:
+        # Create new ledger entry
+        AccountLedger.objects.create(
+            tenant=bill.tenant,
+            branch=bill.branch,
+            ledger_type='sale',
+            transaction_type='sale',
+            debit=bill_total,
+            credit=Decimal('0.00'),
+            description=f"Bill {bill.id} - {customer_name}",
+            reference=f"Bill #{bill.id}",
+            reference_type='bill',
+            reference_id=reference_id,
+            transaction_date=bill.created or timezone.now(),
+            performed_by=bill.created_by,
+            is_manual_entry=False,
+            notes='Auto-generated from bill with purchase items'
+        )
+
+
+@receiver(post_save, sender='sales.PurchaseItem')
 def sync_bill_tenants_branches(sender, instance, created, **kwargs):
     """
     Keep Bill.tenants and Bill.branches in sync with purchase items (via inventory).
@@ -262,27 +324,33 @@ def sync_bill_to_sales_ledger(sender, instance, created, **kwargs):
         if bill_total < 0:
             bill_total = Decimal('0.00')
         
-        customer_name = instance.customer_name or 'Walk-in Customer'
-        description = f"Bill {instance.id} - {customer_name}"
-        reference = f"Bill #{instance.id}"
+        # Quantize to 2 decimal places to avoid validation errors
+        bill_total = bill_total.quantize(Decimal('0.01'))
         
-        # Create ledger entry for the sale
-        AccountLedger.objects.create(
-            tenant=instance.tenant,
-            branch=instance.branch,
-            ledger_type='sale',
-            transaction_type='sale',
-            debit=bill_total,
-            credit=Decimal('0.00'),
-            description=description,
-            reference=reference,
-            reference_type='bill',
-            reference_id=reference_id,
-            transaction_date=instance.created or timezone.now(),
-            performed_by=instance.created_by,
-            is_manual_entry=False,
-            notes='Auto-generated from bill creation'
-        )
+        # Only create ledger entry if bill has a positive total
+        # This prevents validation errors when creating bills without items
+        if bill_total > 0:
+            customer_name = instance.customer_name or 'Walk-in Customer'
+            description = f"Bill {instance.id} - {customer_name}"
+            reference = f"Bill #{instance.id}"
+            
+            # Create ledger entry for the sale
+            AccountLedger.objects.create(
+                tenant=instance.tenant,
+                branch=instance.branch,
+                ledger_type='sale',
+                transaction_type='sale',
+                debit=bill_total,
+                credit=Decimal('0.00'),
+                description=description,
+                reference=reference,
+                reference_type='bill',
+                reference_id=reference_id,
+                transaction_date=instance.created or timezone.now(),
+                performed_by=instance.created_by,
+                is_manual_entry=False,
+                notes='Auto-generated from bill creation'
+            )
     else:
         # Handle status changes - if refunded, create a refund/return entry
         if instance.status == 'refunded':
@@ -299,6 +367,9 @@ def sync_bill_to_sales_ledger(sender, instance, created, **kwargs):
                 bill_total = instance.subtotal - instance.discount_amount
                 if bill_total < 0:
                     bill_total = Decimal('0.00')
+                
+                # Quantize to 2 decimal places to avoid validation errors
+                bill_total = bill_total.quantize(Decimal('0.01'))
                 
                 customer_name = instance.customer_name or 'Walk-in Customer'
                 description = f"Refund for Bill {instance.id} - {customer_name}"
