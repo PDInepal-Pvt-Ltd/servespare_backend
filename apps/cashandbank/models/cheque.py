@@ -1,9 +1,11 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from decimal import Decimal
+from apps.base.models import BaseModel
+from apps.base.managers import TenantManager
 
 
-class Cheque(models.Model):
+class Cheque(BaseModel):
     CHEQUE_TYPE_ISSUED = 'issued'
     CHEQUE_TYPE_GIVEN = 'given'
     CHEQUE_TYPE_CHOICES = [
@@ -35,15 +37,38 @@ class Cheque(models.Model):
     notes = models.TextField(blank=True, null=True)
     reminder_setting = models.CharField(max_length=2, choices=REMINDER_CHOICES, default=REMINDER_7_DAY)
 
-    # Optional bookkeeping fields
-    is_active = models.BooleanField(default=True)
-    created = models.DateTimeField(auto_now_add=True)
-    modified = models.DateTimeField(auto_now=True)
+    # Tenant and Branch context
+    tenant = models.ForeignKey(
+        'tenant.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='cheques',
+        help_text='Tenant that owns this cheque'
+    )
+
+    branch = models.ForeignKey(
+        'branch.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='cheques',
+        help_text='Branch associated with this cheque'
+    )
+
+    objects = TenantManager()
 
     class Meta:
+        db_table = 'cheque'
         ordering = ['-due_date', '-created']
         verbose_name = 'Cheque'
         verbose_name_plural = 'Cheques'
+        indexes = [
+            models.Index(fields=['tenant']),
+            models.Index(fields=['branch']),
+            models.Index(fields=['due_date']),
+            models.Index(fields=['is_active']),
+        ]
 
     def __str__(self):
         label = self.cheque_number or "(no number)"
