@@ -96,3 +96,11 @@ class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         serializer = self.get_serializer(customers, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def names(self, request):
+        """Get party names only (id + party_name). Supports branch filter and other query params."""
+        queryset = self.filter_queryset(self.get_queryset())
+        data = queryset.values('id', 'party_name')
+        return Response(list(data))
+
+

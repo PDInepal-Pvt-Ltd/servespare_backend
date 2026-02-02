@@ -13,7 +13,12 @@ from io import BytesIO
 from decimal import Decimal
 from django.template.loader import render_to_string
 from django.conf import settings
-from xhtml2pdf import pisa
+try:
+    from xhtml2pdf import pisa
+except Exception:
+    # Optional dependency for PDF generation; allow import-time to succeed in test environments
+    pisa = None
+
 import os
 import logging
 
@@ -37,19 +42,21 @@ class PDFGenerator:
         """
         pdf_file = BytesIO()
         
+        if pisa is None:
+            raise RuntimeError('xhtml2pdf is not installed; PDF generation is unavailable in this environment')
+
         try:
             # Generate PDF from HTML with better settings
-            # enableLocalFileAccess allows loading local files/images
             pisa_status = pisa.CreatePDF(
-                html_content, 
+                html_content,
                 pdf_file,
                 show_error_as_pdf=False,
                 raise_on_error=False
             )
-            
+
             if pisa_status.err:
                 logger.warning(f"PDF generation warnings: {pisa_status.err}")
-            
+
             pdf_file.seek(0)
             return pdf_file
         except Exception as e:
