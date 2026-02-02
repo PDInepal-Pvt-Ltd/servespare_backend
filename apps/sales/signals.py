@@ -223,9 +223,6 @@ def update_bill_ledger_on_item_change(sender, instance, created, **kwargs):
     if bill_total < 0:
         bill_total = Decimal('0.00')
     
-    # Quantize to 2 decimal places to avoid validation errors
-    bill_total = bill_total.quantize(Decimal('0.01'))
-    
     # Only proceed if bill has a positive total
     if bill_total <= 0:
         return
@@ -324,9 +321,6 @@ def sync_bill_to_sales_ledger(sender, instance, created, **kwargs):
         if bill_total < 0:
             bill_total = Decimal('0.00')
         
-        # Quantize to 2 decimal places to avoid validation errors
-        bill_total = bill_total.quantize(Decimal('0.01'))
-        
         # Only create ledger entry if bill has a positive total
         # This prevents validation errors when creating bills without items
         if bill_total > 0:
@@ -367,9 +361,6 @@ def sync_bill_to_sales_ledger(sender, instance, created, **kwargs):
                 bill_total = instance.subtotal - instance.discount_amount
                 if bill_total < 0:
                     bill_total = Decimal('0.00')
-                
-                # Quantize to 2 decimal places to avoid validation errors
-                bill_total = bill_total.quantize(Decimal('0.01'))
                 
                 customer_name = instance.customer_name or 'Walk-in Customer'
                 description = f"Refund for Bill {instance.id} - {customer_name}"
