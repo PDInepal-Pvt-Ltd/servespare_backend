@@ -385,9 +385,12 @@ def get_branch_queryset_for_user(user, queryset):
     # Tenant Admin can see objects from all branches in their tenant
     if user.role == User.Role.ADMIN:
         if user.tenant and hasattr(queryset.model, 'branch'):
+            from django.db.models import Q
             from apps.branch.models import Branch
             tenant_branches = Branch.objects.filter(tenant=user.tenant).values_list('id', flat=True)
-            return queryset.filter(branch__in=tenant_branches)
+            return queryset.filter(
+                Q(branch__in=tenant_branches) | Q(branch__isnull=True, tenant=user.tenant)
+            )
         return queryset.none()
     
     # Inventory Manager and Cashier can only see their branch's objects
