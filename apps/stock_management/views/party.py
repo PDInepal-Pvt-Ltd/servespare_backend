@@ -96,3 +96,51 @@ class PartyViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         serializer = self.get_serializer(customers, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'], url_path='party-names', permission_classes=[IsAuthenticated])
+    def party_names(self, request):
+        """
+        Return distinct party names (suppliers and customers) scoped by tenant and branch.
+
+        Rules:
+        - If user has an assigned branch (user.branch), restrict results to that branch.
+        - Otherwise, if `branch` query param is provided, ensure the user has access to that branch and filter by it.
+        - Tenant filtering is applied automatically via TenantViewSetMixin / filter_queryset.
+        """
+        # Base queryset: only active parties
+        base_qs = Party.objects.filter(is_active=True)
+
+        # Apply tenant-level filtering and other global filters
+        qs = self.filter_queryset(base_qs)
+
+        # Apply branch-level permissions
+        from apps.base.permission_utils import get_branch_queryset_for_user
+        from apps.branch.models import Branch
+
+        # If user has an assigned branch, always restrict to that
+        user_branch = getattr(request.user, 'branch', None)
+        if user_branch:
+            qs = qs.filter(branch=user_branch)
+        else:
+            # Allow branch query param for users who can access multiple branches
+            branch_id = request.query_params.get('branch', None)
+            if branch_id:
+                # Validate branch exists
+                try:
+                    branch_obj = Branch.objects.get(pk=branch_id)
+                except Branch.DoesNotExist:
+                    return Response({'detail': 'Branch not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+                # Ensure branch is within user's allowed branches
+                allowed_qs = get_branch_queryset_for_user(request.user, qs)
+                if not allowed_qs.filter(branch=branch_obj).exists():
+                    return Response({'detail': 'You do not have access to this branch.'}, status=status.HTTP_403_FORBIDDEN)
+
+                qs = qs.filter(branch=branch_obj)
+            else:
+                # For users like Tenant Admin, restrict to branches they can access
+                qs = get_branch_queryset_for_user(request.user, qs)
+
+        party_names = qs.exclude(party_name__isnull=True).exclude(party_name__exact='').values_list('party_name', flat=True).distinct()
+        data = [{'party_name': name} for name in party_names]
+        return Response(data)
+
