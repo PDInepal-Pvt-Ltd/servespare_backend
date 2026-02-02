@@ -437,7 +437,8 @@ class Bill(BaseModel):
             self.tax_percentage = Decimal('13.00')
         
         # Skip tax calculation if explicitly disabled (e.g., when creating from invoice)
-        if not getattr(self, '_skip_tax_calculation', False):
+        # Also skip on initial creation (no pk yet) - will be calculated after purchase items are added
+        if not getattr(self, '_skip_tax_calculation', False) and self.pk is not None:
             self.tax_amount = self.calculate_tax_amount()
         
         super().save(*args, **kwargs)
