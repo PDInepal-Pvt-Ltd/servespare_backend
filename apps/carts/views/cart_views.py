@@ -262,7 +262,8 @@ class CartViewSet(viewsets.ViewSet):
             "payment_method": "cash|card|upi|bank_transfer|credit",
             "delivery_address": "...",
             "delivery_city": "...",
-            "delivery_state": "...",
+            "delivery_province": "...",
+            "delivery_district": "...",
             "delivery_pincode": "...",
             "notes": "..."
         }
@@ -324,7 +325,8 @@ class CartViewSet(viewsets.ViewSet):
                     'tenant': request.user.tenant,
                     'delivery_address': checkout_data.get('delivery_address', ''),
                     'delivery_city': checkout_data.get('delivery_city', ''),
-                    'delivery_state': checkout_data.get('delivery_state', ''),
+                    'delivery_province': checkout_data.get('delivery_province', ''),
+                    'delivery_district': checkout_data.get('delivery_district', ''),
                     'delivery_pincode': checkout_data.get('delivery_pincode', ''),
                     'notes': checkout_data.get('notes', ''),
                 }
