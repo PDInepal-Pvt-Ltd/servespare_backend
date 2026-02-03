@@ -222,6 +222,13 @@ class AccountLedger(BaseModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        # Round debit, credit, and balance to 2 decimal places
+        from decimal import ROUND_HALF_UP
+        for field in ['debit', 'credit', 'balance']:
+            value = getattr(self, field, None)
+            if value is not None:
+                setattr(self, field, value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+        
         self.full_clean()
         super().save(*args, **kwargs)
 
