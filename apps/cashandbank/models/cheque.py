@@ -7,10 +7,10 @@ from apps.base.managers import TenantManager
 
 class Cheque(BaseModel):
     CHEQUE_TYPE_ISSUED = 'issued'
-    CHEQUE_TYPE_GIVEN = 'given'
+    CHEQUE_TYPE_RECEIVED = 'received'
     CHEQUE_TYPE_CHOICES = [
         (CHEQUE_TYPE_ISSUED, 'Issued'),
-        (CHEQUE_TYPE_GIVEN, 'Given'),
+        (CHEQUE_TYPE_RECEIVED, 'Received'),
     ]
 
     REMINDER_SAME_DAY = '0'
