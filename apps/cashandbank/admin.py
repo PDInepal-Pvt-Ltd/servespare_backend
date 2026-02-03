@@ -371,12 +371,14 @@ class AccountLedgerAdmin(admin.ModelAdmin):
 
 @admin.register(Cheque)
 class ChequeAdmin(admin.ModelAdmin):
-    list_display = ['cheque_number', 'cheque_type', 'bank_name', 'amount', 'due_date', 'party_name', 'is_active', 'created']
-    list_filter = ['cheque_type', 'is_active', 'due_date']
+    list_display = ['cheque_number', 'cheque_type', 'bank_name', 'amount', 'due_date', 'party_name', 'branch', 'tenant', 'is_active', 'created']
+    list_filter = ['cheque_type', 'is_active', 'due_date', 'tenant', 'branch']
     search_fields = ['cheque_number', 'party_name', 'bank_name', 'account_number']
     readonly_fields = ['created', 'modified']
+    raw_id_fields = ['tenant', 'branch']
     fieldsets = (
-        (None, {'fields': ('cheque_type', 'cheque_number', 'bank_name', 'amount', 'issue_date', 'due_date', 'party_name', 'account_number', 'ifsc_code', 'purpose', 'notes', 'reminder_setting', 'is_active')}),
+        ('Basic Information', {'fields': ('tenant', 'branch', 'cheque_type', 'cheque_number', 'bank_name', 'amount', 'issue_date', 'due_date', 'party_name', 'is_active')}),
+        ('Details', {'fields': ('account_number', 'ifsc_code', 'purpose', 'notes', 'reminder_setting'), 'classes': ('collapse',)}),
         ('Timestamps', {'fields': ('created', 'modified'), 'classes': ('collapse',)}),
     )
     
