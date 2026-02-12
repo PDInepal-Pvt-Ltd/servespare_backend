@@ -47,7 +47,32 @@ class AccountLedgerViewSet(TenantViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Filter ledger entries with extensive filtering options"""
+        from apps.users.models import User
+        from apps.base.permission_utils import get_branch_queryset_for_user
+        
         queryset = AccountLedger.objects.filter(is_removed=False).order_by('transaction_date', 'id')
+        
+        # Apply branch-level filtering for Cashier role
+        user = self.request.user
+        if user.is_authenticated and hasattr(user, 'role'):
+            if user.role == User.Role.CASHIER:
+                # Cashier can only see ledger entries for their branch
+                if user.branch:
+                    queryset = queryset.filter(branch=user.branch)
+                else:
+                    # No branch assigned - return empty queryset
+                    queryset = queryset.none()
+            elif user.role == User.Role.INVENTORY_MANAGER:
+                # Inventory Manager can see ledger entries for their branch
+                if user.branch:
+                    queryset = queryset.filter(branch=user.branch)
+                else:
+                    queryset = queryset.none()
+            elif user.role == User.Role.ADMIN:
+                # Tenant Admin can see ledger entries for all branches in their tenant
+                if user.tenant:
+                    queryset = queryset.filter(branch__tenant=user.tenant)
+            # Super Admin can see all ledger entries (no filtering)
 
         # Filter by ledger type
         ledger_type = self.request.query_params.get('ledger_type', None)

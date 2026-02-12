@@ -741,6 +741,22 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         else:
             return Response(response_data, status=status.HTTP_201_CREATED)
 
+    def destroy(self, request, *args, **kwargs):
+        """
+        Delete inventory item with a proper success message.
+        """
+        instance = self.get_object()
+        product_name = getattr(instance, 'part_number', 'Product')
+        self.perform_destroy(instance)
+        
+        return Response(
+            {
+                'message': f'Inventory product "{product_name}" has been deleted successfully.',
+                'success': True
+            },
+            status=status.HTTP_200_OK
+        )
+
     def perform_destroy(self, instance):
         """
         Soft-delete inventory with role-based validation.

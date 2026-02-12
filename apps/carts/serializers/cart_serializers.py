@@ -166,7 +166,8 @@ class CheckoutSerializer(serializers.Serializer):
     payment_method = serializers.CharField(required=False, allow_blank=True)
     delivery_address = serializers.CharField(required=False, allow_blank=True)
     delivery_city = serializers.CharField(required=False, allow_blank=True)
-    delivery_state = serializers.CharField(required=False, allow_blank=True)
+    delivery_province = serializers.CharField(required=False, allow_blank=True)
+    delivery_district = serializers.CharField(required=False, allow_blank=True)
     delivery_pincode = serializers.CharField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
     selected_item_ids = serializers.ListField(
@@ -192,7 +193,8 @@ class CheckoutSerializer(serializers.Serializer):
         data.setdefault('payment_method', 'cash')
         data.setdefault('delivery_address', '')
         data.setdefault('delivery_city', '')
-        data.setdefault('delivery_state', '')
+        data.setdefault('delivery_province', '')
+        data.setdefault('delivery_district', '')
         data.setdefault('delivery_pincode', '')
         data.setdefault('notes', '')
         # Normalize selected_item_ids if provided

@@ -289,6 +289,51 @@ class DashboardService:
             'low_stock_items': low_stock_count,
         }
     
+    # ============ INVENTORY MANAGER STATS ============
+    
+    def get_inventory_manager_stats(self):
+        """Get inventory statistics for Inventory Manager - branch specific"""
+        filter_kwargs = self._get_filter_kwargs()
+        
+        inventory_queryset = Inventory.objects.filter(
+            is_removed=False,
+            **filter_kwargs
+        )
+        
+        # Total products in branch
+        total_products = inventory_queryset.count()
+        
+        # Low stock items (quantity <= min_stock_level but not zero)
+        low_stock_items = inventory_queryset.filter(
+            Q(quantity__lte=F('min_stock_level')) & Q(quantity__gt=0)
+        ).count()
+        
+        # Out of stock items (quantity = 0)
+        out_of_stock_items = inventory_queryset.filter(
+            quantity=0
+        ).count()
+        
+        # Total stock value (quantity * price)
+        total_stock_value = inventory_queryset.aggregate(
+            total_value=Sum(
+                ExpressionWrapper(
+                    F('quantity') * F('price'),
+                    output_field=DecimalField(max_digits=12, decimal_places=2)
+                )
+            )
+        )['total_value'] or Decimal('0.00')
+        
+        # Active products (quantity > 0)
+        active_products = inventory_queryset.filter(quantity__gt=0).count()
+        
+        return {
+            'total_products': total_products,
+            'low_stock_items': low_stock_items,
+            'out_of_stock_items': out_of_stock_items,
+            'total_stock_value': float(total_stock_value),
+            'active_products': active_products,
+        }
+    
     # ============ ACTIVE CUSTOMERS ============
     
     def get_active_customers(self, days=30, limit=10):
