@@ -390,6 +390,10 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     def bulk_upload(self, request):
         """
         Bulk upload inventory items from CSV file
+
+        Required form-data fields:
+        - branch_id: Branch ID where these inventory items should be created
+        - file: CSV file
         
         Expected CSV columns:
         - Item Name* (required)
@@ -412,6 +416,38 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         - Location (optional)
         - Warranty Period (months) (optional: numeric, will be converted to format like "6_month")
         """
+        from apps.branch.models import Branch
+        from apps.base.permission_utils import can_manage_branch_resources
+
+        branch_id = request.data.get('branch_id')
+        if not branch_id:
+            return Response(
+                {'error': 'branch_id is required in payload to upload inventory into a specific branch.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            branch_id_int = int(str(branch_id).strip())
+        except (TypeError, ValueError):
+            return Response(
+                {'error': f'Invalid branch_id: {branch_id}. branch_id must be an integer.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            target_branch = Branch.objects.get(pk=branch_id_int)
+        except Branch.DoesNotExist:
+            return Response(
+                {'error': f'Branch with id {branch_id_int} not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not can_manage_branch_resources(request.user, target_branch):
+            return Response(
+                {'error': 'You do not have permission to upload inventory into this branch.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         if 'file' not in request.FILES:
             return Response(
                 {'error': 'CSV file is required. Please upload a file with key "file".'},
@@ -483,10 +519,59 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         
         # Required fields
         required_fields = ['item_name', 'part_number', 'category', 'vehicle_type', 'quantity', 'min_stock_level', 'price', 'mrp']
+
+        # Map model fields to acceptable CSV headers (for clearer missing-field errors)
+        required_csv_headers = {
+            'item_name': ['Item Name*', 'Item Name'],
+            'part_number': ['Part Number*', 'Part Number'],
+            'category': ['Category* (local/original)', 'Category (local/original)', 'Category*', 'Category'],
+            'vehicle_type': ['Vehicle Type* (two_wheeler/four_wheeler)', 'Vehicle Type (two_wheeler/four_wheeler)', 'Vehicle Type*', 'Vehicle Type'],
+            'quantity': ['Quantity*', 'Quantity'],
+            'min_stock_level': ['Min Stock Level*', 'Min Stock Level'],
+            'price': ['Price*', 'Price'],
+            'mrp': ['MRP*', 'MRP'],
+        }
         
         successful_imports = []
         failed_imports = []
-        
+
+        def _row_value(row_dict, header_names):
+            """Return the first non-empty trimmed value for any of the headers in header_names."""
+            for h in header_names:
+                if h in row_dict and row_dict[h] is not None:
+                    v = str(row_dict[h]).strip() if row_dict[h] else ''
+                    if v:
+                        return v
+            return ''
+
+        def _barcode_from_row(row_dict):
+            # Barcode column can come with different casing sometimes; handle common variants
+            for h in ('Barcode', 'barcode', 'BARCODE'):
+                if h in row_dict and row_dict[h] is not None:
+                    v = str(row_dict[h]).strip() if row_dict[h] else ''
+                    if v:
+                        return v
+            return ''
+
+        def _flatten_serializer_errors(errs):
+            """Convert DRF serializer error dict/list into a list of readable strings."""
+            out = []
+            if isinstance(errs, dict):
+                for field, messages in errs.items():
+                    if isinstance(messages, (list, tuple)):
+                        for m in messages:
+                            out.append(f"{field}: {m}")
+                    else:
+                        out.append(f"{field}: {messages}")
+            elif isinstance(errs, (list, tuple)):
+                for m in errs:
+                    out.append(str(m))
+            else:
+                out.append(str(errs))
+            return out
+
+        seen_barcodes = set()
+
         # Process each row
         for row_num, row in enumerate(reader, start=2):  # Start at 2 because row 1 is header
             try:
@@ -497,6 +582,7 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 # Map CSV columns to model fields
                 inventory_data = {}
                 errors = []
+                row_barcode = _barcode_from_row(row)
                 
                 # Process each field in the mapping
                 for csv_col, model_field in field_mapping.items():
@@ -574,39 +660,69 @@ class InventoryViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                         
                         inventory_data[model_field] = value
                 
-                # Check required fields
+                # Always target the provided branch for created inventory items
+                inventory_data['branch'] = target_branch.id
+
+                # Clear + explicit required-field validation
+                # - Missing header in CSV => error
+                # - Header exists but empty value for row => error
                 for req_field in required_fields:
-                    if req_field not in inventory_data:
-                        errors.append(f"Required field '{req_field}' is missing")
+                    header_options = required_csv_headers.get(req_field, [])
+                    if header_options:
+                        # Check if any of the acceptable headers exist in the file at all
+                        if not any(h in (reader.fieldnames or []) for h in header_options):
+                            errors.append(f"Missing required column in CSV header for '{req_field}': expected one of {header_options}")
+                            continue
+
+                        if req_field not in inventory_data:
+                            # Header exists but row value is empty/blank
+                            preferred = header_options[0]
+                            errors.append(f"Missing required value for '{preferred}'")
+                    else:
+                        if req_field not in inventory_data:
+                            errors.append(f"Missing required field '{req_field}'")
+
+                # Barcode: de-dup within file for clearer error
+                if row_barcode:
+                    normalized = row_barcode.strip()
+                    if normalized in seen_barcodes:
+                        errors.append(f"Duplicate Barcode in CSV file: '{row_barcode}'")
+                    else:
+                        seen_barcodes.add(normalized)
                 
                 if errors:
                     failed_imports.append({
                         'row': row_num,
+                        'barcode': row_barcode or None,
                         'data': row,
                         'errors': errors
                      })
                     continue
                 
                 # Validate and create inventory item
-                serializer = InventorySerializer(data=inventory_data)
+                serializer = InventorySerializer(data=inventory_data, context={'request': request})
                 if serializer.is_valid():
                     inventory = serializer.save()
                     successful_imports.append({
                         'row': row_num,
                         'id': inventory.id,
                         'item_name': inventory.item_name,
-                        'part_number': inventory.part_number
+                        'part_number': inventory.part_number,
+                        'barcode': inventory.barcode,
+                        'branch': inventory.branch_id,
                     })
                 else:
                     failed_imports.append({
                         'row': row_num,
+                        'barcode': row_barcode or inventory_data.get('barcode') or None,
                         'data': row,
-                        'errors': serializer.errors
+                        'errors': _flatten_serializer_errors(serializer.errors)
                     })
             
             except Exception as e:
                 failed_imports.append({
                     'row': row_num,
+                    'barcode': row_barcode or None,
                     'data': row,
                     'errors': [f'Unexpected error: {str(e)}']
                 })
