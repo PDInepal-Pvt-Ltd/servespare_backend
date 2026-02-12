@@ -228,6 +228,48 @@ class DashboardViewSet(TenantViewSetMixin, viewsets.ViewSet):
         serializer = TotalInventoryValueSerializer(data)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+    @action(detail=False, methods=['get'], url_path='inventory-manager-stats')
+    def inventory_manager_stats(self, request):
+        """
+        Get inventory statistics for Inventory Manager
+        
+        Returns branch-specific inventory stats:
+        - Total products
+        - Low stock items
+        - Out of stock items
+        - Total stock value
+        - Active products
+        
+        Automatically filters by the inventory manager's branch
+        """
+        user = request.user
+        
+        # Only for Inventory Manager and Cashier
+        if not hasattr(user, 'role') or user.role not in [User.Role.INVENTORY_MANAGER, User.Role.CASHIER]:
+            return Response(
+                {'error': 'This endpoint is only for Inventory Managers and Cashiers'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get user's branch
+        branch = getattr(user, 'branch', None)
+        tenant = getattr(user, 'tenant', None)
+        
+        if not branch:
+            return Response(
+                {'error': 'No branch assigned to your account'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        service = DashboardService(tenant=tenant, branch=branch)
+        data = service.get_inventory_manager_stats()
+        
+        return Response({
+            'branch_id': branch.id,
+            'branch_name': branch.branch_name,
+            'stats': data,
+        }, status=status.HTTP_200_OK)
+    
     # Override list to prevent default behavior
     def list(self, request):
         """Redirect to complete dashboard"""
