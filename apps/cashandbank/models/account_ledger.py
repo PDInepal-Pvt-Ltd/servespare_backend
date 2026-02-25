@@ -9,7 +9,7 @@ from apps.base.managers import TenantManager
 
 class AccountLedger(BaseModel):
     """
-    Complete financial record with running balance for a cashier shift.
+    Complete financial record with running balance for a cashier shift.  
     
     Ledger Types:
     - general: All transactions (cash in/out, sales, adjustments)
